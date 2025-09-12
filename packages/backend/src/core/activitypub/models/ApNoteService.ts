@@ -35,7 +35,8 @@ import { promiseMap } from '@/misc/promise-map.js';
 import { trackPromise } from '@/misc/promise-tracker.js';
 import { CustomEmojiService, encodeEmojiKey, isValidEmojiName } from '@/core/CustomEmojiService.js';
 import { TimeService } from '@/global/TimeService.js';
-import { getOneApId, getApId, validPost, isEmoji, getApType, isApObject, isDocument, isLink, getNullableApId } from '../type.js';
+import { CacheService } from '@/core/CacheService.js';
+import { getOneApId, getApId, isPost, isEmoji, getApType, isApObject, isDocument, isLink, getNullableApId } from '../type.js';
 import { ApLoggerService } from '../ApLoggerService.js';
 import { ApMfmService } from '../ApMfmService.js';
 import { ApDbResolverService } from '../ApDbResolverService.js';
@@ -94,6 +95,7 @@ export class ApNoteService implements OnModuleInit {
 		private readonly apUtilityService: ApUtilityService,
 		private readonly customEmojiService: CustomEmojiService,
 		private readonly timeService: TimeService,
+		private readonly cacheService: CacheService,
 	) {
 		this.logger = this.apLoggerService.logger;
 	}
@@ -108,14 +110,13 @@ export class ApNoteService implements OnModuleInit {
 		object: IObject,
 		uri: string,
 		actor?: MiRemoteUser,
-		user?: MiRemoteUser,
 	): Error | null {
-		this.utilityService.assertUrl(uri);
-		const expectHost = this.utilityService.extractDbHost(uri);
-		const apType = getApType(object);
+		const parsedUri = this.utilityService.assertUrl(uri);
+		const expectHost = this.utilityService.punyHostPSLDomain(parsedUri);
 
-		if (apType == null || !validPost.includes(apType)) {
-			return new IdentifiableError('d450b8a9-48e4-4dab-ae36-f4db763fda7c', `invalid Note from ${uri}: invalid object type ${apType ?? 'undefined'}`);
+		// Validate type
+		if (!isPost(object)) {
+			return new IdentifiableError('d450b8a9-48e4-4dab-ae36-f4db763fda7c', `invalid Note from ${uri}: invalid object type ${getApType(object) ?? 'undefined'}`);
 		}
 
 		// Validate id (URI)
@@ -131,23 +132,25 @@ export class ApNoteService implements OnModuleInit {
 			throw new UnrecoverableError(`invalid Note from ${uri}: wrong host in id ${object.id} (got ${parsedId}, expected ${expectHost})`);
 		}
 
-		const actualHost = object.attributedTo && this.utilityService.extractDbHost(getOneApId(object.attributedTo));
-		if (object.attributedTo && actualHost !== expectHost) {
-			return new IdentifiableError('d450b8a9-48e4-4dab-ae36-f4db763fda7c', `invalid Note from ${uri}: attributedTo has different host. expected: ${expectHost}, actual: ${actualHost}`);
+		// Validate attributedTo (author)
+		if (!object.attributedTo) {
+			throw new UnrecoverableError(`invalid Note from ${uri}: missing attributedTo`);
+		}
+		if (typeof(object.attributedTo) !== 'string') {
+			throw new UnrecoverableError(`invalid Note from ${uri}: wrong attributedTo type ${typeof(object.attributedTo)}`);
+		}
+		const parsedAttributedTo = this.utilityService.assertUrl(object.attributedTo);
+		const attributedToHost = this.utilityService.punyHostPSLDomain(parsedAttributedTo);
+		if (attributedToHost !== expectHost) {
+			throw new UnrecoverableError(`invalid Note from ${uri}: wrong host in attributedTo ${object.attributedTo} (got ${parsedAttributedTo}, expected ${expectHost})`);
+		}
+		if (actor && object.attributedTo !== actor.uri) {
+			return new IdentifiableError('d450b8a9-48e4-4dab-ae36-f4db763fda7c', `invalid Note from ${uri}: attribution does not match the actor that send it. (got ${object.attributedTo}, expected ${actor.uri})`);
 		}
 
+		// Validate published (created date)
 		if (object.published && !this.idService.isSafeT(new Date(object.published).valueOf())) {
-			return new IdentifiableError('d450b8a9-48e4-4dab-ae36-f4db763fda7c', 'invalid Note from ${uri}: published timestamp is malformed');
-		}
-
-		if (actor) {
-			const attribution = (object.attributedTo) ? getOneApId(object.attributedTo) : actor.uri;
-			if (attribution !== actor.uri) {
-				return new IdentifiableError('d450b8a9-48e4-4dab-ae36-f4db763fda7c', `invalid Note from ${uri}: attribution does not match the actor that send it. attribution: ${attribution}, actor: ${actor.uri}`);
-			}
-			if (user && attribution !== user.uri) {
-				return new IdentifiableError('d450b8a9-48e4-4dab-ae36-f4db763fda7c', `invalid Note from ${uri}: updated attribution does not match original attribution. updated attribution: ${user.uri}, original attribution: ${attribution}`);
-			}
+			return new IdentifiableError('d450b8a9-48e4-4dab-ae36-f4db763fda7c', `invalid Note from ${uri}: published timestamp is malformed`);
 		}
 
 		return null;
@@ -376,22 +379,25 @@ export class ApNoteService implements OnModuleInit {
 		const updatedNote = await this.notesRepository.findOneBy({ uri: noteUri });
 		if (updatedNote == null) throw new UnrecoverableError(`failed to update note ${noteUri}: note does not exist`);
 
-		const user = await this.usersRepository.findOneBy({ id: updatedNote.userId }) as MiRemoteUser | null;
-		if (user == null) throw new UnrecoverableError(`failed to update note ${noteUri}: user does not exist`);
+		if (actor) {
+			// If an actor is specified, then they must be the author.
+			if (actor.id !== updatedNote.userId) {
+				throw new UnrecoverableError(`Failed to update note ${updatedNote.id} (${noteUri}) - actor ${actor.id} is not the author`);
+			}
+		} else {
+			actor = await this.cacheService.findRemoteUserById(updatedNote.userId);
+		}
 
 		resolver ??= this.apResolverService.createResolver();
 
 		const object = await resolver.resolve(value);
 
 		const entryUri = getApId(value);
-		const err = this.validateNote(object, entryUri, actor, user);
+		const err = this.validateNote(object, entryUri, actor);
 		if (err) {
 			this.logger.error(`Failed to update note ${noteUri}: ${renderInlineError(err)}`);
 			throw err;
 		}
-
-		// `validateNote` checks that the actor and user are one and the same
-		actor ??= user;
 
 		const note = object as IPost;
 
