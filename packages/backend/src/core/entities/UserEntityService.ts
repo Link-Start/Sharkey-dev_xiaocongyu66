@@ -14,7 +14,7 @@ import type { Packed } from '@/misc/json-schema.js';
 import type { Promiseable } from '@/misc/prelude/await-all.js';
 import { awaitAll } from '@/misc/prelude/await-all.js';
 import { USER_ACTIVE_THRESHOLD, USER_ONLINE_THRESHOLD, permissions } from '@/const.js';
-import type { MiLocalUser, MiPartialLocalUser, MiPartialRemoteUser, MiRemoteUser, MiUser } from '@/models/User.js';
+import type { MiPartialUser, MiUser } from '@/models/User.js';
 import {
 	birthdaySchema,
 	descriptionSchema,
@@ -65,17 +65,11 @@ import type { PageEntityService } from './PageEntityService.js';
 const Ajv = _Ajv.default;
 const ajv = new Ajv();
 
-function isLocalUser(user: MiUser): user is MiLocalUser;
-function isLocalUser<T extends { host: MiUser['host'] }>(user: T): user is (T & { host: null; });
-
-function isLocalUser(user: MiUser | { host: MiUser['host'] }): boolean {
+function isLocalUser<TUser extends Pick<MiUser, 'host' | 'uri'> = MiUser>(user: TUser): user is TUser & { host: null, uri: null } {
 	return user.host == null;
 }
 
-function isRemoteUser(user: MiUser): user is MiRemoteUser;
-function isRemoteUser<T extends { host: MiUser['host'] }>(user: T): user is (T & { host: string; });
-
-function isRemoteUser(user: MiUser | { host: MiUser['host'] }): boolean {
+function isRemoteUser<TUser extends Pick<MiUser, 'host' | 'uri'> = MiUser>(user: TUser): user is TUser & { host: string, uri: string } {
 	return !isLocalUser(user);
 }
 
@@ -442,8 +436,8 @@ export class UserEntityService implements OnModuleInit {
 	}
 
 	@bindThis
-	public getUserUri(user: MiLocalUser | MiPartialLocalUser | MiRemoteUser | MiPartialRemoteUser): string {
-		return this.isRemoteUser(user)
+	public getUserUri(user: MiPartialUser): string {
+		return isRemoteUser(user)
 			? user.uri : this.genLocalUserUri(user.id);
 	}
 
