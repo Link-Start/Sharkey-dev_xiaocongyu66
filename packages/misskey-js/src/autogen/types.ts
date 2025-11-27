@@ -11135,6 +11135,7 @@ export type components = {
             allowRenoteToExternal: boolean;
             isFollowing?: boolean;
             isFavorited?: boolean;
+            hasUnreadNote?: boolean;
             pinnedNotes?: components['schemas']['Note'][];
         };
         QueueCount: {
