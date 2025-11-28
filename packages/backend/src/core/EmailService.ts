@@ -19,6 +19,7 @@ import { LoggerService } from '@/core/LoggerService.js';
 import { CacheService } from '@/core/CacheService.js';
 import { bindThis } from '@/decorators.js';
 import { HttpRequestService } from '@/core/HttpRequestService.js';
+import { InternalEventService } from '@/global/InternalEventService.js';
 
 @Injectable()
 export class EmailService {
@@ -38,6 +39,7 @@ export class EmailService {
 		private utilityService: UtilityService,
 		private httpRequestService: HttpRequestService,
 		private cacheService: CacheService,
+		private readonly internalEventService: InternalEventService,
 	) {
 		this.logger = this.loggerService.getLogger('email');
 	}
@@ -155,7 +157,7 @@ export class EmailService {
 			if (!oneClickUnsubscribeToken) {
 				oneClickUnsubscribeToken = nanoid();
 				await this.userProfilesRepository.update({ userId }, { oneClickUnsubscribeToken });
-				await this.cacheService.userProfileCache.delete(userId);
+				await this.internalEventService.emit('updateUserProfile', { userId });
 			}
 			headers['List-Unsubscribe'] = `<${this.config.apiUrl}/unsubscribe/${userId}/${oneClickUnsubscribeToken}>`;
 			headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
