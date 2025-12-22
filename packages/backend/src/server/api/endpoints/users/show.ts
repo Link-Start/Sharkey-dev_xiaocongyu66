@@ -8,6 +8,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { UsersRepository } from '@/models/_.js';
 import type { MiUser } from '@/models/User.js';
 import { Endpoint } from '@/server/api/endpoint-base.js';
+import { UtilityService } from '@/core/UtilityService.js';
 import { UserEntityService } from '@/core/entities/UserEntityService.js';
 import { RemoteUserResolveService } from '@/core/RemoteUserResolveService.js';
 import { DI } from '@/di-symbols.js';
@@ -104,6 +105,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private perUserPvChart: PerUserPvChart,
 		private apiLoggerService: ApiLoggerService,
 		private readonly cacheService: CacheService,
+		private readonly utilityService: UtilityService,
 	) {
 		super(meta, paramDef, async (ps, me, _1, _2, _3, ip) => {
 			let user;
@@ -124,7 +126,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				for (const id of ps.userIds) {
 					const user = users.get(id);
 					if (user != null) {
-						if (isModerator || !user.isSuspended) {
+						if (isModerator || this.utilityService.isActiveUser(user)) {
 							_users.push(user);
 						}
 					}
@@ -145,7 +147,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 					throw new ApiError(meta.errors.failedToResolveRemoteUser);
 				}
 
-				if (user == null || (!isModerator && user.isSuspended)) {
+				if (user == null || (!isModerator && !this.utilityService.isActiveUser(user))) {
 					throw new ApiError(meta.errors.noSuchUser);
 				}
 
