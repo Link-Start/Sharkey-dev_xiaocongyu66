@@ -64,49 +64,38 @@ export default abstract class Channel {
 	/**
 	 * Checks if a note is visible to the current user *excluding* blocks and mutes.
 	 */
-	protected isNoteVisibleToMe(note: Packed<'Note'>): boolean {
-		if (note.visibility === 'public') return true;
-		if (note.visibility === 'home') return true;
-		if (!this.user) return false;
-		if (this.user.id === note.userId) return true;
+	protected isNoteVisibleForMe(note: Packed<'Note'>): boolean {
+		// This code must always be synchronized with the checks in generateVisibilityQuery.
+		// visibility が specified かつ自分が指定されていなかったら非表示
+		if (note.visibility === 'specified') {
+			if (this.connection.user?.id == null) {
+				return false;
+			} else if (this.connection.user.id === note.userId) {
+				return true;
+			} else {
+				// 指定されているかどうか
+				return false;
+			}
+		}
+
+		// visibility が followers かつ自分が投稿者のフォロワーでなかったら非表示
 		if (note.visibility === 'followers') {
-			return this.following.has(note.userId);
-		}
-		if (!note.visibleUserIds) return false;
-		return note.visibleUserIds.includes(this.user.id);
-	}
-
-	/*
-	 * ミュートとブロックされてるを処理する
-	 */
-	protected isNoteMutedOrBlocked(note: Packed<'Note'>): boolean {
-		// Ignore notes that require sign-in
-		if (note.user.requireSigninToViewContents && !this.user) return true;
-
-		// 流れてきたNoteがインスタンスミュートしたインスタンスが関わる
-		if (isInstanceMuted(note, this.userMutedInstances) && !this.following.has(note.userId)) return true;
-
-		// 流れてきたNoteがミュートしているユーザーが関わる
-		if (isUserRelated(note, this.userIdsWhoMeMuting)) return true;
-		// 流れてきたNoteがブロックされているユーザーが関わる
-		if (isUserRelated(note, this.userIdsWhoBlockingMe)) return true;
-
-		// 流れてきたNoteがリノートをミュートしてるユーザが行ったもの
-		if (isRenotePacked(note) && !isQuotePacked(note) && this.userIdsWhoMeMutingRenotes.has(note.user.id)) return true;
-
-		// If it's a boost (pure renote) then we need to check the target as well
-		if (isPackedPureRenote(note) && note.renote && this.isNoteMutedOrBlocked(note.renote)) return true;
-
-		// Hide silenced notes
-		if (note.user.isSilenced || note.user.instance?.isSilenced) {
-			if (this.user == null) return true;
-			if (this.user.id === note.userId) return false;
-			if (!this.following.has(note.userId)) return true;
+			if (this.connection.user?.id == null) {
+				return false;
+			} else if (this.connection.user.id === note.userId) {
+				return true;
+			} else if (note.reply && (this.connection.user.id === note.reply.userId)) {
+				// 自分の投稿に対するリプライ
+				return true;
+			} else if (note.mentions && note.mentions.some(id => this.connection.user?.id === id)) {
+				// 自分へのメンション
+				return true;
+			}
 		}
 
-		// TODO muted threads
+		if (this.connection.userIdsWhoBlockingMe.has(note.userId)) return false;
 
-		return false;
+		return true;
 	}
 
 	/**

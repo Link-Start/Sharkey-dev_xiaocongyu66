@@ -36,8 +36,7 @@ class MainChannel extends Channel {
 					if (data.body.userId && this.userIdsWhoMeMuting.has(data.body.userId)) return;
 
 					if (data.body.note && data.body.note.isHidden) {
-						if (this.isNoteMutedOrBlocked(data.body.note)) return;
-						if (!this.isNoteVisibleToMe(data.body.id)) return;
+						if (this.isNoteVisibleForMe(data.body.note)) return;
 						const note = await this.noteEntityService.pack(data.body.note.id, this.user, {
 							detail: true,
 						});
@@ -46,7 +45,7 @@ class MainChannel extends Channel {
 					break;
 				}
 				case 'mention': {
-					if (this.isNoteMutedOrBlocked(data.body)) return;
+					if (this.isNoteVisibleForMe(data.body)) return;
 					if (data.body.isHidden) {
 						const note = await this.noteEntityService.pack(data.body.id, this.user, {
 							detail: true,

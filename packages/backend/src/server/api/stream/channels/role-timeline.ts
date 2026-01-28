@@ -49,12 +49,12 @@ class RoleTimelineChannel extends Channel {
 			}
 			if (note.visibility !== 'public') return;
 
-			if (this.isNoteMutedOrBlocked(note)) return;
+			if (!this.isNoteVisibleForMe(note)) return;
 
 			if (note.reply) {
 				const reply = note.reply;
 				// 自分のフォローしていないユーザーの visibility: followers な投稿への返信は弾く
-				if (!this.isNoteVisibleToMe(reply)) return;
+				if (!this.isNoteVisibleForMe(reply)) return;
 				if (!this.following.get(note.userId)?.withReplies) {
 					// 「チャンネル接続主への返信」でもなければ、「チャンネル接続主が行った返信」でもなければ、「投稿者の投稿者自身への返信」でもない場合
 					if (reply.userId !== this.user?.id && !isMe && reply.userId !== note.userId) return;
@@ -66,7 +66,7 @@ class RoleTimelineChannel extends Channel {
 				if (note.renote.reply) {
 					const reply = note.renote.reply;
 					// 自分のフォローしていないユーザーの visibility: followers な投稿への返信のリノートは弾く
-					if (!this.isNoteVisibleToMe(reply)) return;
+					if (!this.isNoteVisibleForMe(reply)) return;
 				}
 			}
 
