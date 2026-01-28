@@ -136,7 +136,7 @@ export default abstract class Channel {
 		});
 	}
 
-	public abstract init(params: JsonObject): void;
+	public abstract init(params: JsonObject): void | Promise<void> | Promise<boolean>;
 
 	public dispose?(): void;
 

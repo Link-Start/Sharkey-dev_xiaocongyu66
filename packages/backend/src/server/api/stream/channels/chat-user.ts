@@ -3,8 +3,10 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { DI } from '@/di-symbols.js';
 import { bindThis } from '@/decorators.js';
+import type { ChatMessagesRepository } from '@/models/_.js';
 import type { GlobalEvents } from '@/core/GlobalEventService.js';
 import type { JsonObject } from '@/misc/json-value.js';
 import { ChatService } from '@/core/ChatService.js';
@@ -19,21 +21,34 @@ class ChatUserChannel extends Channel {
 	private otherId: string;
 
 	constructor(
+		private chatMessagesRepository: ChatMessagesRepository,
 		private chatService: ChatService,
 
+		noteEntityService: NoteEntityService,
 		id: string,
 		connection: Channel['connection'],
-		noteEntityService: NoteEntityService,
 	) {
 		super(id, connection, noteEntityService);
 	}
 
 	@bindThis
-	public async init(params: JsonObject) {
-		if (typeof params.otherId !== 'string') return;
+	public async init(params: JsonObject): Promise<boolean> {
+		if (typeof params.otherId !== 'string') return false;
 		this.otherId = params.otherId;
 
+		const exists = (await this.chatMessagesRepository.findOne({
+			select: { id: true },
+			where: {
+				fromUserId: this.user!.id,
+				toUserId: this.otherId,
+			},
+		})) != null;
+
+		if (!exists) return false;
+
 		this.subscriber.on(`chatUserStream:${this.user!.id}-${this.otherId}`, this.onEvent);
+
+		return true;
 	}
 
 	@bindThis
@@ -65,6 +80,9 @@ export class ChatUserChannelService implements MiChannelService<true> {
 	public readonly kind = ChatUserChannel.kind;
 
 	constructor(
+		@Inject(DI.chatMessagesRepository)
+		private readonly chatMessagesRepository: ChatMessagesRepository,
+
 		private chatService: ChatService,
 		private readonly noteEntityService: NoteEntityService,
 	) {
@@ -73,10 +91,11 @@ export class ChatUserChannelService implements MiChannelService<true> {
 	@bindThis
 	public create(id: string, connection: Channel['connection']): ChatUserChannel {
 		return new ChatUserChannel(
+			this.chatMessagesRepository,
 			this.chatService,
+			this.noteEntityService,
 			id,
 			connection,
-			this.noteEntityService,
 		);
 	}
 }

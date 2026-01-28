@@ -3,7 +3,9 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { DI } from '@/di-symbols.js';
+import type { AntennasRepository } from '@/models/_.js';
 import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
 import { bindThis } from '@/decorators.js';
 import type { GlobalEvents } from '@/core/GlobalEventService.js';
@@ -18,35 +20,41 @@ class AntennaChannel extends Channel {
 	private antennaId: string;
 
 	constructor(
-		noteEntityService: NoteEntityService,
+		private antennassReposiotry: AntennasRepository,
 
+		noteEntityService: NoteEntityService,
 		id: string,
 		connection: Channel['connection'],
 	) {
 		super(id, connection, noteEntityService);
-		//this.onEvent = this.onEvent.bind(this);
 	}
 
 	@bindThis
-	public async init(params: JsonObject) {
-		if (typeof params.antennaId !== 'string') return;
+	public async init(params: JsonObject): Promise<boolean> {
+		if (typeof params.antennaId !== 'string') return false;
 		this.antennaId = params.antennaId;
+
+		const antenna = await this.antennassReposiotry.findOne({
+			select: { id: true, userId: true },
+			where: { id: this.antennaId },
+		});
+
+		if (!antenna) return false;
+		if (antenna.userId !== this.user?.id) return false;
 
 		// Subscribe stream
 		this.subscriber.on(`antennaStream:${this.antennaId}`, this.onEvent);
+
+		return true;
 	}
 
 	@bindThis
 	private async onEvent(data: GlobalEvents['antenna']['payload']) {
-		if (data.type === 'note') {
-			const note = await this.noteEntityService.pack(data.body.id, this.user, { detail: true });
+		const note = await this.noteEntityService.pack(data.body.id, this.user, { detail: true });
 
-			if (!this.isNoteVisibleForMe(note)) return;
+		if (!this.isNoteVisibleForMe(note)) return;
 
-			this.send('note', note);
-		} else {
-			this.send(data.type, data.body);
-		}
+		this.send('note', note);
 	}
 
 	@bindThis
@@ -63,13 +71,17 @@ export class AntennaChannelService implements MiChannelService<true> {
 	public readonly kind = AntennaChannel.kind;
 
 	constructor(
-		private noteEntityService: NoteEntityService,
+		@Inject(DI.antennasRepository)
+		private readonly antennasRepository: AntennasRepository,
+
+		private readonly noteEntityService: NoteEntityService,
 	) {
 	}
 
 	@bindThis
 	public create(id: string, connection: Channel['connection']): AntennaChannel {
 		return new AntennaChannel(
+			this.antennasRepository,
 			this.noteEntityService,
 			id,
 			connection,

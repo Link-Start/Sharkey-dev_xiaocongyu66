@@ -18,27 +18,27 @@ class HashtagChannel extends Channel {
 	private q: string[][];
 
 	constructor(
-		noteEntityService: NoteEntityService,
-
 		id: string,
 		connection: Channel['connection'],
+		noteEntityService: NoteEntityService,
 	) {
 		super(id, connection, noteEntityService);
-		//this.onNote = this.onNote.bind(this);
 	}
 
 	@bindThis
-	public async init(params: JsonObject) {
-		if (!Array.isArray(params.q)) return;
+	public async init(params: JsonObject): Promise<boolean> {
+		if (!Array.isArray(params.q)) return false;
 		if (!params.q.every((x): x is string[] => (
 			Array.isArray(x) &&
 			x.length >= 1 &&
 			x.every(y => typeof y === 'string')
-		))) return;
+		))) return false;
 		this.q = params.q;
 
 		// Subscribe stream
 		this.subscriber.on('notesStream', this.onNote);
+
+		return true;
 	}
 
 	@bindThis
@@ -76,9 +76,9 @@ export class HashtagChannelService implements MiChannelService<false> {
 	@bindThis
 	public create(id: string, connection: Channel['connection']): HashtagChannel {
 		return new HashtagChannel(
-			this.noteEntityService,
 			id,
 			connection,
+			this.noteEntityService,
 		);
 	}
 }
