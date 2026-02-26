@@ -223,7 +223,7 @@ export abstract class NoteChannel extends Channel {
 	 * who owns this connection, for whatever reason.
 	 */
 	protected async prepareNote(note: Packed<'Note'>): Promise<Packed<'Note'> | null> {
-		const isMe = this.user?.id === note.userId;
+		if (this.user?.id === note.userId) return note;
 
 		if (!this.isNoteVisibleForMe(note)) return null;
 		if (this.isNoteMutedOrBlocked(note)) return null;
@@ -235,7 +235,7 @@ export abstract class NoteChannel extends Channel {
 			if (this.isNoteMutedOrBlocked(reply)) return null;
 			if (this.user && !this.following.get(note.userId)?.withReplies) {
 				// 「チャンネル接続主への返信」でもなければ、「チャンネル接続主が行った返信」でもなければ、「投稿者の投稿者自身への返信」でもない場合
-				if (reply.userId !== this.user.id && !isMe && reply.userId !== note.userId) return null;
+				if (reply.userId !== this.user.id && reply.userId !== note.userId) return null;
 			}
 		}
 
