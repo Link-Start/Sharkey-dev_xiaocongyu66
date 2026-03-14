@@ -15,6 +15,7 @@ import type { StreamEventEmitter, GlobalEvents } from '@/core/GlobalEventService
 import { ChannelFollowingService } from '@/core/ChannelFollowingService.js';
 import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
 import { isJsonObject } from '@/misc/json-value.js';
+import { IdentifiableError, errorCodes } from '@/misc/identifiable-error.js';
 import type { JsonObject, JsonValue } from '@/misc/json-value.js';
 import { LoggerService } from '@/core/LoggerService.js';
 import { TimeService, type TimerHandle } from '@/global/TimeService.js';
@@ -250,8 +251,8 @@ export default class Connection {
 	}
 
 	@bindThis
-	private onBroadcastMessage(data: GlobalEvents['broadcast']['payload']) {
-		this.sendMessageToWs(data.type, data.body);
+	private async onBroadcastMessage(data: GlobalEvents['broadcast']['payload']) {
+		await this.sendMessageToWs(data.type, data.body);
 	}
 
 	@bindThis
@@ -345,7 +346,7 @@ export default class Connection {
 		}
 
 		// Checks ok; send the message.
-		this.sendMessageToWs('noteUpdated', {
+		await this.sendMessageToWs('noteUpdated', {
 			id: data.body.id,
 			type: data.type,
 			body: data.body.body,
@@ -391,12 +392,24 @@ export default class Connection {
 	 * クライアントにメッセージ送信
 	 */
 	@bindThis
-	public sendMessageToWs(type: string, payload: JsonObject) {
-		if (!this.wsConnection) throw new Error('Cannot send: not connected');
-		this.wsConnection.send(JSON.stringify({
+	public async sendMessageToWs(type: string, payload: JsonObject): Promise<void> {
+		const message = JSON.stringify({
 			type: type,
 			body: payload,
-		}));
+		});
+
+		await new Promise<void>((resolve, reject) => {
+			// This is inside to make TypeScript happy
+			if (!this.wsConnection) {
+				throw new IdentifiableError(errorCodes.websocketError, 'Cannot send: not connected');
+			}
+
+			// Manually wrap the async call
+			this.wsConnection.send(message, err => {
+				if (err) reject(err);
+				else resolve();
+			});
+		});
 	}
 
 	/**
@@ -441,7 +454,7 @@ export default class Connection {
 		}
 
 		if (pong) {
-			this.sendMessageToWs('connected', {
+			await this.sendMessageToWs('connected', {
 				id: id,
 			});
 		}
