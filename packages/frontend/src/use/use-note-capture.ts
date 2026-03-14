@@ -103,6 +103,7 @@ export function useNoteCapture(props: {
 
 			case 'updated': {
 				try {
+					// TODO pass the note through the socket instead of blasting the backend with a call from every single client at once
 					const editedNote = await misskeyApi('notes/show', {
 						noteId: id,
 					});

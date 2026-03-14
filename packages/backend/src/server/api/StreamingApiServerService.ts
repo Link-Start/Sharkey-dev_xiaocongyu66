@@ -26,7 +26,7 @@ import type Logger from '@/logger.js';
 import { SkRateLimiterService } from '@/server/SkRateLimiterService.js';
 import { QueryService } from '@/core/QueryService.js';
 import { TimeService, type TimerHandle } from '@/global/TimeService.js';
-import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
+import { NoteVisibilityService } from '@/core/NoteVisibilityService.js';
 import { AuthenticateService, AuthenticationError } from './AuthenticateService.js';
 import MainStreamConnection from './stream/Connection.js';
 import { ChannelsService } from './stream/ChannelsService.js';
@@ -70,9 +70,9 @@ export class StreamingApiServerService implements OnApplicationShutdown {
 		private notificationService: NotificationService,
 		private usersService: UserService,
 		private channelFollowingService: ChannelFollowingService,
-		private noteEntityService: NoteEntityService,
-		private rateLimiterService: SkRateLimiterService,
-		private loggerService: LoggerService,
+		private readonly noteVisibilityService: NoteVisibilityService,
+		private readonly rateLimiterService: SkRateLimiterService,
+		private readonly loggerService: LoggerService,
 		private readonly queryService: QueryService,
 		private readonly timeService: TimeService,
 		private readonly utilityService: UtilityService,
@@ -211,14 +211,12 @@ export class StreamingApiServerService implements OnApplicationShutdown {
 				this.cacheService,
 				this.channelFollowingService,
 				this.notesRepository,
-				this.noteEntityService,
+				this.noteVisibilityService,
 				this.timeService,
 				this.loggerService,
 				user, app, requestIp,
 				rateLimiter,
 			);
-
-			await stream.init();
 
 			wss.handleUpgrade(request, socket, head, (ws) => {
 				connectionsForClient.add(ws);
@@ -271,7 +269,7 @@ export class StreamingApiServerService implements OnApplicationShutdown {
 
 			this.#globalEv.on('message', onRedisMessage);
 
-			await stream.listen(ev, connection);
+			await stream.start(ev, connection);
 
 			this.#connections.set(connection, this.timeService.now);
 

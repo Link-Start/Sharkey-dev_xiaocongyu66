@@ -10,10 +10,10 @@ import type { Packed } from '@/misc/json-schema.js';
 import type { NotificationService } from '@/core/NotificationService.js';
 import { bindThis } from '@/decorators.js';
 import { CacheService } from '@/core/CacheService.js';
-import type { MiFollowing, MiUserProfile, NoteFavoritesRepository, NoteReactionsRepository, NotesRepository } from '@/models/_.js';
+import type { MiUserProfile, NoteFavoritesRepository, NoteReactionsRepository, NotesRepository } from '@/models/_.js';
 import type { StreamEventEmitter, GlobalEvents } from '@/core/GlobalEventService.js';
 import { ChannelFollowingService } from '@/core/ChannelFollowingService.js';
-import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
+import { NoteVisibilityService } from '@/core/NoteVisibilityService.js';
 import { isJsonObject } from '@/misc/json-value.js';
 import { IdentifiableError, errorCodes } from '@/misc/identifiable-error.js';
 import type { JsonObject, JsonValue } from '@/misc/json-value.js';
@@ -25,8 +25,10 @@ import type { ChannelsService } from './ChannelsService.js';
 import type { EventEmitter } from 'events';
 import type Channel from './channel.js';
 
+// TODO convert these to "performance" settings.
 const MAX_CHANNELS_PER_CONNECTION = 32;
 const MAX_SUBSCRIPTIONS_PER_CONNECTION = 512;
+const MAX_CACHE_AGE = 10 * 1000; // 10 seconds
 
 /**
  * Main stream connection
@@ -48,7 +50,7 @@ export default class Connection {
 	public myRecentRenotes: Set<string> = new Set();
 	public myRecentFavorites: Set<string> = new Set();
 	private fetchIntervalId: TimerHandle | null = null;
-	private closingConnection = false;
+	private isActive = false;
 	private logger: Logger;
 
 	constructor(
@@ -60,7 +62,7 @@ export default class Connection {
 		public readonly cacheService: CacheService,
 		private channelFollowingService: ChannelFollowingService,
 		private notesRepository: NotesRepository,
-		private noteEntityService: NoteEntityService,
+		private readonly noteVisibilityService: NoteVisibilityService,
 		private readonly timeService: TimeService,
 
 		loggerService: LoggerService,
@@ -77,8 +79,9 @@ export default class Connection {
 	}
 
 	@bindThis
-	public async fetch() {
+	private async fetchRecent() {
 		if (this.user == null) return;
+
 		const [myRecentReactions, myRecentFavorites, myRecentRenotes] = await Promise.all([
 			this.noteReactionsRepository.find({
 				where: { userId: this.user.id },
@@ -100,27 +103,18 @@ export default class Connection {
 				.select('note.renoteId', 'renoteId')
 				.getRawMany<{ renoteId: string }>(),
 		]);
+
 		this.myRecentReactions = new Map(myRecentReactions.map(r => [r.noteId, r.reaction]));
 		this.myRecentFavorites = new Set(myRecentFavorites.map(f => f.noteId ));
 		this.myRecentRenotes = new Set(myRecentRenotes.map(r => r.renoteId ));
 	}
 
 	@bindThis
-	public async init() {
-		if (this.user != null) {
-			// This sets up an automatic sync, so don't call it from the fetch timer!
-			await this.setupCacheService();
-			await this.fetch();
-
-			if (!this.fetchIntervalId) {
-				this.fetchIntervalId = this.timeService.startTimer(this.fetch, 1000 * 10, { repeated: true });
-			}
-		}
-	}
-
-	@bindThis
-	private async setupCacheService(): Promise<void> {
+	private async connectCache(): Promise<void> {
 		if (this.user == null) return;
+
+		// Just in case someone calls this twice.
+		this.disconnectCache();
 
 		// Fetch initial values
 		await Promise.all([
@@ -129,28 +123,34 @@ export default class Connection {
 			this.onUserFollowingChannelsCacheChanged({ keys: [this.user.id] }),
 			this.onThreadMutingsCacheChanged({ keys: [this.user.id] }),
 			this.onNoteMutingsCacheChanged({ keys: [this.user.id] }),
+			this.fetchRecent(),
 		]);
 
 		// Bind events to automatically sync
-		this.connectCacheService();
-	}
-
-	@bindThis
-	private connectCacheService(): void {
 		this.cacheService.userByIdCache.on('changed', this.onUserByIdCacheChanged);
 		this.cacheService.userProfileCache.on('changed', this.onUserProfileCacheChanged);
 		this.cacheService.userFollowingChannelsCache.on('changed', this.onUserFollowingChannelsCacheChanged);
 		this.cacheService.threadMutingsCache.on('changed', this.onThreadMutingsCacheChanged);
 		this.cacheService.noteMutingsCache.on('changed', this.onNoteMutingsCacheChanged);
+
+		// Schedule timer to sync recents
+		this.fetchIntervalId = this.timeService.startTimer(this.fetchRecent, MAX_CACHE_AGE, { repeated: true });
 	}
 
 	@bindThis
-	private disconnectCacheService(): void {
+	private disconnectCache(): void {
+		if (this.user == null) return;
+
+		// Disconnect events
 		this.cacheService.userByIdCache.off('changed', this.onUserByIdCacheChanged);
 		this.cacheService.userProfileCache.off('changed', this.onUserProfileCacheChanged);
 		this.cacheService.userFollowingChannelsCache.off('changed', this.onUserFollowingChannelsCacheChanged);
 		this.cacheService.threadMutingsCache.off('changed', this.onThreadMutingsCacheChanged);
 		this.cacheService.noteMutingsCache.off('changed', this.onNoteMutingsCacheChanged);
+
+		// Stop timer
+		this.timeService.stopTimer(this.fetchIntervalId);
+		this.fetchIntervalId = null;
 	}
 
 	@bindThis
@@ -202,12 +202,21 @@ export default class Connection {
 	}
 
 	@bindThis
-	public async listen(subscriber: EventEmitter, wsConnection: WebSocket.WebSocket) {
+	public async start(subscriber: EventEmitter, wsConnection: WebSocket.WebSocket) {
+		// Just in case someone calls this twice.
+		this.stop();
+
+		// Initialize cache before listening for events.
+		await this.connectCache();
+
 		this.subscriber = subscriber;
+		this.subscriber.on('broadcast', this.onBroadcastMessage);
 
 		this.wsConnection = wsConnection;
 		this.wsConnection.on('message', this.onWsConnectionMessage);
-		this.subscriber.on('broadcast', this.onBroadcastMessage);
+
+		// Mark as online.
+		this.isActive = true;
 	}
 
 	/**
@@ -217,14 +226,13 @@ export default class Connection {
 	private async onWsConnectionMessage(data: WebSocket.RawData) {
 		let obj: JsonObject;
 
-		if (this.closingConnection) return;
+		if (!this.isActive) return;
 
 		// The rate limit is very high, so we can safely disconnect any client that hits it.
 		if (await this.rateLimiter()) {
 			this.logger.warn(`Closing a connection from ${this.ip} (user=${this.user?.id}}) due to an excessive influx of messages.`);
-
-			this.closingConnection = true;
 			this.wsConnection?.close(1008, 'Disconnected - too many requests');
+			this.stop();
 			return;
 		}
 
@@ -400,7 +408,7 @@ export default class Connection {
 
 		await new Promise<void>((resolve, reject) => {
 			// This is inside to make TypeScript happy
-			if (!this.wsConnection) {
+			if (!this.isActive || !this.wsConnection) {
 				throw new IdentifiableError(errorCodes.websocketError, 'Cannot send: not connected');
 			}
 
@@ -496,19 +504,34 @@ export default class Connection {
 	 */
 	@bindThis
 	public dispose() {
-		this.disconnectCacheService();
-		if (this.fetchIntervalId) this.timeService.stopTimer(this.fetchIntervalId);
+		this.stop();
+	}
+
+	@bindThis
+	public stop() {
+		// Mark as offline.
+		this.isActive = false;
+
+		// Dispose cache events and sync timer
+		this.disconnectCache();
+
+		// Dispose active channels
 		for (const c of this.channels.values()) {
 			if (c.dispose) c.dispose();
 		}
+		this.channels.clear();
+
+		// Dispose note subscriptions
 		for (const k of this.subscribingNotes.keys()) {
 			this.subscriber?.off(`noteStream:${k}`, this.onNoteStreamMessage);
 		}
-		this.subscriber?.off('broadcast', this.onBroadcastMessage);
-		this.wsConnection?.off('message', this.onWsConnectionMessage);
-
-		this.fetchIntervalId = null;
-		this.channels.clear();
 		this.subscribingNotes.clear();
+
+		// Dispose external connections
+		this.subscriber?.off('broadcast', this.onBroadcastMessage);
+		this.subscriber = undefined;
+
+		this.wsConnection?.off('message', this.onWsConnectionMessage);
+		this.wsConnection = undefined;
 	}
 }
