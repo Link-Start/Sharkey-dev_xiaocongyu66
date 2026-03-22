@@ -122,18 +122,12 @@ export class ReactionService implements OnModuleInit {
 
 	@bindThis
 	public async create(user: MiUser, note: MiNote, _reaction?: string | null) {
-		// Check blocking
+		// Check blocking / visibility
 		if (note.userId !== user.id) {
-			const blocked = await this.userBlockingService.checkBlocked(note.userId, user.id);
-			if (blocked) {
-				throw new IdentifiableError('e70412a4-7197-4726-8e74-f3e0deb92aa7', 'Note not accessible for you.');
+			const { accessible } = await this.noteVisibilityService.checkNoteVisibilityAsync(note, user);
+			if (!accessible) {
+				throw new IdentifiableError('68e9d2d1-48bf-42c2-b90a-b20e09fd3d48', 'Note not accessible for you.');
 			}
-		}
-
-		// check visibility
-		const { accessible } = await this.noteVisibilityService.checkNoteVisibilityAsync(note, user);
-		if (!accessible) {
-			throw new IdentifiableError('68e9d2d1-48bf-42c2-b90a-b20e09fd3d48', 'Note not accessible for you.');
 		}
 
 		// Check if note is Renote
