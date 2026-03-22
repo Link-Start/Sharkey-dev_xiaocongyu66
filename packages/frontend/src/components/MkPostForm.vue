@@ -111,7 +111,7 @@ import * as mfm from 'mfm-js';
 import * as Misskey from 'misskey-js';
 import insertTextAtCursor from 'insert-text-at-cursor';
 import { toASCII } from 'punycode.js';
-import { host, url } from '@@/js/config.js';
+import { url } from '@@/js/config.js';
 import { appendContentWarning } from '@@/js/append-content-warning.js';
 import type { ShallowRef } from 'vue';
 import type { MenuItem } from '@/types/menu.js';
@@ -123,7 +123,7 @@ import XTextCounter from '@/components/MkPostForm.TextCounter.vue';
 import MkPollEditor from '@/components/MkPollEditor.vue';
 import MkNoteSimple from '@/components/MkNoteSimple.vue';
 import { erase, unique } from '@/utility/array.js';
-import { extractMentions } from '@/utility/extract-mentions.js';
+import { extractMentions, type MfmMention } from '@/utility/extract-mentions.js';
 import { formatTimeString } from '@/utility/format-time-string.js';
 import { Autocomplete } from '@/utility/autocomplete.js';
 import * as os from '@/os.js';
@@ -309,32 +309,26 @@ watch(visibleUsers, () => {
 });
 
 if (props.mention) {
-	text.value = props.mention.host ? `@${props.mention.username}@${toASCII(props.mention.host)}` : `@${props.mention.username}`;
-	text.value += ' ';
+	text.value += `@${Misskey.acct.toString(props.mention)} `;
 }
 
-if (props.reply && (props.reply.user.username !== $i.username || (props.reply.user.host != null && props.reply.user.host !== host))) {
-	text.value = `@${props.reply.user.username}${props.reply.user.host != null ? '@' + toASCII(props.reply.user.host) : ''} `;
+if (props.reply && props.reply.user.id !== $i.id) {
+	text.value += `@${Misskey.acct.toString(props.reply.user)} `;
 }
 
 if (props.reply && props.reply.text != null) {
 	const ast = mfm.parse(props.reply.text);
 	const otherHost = props.reply.user.host;
 
-	for (const x of extractMentions(ast)) {
-		const mention = x.host ?
-			`@${x.username}@${toASCII(x.host)}` :
-			(otherHost == null || otherHost === host) ?
-				`@${x.username}` :
-				`@${x.username}@${toASCII(otherHost)}`;
-
+	for (const x of extractMentions(ast, otherHost)) {
 		// 自分は除外
-		if ($i.username === x.username && (x.host == null || x.host === host)) continue;
+		if ($i.username.toLowerCase() === x.username.toLowerCase() && x.host == null) continue;
 
 		// 重複は除外
-		if (text.value.includes(`${mention} `)) continue;
-
-		text.value += `${mention} `;
+		const mention = `@${x.acct} `;
+		if (!text.value.toLowerCase().includes(mention.toLowerCase())) {
+			text.value += mention;
+		}
 	}
 }
 
@@ -424,28 +418,33 @@ function MFMWindow() {
 
 function checkMissingMention() {
 	if (visibility.value === 'specified') {
-		const ast = mfm.parse(text.value);
-
-		for (const x of extractMentions(ast)) {
-			if (!visibleUsers.value.some(u => (u.username === x.username) && (u.host === x.host))) {
-				hasNotSpecifiedMentions.value = true;
-				return;
-			}
-		}
+		hasNotSpecifiedMentions.value = getMissingMentions().length > 0;
 	}
-	hasNotSpecifiedMentions.value = false;
 }
 
 function addMissingMention() {
-	const ast = mfm.parse(text.value);
-
-	for (const x of extractMentions(ast)) {
-		if (!visibleUsers.value.some(u => (u.username === x.username) && (u.host === x.host))) {
-			misskeyApi('users/show', { username: x.username, host: x.host }).then(user => {
-				pushVisibleUser(user);
-			});
-		}
+	for (const x of getMissingMentions()) {
+		misskeyApi('users/show', { username: x.username, host: x.host }).then(user => {
+			pushVisibleUser(user);
+		});
 	}
+}
+
+function getMissingMentions(): MfmMention[] {
+	const ast = mfm.parse(text.value);
+	const mentions = extractMentions(ast);
+
+	return mentions.filter(mu => {
+		const mUsername = mu.username.toLowerCase();
+		const mHost = mu.host;
+
+		// We're looking for missing mentions, so only include this mention if it *doesn't* match any visible.
+		return !visibleUsers.value.some(vu => {
+			const vUsername = vu.username.toLowerCase();
+			const vHost = vu.host ? toASCII(vu.host).toLowerCase() : null;
+			return mUsername === vUsername && mHost === vHost;
+		});
+	});
 }
 
 function togglePoll() {
@@ -657,7 +656,7 @@ function showOtherSettings() {
 //#endregion
 
 function pushVisibleUser(user: Misskey.entities.UserDetailed) {
-	if (!visibleUsers.value.some(u => u.username === user.username && u.host === user.host)) {
+	if (!visibleUsers.value.some(u => u.id === user.id)) {
 		visibleUsers.value.push(user);
 	}
 }
@@ -666,13 +665,15 @@ function addVisibleUser() {
 	os.selectUser().then(user => {
 		pushVisibleUser(user);
 
-		if (!text.value.toLowerCase().includes(`@${user.username.toLowerCase()}`)) {
-			text.value = `@${Misskey.acct.toString(user)} ${text.value}`;
+		const acct = Misskey.acct.toString(user);
+		const mention = `@${acct} `;
+		if (!text.value.toLowerCase().includes(mention.toLowerCase())) {
+			text.value = `${mention}${text.value}`;
 		}
 	});
 }
 
-function removeVisibleUser(user) {
+  function removeVisibleUser(user: Misskey.entities.UserDetailed) {
 	visibleUsers.value = erase(user, visibleUsers.value);
 }
 
