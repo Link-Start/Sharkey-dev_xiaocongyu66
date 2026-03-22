@@ -10560,9 +10560,6 @@ export type components = {
             /** @enum {string} */
             visibility: 'public' | 'home' | 'followers' | 'specified';
             mentions?: string[];
-            mentionHandles?: {
-                [key: string]: string;
-            };
             visibleUserIds?: string[];
             fileIds?: string[];
             files?: components['schemas']['DriveFile'][];

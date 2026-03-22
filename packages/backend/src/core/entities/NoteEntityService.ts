@@ -573,7 +573,6 @@ export class NoteEntityService implements OnModuleInit {
 				myReactions?: Map<MiNote['id'], string | null>;
 				packedFiles?: Map<MiNote['fileIds'][number], Packed<'DriveFile'> | null>;
 				packedUsers?: Map<MiUser['id'], Packed<'UserLite'>>;
-				mentionHandles?: Map<string, string>;
 				polls?: Map<string, MiPoll>;
 				pollVotes?: Map<string, Map<string, MiPollVote[]>>;
 				channels?: Map<string, MiChannel>;
@@ -654,10 +653,6 @@ export class NoteEntityService implements OnModuleInit {
 
 		const bypassSilence = opts.bypassSilence || note.userId === meId;
 
-		const mentionHandlesPromise = note.mentions.length > 0
-			? Promise.resolve(options?._hint_?.mentionHandles ?? this.getUserHandles(note.mentions))
-			: null;
-
 		const iAmAdmin = me ? (opts._hint_?.iAmAdmin ?? await this.roleService.isAdministrator(me)) : false;
 		const iAmModerator = me ? (opts._hint_?.iAmModerator ?? (iAmAdmin || await this.roleService.isModerator(me))) : false;
 
@@ -708,7 +703,6 @@ export class NoteEntityService implements OnModuleInit {
 				userId: channel.userId,
 			} : undefined,
 			mentions: note.mentions.length > 0 ? note.mentions : undefined,
-			mentionHandles: mentionHandlesPromise?.then(mentionHandles => Object.fromEntries(mentionHandles.entries())),
 			uri: note.uri ?? undefined,
 			url: note.url ?? undefined,
 			poll: note.hasPoll ? this.populatePoll(note, meId, {
@@ -824,7 +818,6 @@ export class NoteEntityService implements OnModuleInit {
 		const userIds = Array.from(usersMap.keys());
 
 		const fileIds = new Set(targetNotes.values().flatMap(n => n.fileIds));
-		const mentionedUsers = new Set(targetNotes.values().flatMap(note => note.mentions));
 
 		// These are pulled out so we can reference it twice within the same awaitAll() call
 		const userRelationsPromise = Promise.resolve(me
@@ -837,7 +830,7 @@ export class NoteEntityService implements OnModuleInit {
 			? (options?.hint?.iAmModerator ?? (iAmAdmin || this.roleService.isModerator(me)))
 			: false);
 
-		const [{ bufferedReactions, myReactionsMap }, packedFiles, packedUsers, mentionHandles, polls, pollVotes, channels, mutedThreads, mutedNotes, favoriteNotes, renotedNotes, userRelations, iAmAdmin, iAmModerator] = await Promise.all([
+		const [{ bufferedReactions, myReactionsMap }, packedFiles, packedUsers, polls, pollVotes, channels, mutedThreads, mutedNotes, favoriteNotes, renotedNotes, userRelations, iAmAdmin, iAmModerator] = await Promise.all([
 			// bufferedReactions & myReactionsMap
 			this.getReactions(targetNotes.values().toArray(), me),
 			// packedFiles
@@ -846,8 +839,6 @@ export class NoteEntityService implements OnModuleInit {
 			Promise.all([userRelationsPromise, iAmAdminPromise, iAmModeratorPromise])
 				.then(([userRelations, iAmAdmin, iAmModerator]) => this.userEntityService.packMany(users, me, { hint: { userRelations, iAmAdmin, iAmModerator } }))
 				.then(packedUsers => new Map(packedUsers.map(u => [u.id, u]))),
-			// mentionHandles
-			this.getUserHandles(Array.from(mentionedUsers)),
 			// polls
 			this.pollsRepository.findBy({ noteId: IsOne(noteIds) })
 				.then(polls => new Map(polls.map(p => [p.noteId, p]))),
@@ -906,7 +897,6 @@ export class NoteEntityService implements OnModuleInit {
 				myReactions: myReactionsMap,
 				packedFiles,
 				packedUsers,
-				mentionHandles,
 				polls,
 				pollVotes,
 				channels,
@@ -1040,23 +1030,6 @@ export class NoteEntityService implements OnModuleInit {
 	@bindThis
 	private findChannelOrFail(id: string): Promise<MiChannel> {
 		return this.channelsRepository.findOneByOrFail({ id });
-	}
-
-	private async getUserHandles(userIds: string[]): Promise<Map<string, string>> {
-		if (userIds.length < 1) {
-			return new Map();
-		}
-
-		const users = await this.cacheService.findUsersById(userIds);
-		const userHandles = users
-			.entries()
-			.map(([id, user]) => {
-				const handle = user.host
-					? `@${user.username}@${user.host}`
-					: `@${user.username}`;
-				return [id, handle] as const;
-			});
-		return new Map(userHandles);
 	}
 
 	private async getChannels(notes: Iterable<MiNote>): Promise<Map<string, MiChannel>> {

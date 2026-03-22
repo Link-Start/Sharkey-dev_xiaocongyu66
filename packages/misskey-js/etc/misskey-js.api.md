@@ -4,10 +4,10 @@
 
 ```ts
 
-import type { AuthenticationResponseJSON } from '@simplewebauthn/types';
+import type { AuthenticationResponseJSON } from '@simplewebauthn/server';
 import { EventEmitter } from 'eventemitter3';
 import type { Options } from 'reconnecting-websocket';
-import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/types';
+import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/server';
 
 // Warning: (ae-forgotten-export) The symbol "components" needs to be exported by the entry point index.d.ts
 //
@@ -658,6 +658,15 @@ type BlockingListRequest = operations['blocking___list']['requestBody']['content
 
 // @public (undocumented)
 type BlockingListResponse = operations['blocking___list']['responses']['200']['content']['application/json'];
+
+// @public (undocumented)
+export type BroadcastEvents = {
+    noteUpdated: (payload: NoteUpdatedEvent) => void;
+    emojiAdded: (payload: EmojiAdded) => void;
+    emojiUpdated: (payload: EmojiUpdated) => void;
+    emojiDeleted: (payload: EmojiDeleted) => void;
+    announcementCreated: (payload: AnnouncementCreated) => void;
+};
 
 // @public (undocumented)
 type BubbleGameRankingRequest = operations['bubble-game___ranking']['requestBody']['content']['application/json'];
@@ -2823,6 +2832,8 @@ export interface IStream extends EventEmitter<StreamEvents> {
     heartbeat(): void;
     // (undocumented)
     ping(): void;
+    // (undocumented)
+    pong(): void;
     // Warning: (ae-forgotten-export) The symbol "SharedConnection" needs to be exported by the entry point index.d.ts
     //
     // (undocumented)
@@ -3395,6 +3406,47 @@ type NotesVersionsRequest = operations['notes___versions']['requestBody']['conte
 type NotesVersionsResponse = operations['notes___versions']['responses']['200']['content']['application/json'];
 
 // @public (undocumented)
+export type NoteUpdatedEvent = {
+    id: Note['id'];
+} & ({
+    type: 'reacted';
+    body: {
+        reaction: string;
+        emoji?: {
+            name: string;
+            url: string;
+        } | null;
+        userId: User['id'];
+    };
+} | {
+    type: 'unreacted';
+    body: {
+        reaction: string;
+        userId: User['id'];
+    };
+} | {
+    type: 'updated';
+    body: Record<string, never>;
+} | {
+    type: 'deleted';
+    body: {
+        deletedAt: string;
+    };
+} | {
+    type: 'pollVoted';
+    body: {
+        choice: number;
+        userId: User['id'];
+    };
+} | {
+    type: 'replied';
+    body: {
+        id: Note['id'];
+        userId: User['id'];
+    };
+});
+
+// @public (undocumented)
 export const noteVisibilities: readonly ["public", "home", "followers", "specified"];
 
 // @public (undocumented)
@@ -3763,6 +3815,8 @@ export class Stream extends EventEmitter<StreamEvents> implements IStream {
     // (undocumented)
     ping(): void;
     // (undocumented)
+    pong(): void;
+    // (undocumented)
     removeSharedConnection(connection: SharedConnection): void;
     // (undocumented)
     removeSharedConnectionPool(pool: Pool): void;
@@ -3777,12 +3831,12 @@ export class Stream extends EventEmitter<StreamEvents> implements IStream {
     useChannel<C extends keyof Channels>(channel: C, params?: Channels[C]['params'], name?: string): ChannelConnection<Channels[C]>;
 }
 
-// Warning: (ae-forgotten-export) The symbol "BroadcastEvents" needs to be exported by the entry point index.d.ts
-//
 // @public (undocumented)
 export type StreamEvents = {
     _connected_: void;
     _disconnected_: void;
+    _ping_: void;
+    _pong_: void;
 } & BroadcastEvents;
 
 // Warning: (ae-forgotten-export) The symbol "SwitchCase" needs to be exported by the entry point index.d.ts
