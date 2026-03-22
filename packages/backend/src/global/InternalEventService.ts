@@ -54,8 +54,6 @@ const thisNodeId = Math.round(Math.random() * Math.pow(2, 32)).toString(32);
 
 @Injectable()
 export class InternalEventService extends SkEventSource<InternalEventTypes, InternalEventProps, InternalEventContext> implements OnModuleInit, OnApplicationShutdown {
-	// private readonly listeners = new Map<keyof InternalEventTypes, Map<AnyListener, InternalEventProps>>();
-
 	constructor(
 		@Inject(DI.redis)
 		private readonly redisForPub: Redis.Redis,
