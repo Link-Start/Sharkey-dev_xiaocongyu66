@@ -92,7 +92,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			await this.userProfilesRepository.update(me.id, {
 				twoFactorTempSecret: secret.base32,
 			});
-			await this.internalEventService.emit('updateUserProfile', { userId: me.id });
+			await this.internalEventService.emit('updateUserProfile', { userId: me.id, keys: ['twoFactorTempSecret'] });
 
 			// Get the data URL of the authenticator URL
 			const totp = new OTPAuth.TOTP({

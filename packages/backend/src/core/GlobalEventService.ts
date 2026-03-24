@@ -266,7 +266,19 @@ export interface InternalEventTypes {
 	metaUpdated: { before?: MiMeta; after: MiMeta; };
 	followChannel: { userId: MiUser['id']; channelId: MiChannel['id']; };
 	unfollowChannel: { userId: MiUser['id']; channelId: MiChannel['id']; };
-	updateUserProfile: { userId: MiUserProfile['userId'] };
+	updateUserProfile: {
+		/**
+		 * ID of the user profile being updated.
+		 * This is also the user ID.
+		 */
+		userId: MiUserProfile['userId'],
+
+		/**
+		 * List of keys that may have been changed.
+		 * Null means that all keys are potentially changed.
+		 */
+		keys: (keyof MiUserProfile)[] | null,
+	};
 	mute: { muterId: MiUser['id']; muteeId: MiUser['id'] | MiUser['id'][]; };
 	unmute: { muterId: MiUser['id']; muteeId: MiUser['id'] | MiUser['id'][]; };
 	muteRenotes: { muterId: MiUser['id']; muteeId: MiUser['id'] | MiUser['id'][]; };

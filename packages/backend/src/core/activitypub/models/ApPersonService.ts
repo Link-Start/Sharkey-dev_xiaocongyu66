@@ -48,6 +48,7 @@ import { errorCodes, IdentifiableError } from '@/misc/identifiable-error.js';
 import { QueueService } from '@/core/QueueService.js';
 import { InternalEventService } from '@/global/InternalEventService.js';
 import { CollapsedQueueService } from '@/core/CollapsedQueueService.js';
+import { deepEquals } from '@/misc/deep-equals.js';
 import { promiseMap } from '@/misc/promise-map.js';
 import { getApId, getApType, getNullableApId, isActor, isPost, isPropertyValue } from '../type.js';
 import { ApLoggerService } from '../ApLoggerService.js';
@@ -777,19 +778,50 @@ export class ApPersonService implements OnModuleInit {
 			_description = this.apMfmService.htmlToMfm(truncate(person.summary, this.config.maxRemoteBioLength), person.tag);
 		}
 
-		await this.userProfilesRepository.update({ userId: updated.id }, {
-			url,
-			fields,
-			verifiedLinks,
-			description: _description,
-			followedMessage: person._misskey_followedMessage != null ? truncate(person._misskey_followedMessage, 256) : null,
-			followingVisibility,
-			followersVisibility,
-			birthday: bday?.[0] ?? null,
-			location: person['vcard:Address'] ?? null,
-			listenbrainz: person.listenbrainz ?? null,
-		});
-		await this.internalEventService.emit('updateUserProfile', { userId: updated.id });
+		const followedMessage = person._misskey_followedMessage != null ? truncate(person._misskey_followedMessage, 256) : null;
+		const birthday = bday?.[0] ?? null;
+		const location = person['vcard:Address'] ?? null;
+		const listenbrainz = person.listenbrainz ?? null;
+
+		const existingProfile = await this.cacheService.userProfileCache.fetch(exist.id);
+		const profileUpdates: Partial<MiUserProfile> = {};
+
+		if (url !== existingProfile.url) {
+			profileUpdates.url = url;
+		}
+		if (!deepEquals(fields, existingProfile.fields)) {
+			profileUpdates.fields = fields;
+		}
+		if (!deepEquals(verifiedLinks, existingProfile.verifiedLinks)) {
+			profileUpdates.verifiedLinks = verifiedLinks;
+		}
+		if (_description !== existingProfile.description) {
+			profileUpdates.description = _description;
+		}
+		if (followedMessage !== existingProfile.followedMessage) {
+			profileUpdates.followedMessage = followedMessage;
+		}
+		if (followingVisibility !== existingProfile.followingVisibility) {
+			profileUpdates.followingVisibility = followingVisibility;
+		}
+		if (followersVisibility !== existingProfile.followersVisibility) {
+			profileUpdates.followersVisibility = followersVisibility;
+		}
+		if (birthday !== existingProfile.birthday) {
+			profileUpdates.birthday = birthday;
+		}
+		if (location !== existingProfile.location) {
+			profileUpdates.location = location;
+		}
+		if (listenbrainz !== existingProfile.listenbrainz) {
+			profileUpdates.listenbrainz = listenbrainz;
+		}
+
+		const updatedProfileKeys = Object.keys(profileUpdates) as (keyof MiUserProfile)[];
+		if (updatedProfileKeys.length > 0) {
+			await this.userProfilesRepository.update({ userId: updated.id }, profileUpdates);
+			await this.internalEventService.emit('updateUserProfile', { userId: updated.id, keys: updatedProfileKeys });
+		}
 
 		// 該当ユーザーが既にフォロワーになっていた場合はFollowingもアップデートする
 		if (updated.inbox !== person.inbox || updated.sharedInbox !== (person.sharedInbox ?? person.endpoints?.sharedInbox)) {

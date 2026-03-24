@@ -164,8 +164,8 @@ export class ApiServerService {
 				receiveAnnouncementEmail: false,
 			});
 			if (affected) {
-				await this.internalEventService.emit('updateUserProfile', { userId: request.params.user });
-				return ["Unsubscribed."];
+				await this.internalEventService.emit('updateUserProfile', { userId: request.params.user, keys: ['receiveAnnouncementEmail'] });
+				return ['Unsubscribed.'];
 			} else {
 				reply.code(401);
 				return {

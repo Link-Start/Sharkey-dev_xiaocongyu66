@@ -83,7 +83,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			}, {
 				password: hash,
 			});
-			await this.internalEventService.emit('updateUserProfile', { userId: user.id });
+			await this.internalEventService.emit('updateUserProfile', { userId: user.id, keys: ['password'] });
 
 			await this.moderationLogService.log(me, 'resetPassword', {
 				userId: user.id,

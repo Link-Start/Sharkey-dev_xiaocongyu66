@@ -346,7 +346,7 @@ export class SignupApiService {
 				emailVerified: true,
 				emailVerifyCode: null,
 			});
-			await this.internalEventService.emit('updateUserProfile', { userId: profile.userId });
+			await this.internalEventService.emit('updateUserProfile', { userId: profile.userId, keys: ['email', 'emailVerified', 'emailVerifyCode'] });
 
 			const ticket = await this.registrationTicketsRepository.findOneBy({ pendingUserId: pendingUser.id });
 			if (ticket) {

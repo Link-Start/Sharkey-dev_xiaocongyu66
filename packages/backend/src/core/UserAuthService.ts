@@ -109,7 +109,7 @@ export class UserAuthService {
 			await this.userProfilesRepository.update({ userId: userProfile.userId }, {
 				twoFactorBackupSecret: twoFactorBackupSecret.filter((secret) => secret !== providedToken),
 			});
-			await this.internalEventService.emit('updateUserProfile', { userId: userProfile.userId });
+			await this.internalEventService.emit('updateUserProfile', { userId: userProfile.userId, keys: ['twoFactorBackupSecret'] });
 		}
 
 		return isMatch;
@@ -186,7 +186,7 @@ export class UserAuthService {
 		if (isCorrect) {
 			const newHash = await argon2.hash(providedPassword);
 			await this.userProfilesRepository.update({ userId: userProfile.userId }, { password: newHash });
-			await this.internalEventService.emit('updateUserProfile', { userId: userProfile.userId });
+			await this.internalEventService.emit('updateUserProfile', { userId: userProfile.userId, keys: ['password'] });
 		}
 
 		return isCorrect;

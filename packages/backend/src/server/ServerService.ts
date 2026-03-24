@@ -255,7 +255,7 @@ export class ServerService implements OnApplicationShutdown {
 					emailVerified: true,
 					emailVerifyCode: null,
 				});
-				await this.internalEventService.emit('updateUserProfile', { userId: profile.userId });
+				await this.internalEventService.emit('updateUserProfile', { userId: profile.userId, keys: ['emailVerified', 'emailVerifyCode'] });
 
 				await this.globalEventService.publishMainStream(profile.userId, 'meUpdated', await this.userEntityService.pack(profile.userId, { id: profile.userId }, {
 					schema: 'MeDetailed',

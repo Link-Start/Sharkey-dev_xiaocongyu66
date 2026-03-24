@@ -97,7 +97,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				await this.userProfilesRepository.update(me.id, {
 					usePasswordLessLogin: false,
 				});
-				await this.internalEventService.emit('updateUserProfile', { userId: me.id });
+				await this.internalEventService.emit('updateUserProfile', { userId: me.id, keys: ['usePasswordLessLogin'] });
 			}
 
 			// Publish meUpdated event

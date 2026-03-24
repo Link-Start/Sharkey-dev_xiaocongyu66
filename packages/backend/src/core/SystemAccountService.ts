@@ -201,12 +201,17 @@ export class SystemAccountService implements OnApplicationShutdown {
 			await this.internalEventService.emit('localUserUpdated', { id: user.id });
 		}
 
+		const existingProfile = await this.cacheService.userProfileCache.fetch(user.id);
 		const profileUpdates = {} as Partial<MiUserProfile>;
-		if (extra.description !== undefined) profileUpdates.description = extra.description;
 
-		if (Object.keys(profileUpdates).length > 0) {
-			await this.userProfilesRepository.update(user.id, profileUpdates);
-			await this.internalEventService.emit('updateUserProfile', { userId: user.id });
+		if (extra.description !== undefined && extra.description !== existingProfile.description) {
+			profileUpdates.description = extra.description;
+		}
+
+		const updatedProfileKeys = Object.keys(profileUpdates) as (keyof MiUserProfile)[];
+		if (updatedProfileKeys.length > 0) {
+			await this.userProfilesRepository.update({ userId: user.id }, profileUpdates);
+			await this.internalEventService.emit('updateUserProfile', { userId: user.id, keys: updatedProfileKeys });
 		}
 
 		// TODO federate this?

@@ -157,7 +157,7 @@ export class EmailService {
 			if (!oneClickUnsubscribeToken) {
 				oneClickUnsubscribeToken = nanoid();
 				await this.userProfilesRepository.update({ userId }, { oneClickUnsubscribeToken });
-				await this.internalEventService.emit('updateUserProfile', { userId });
+				await this.internalEventService.emit('updateUserProfile', { userId, keys: ['oneClickUnsubscribeToken'] });
 			}
 			headers['List-Unsubscribe'] = `<${this.config.apiUrl}/unsubscribe/${userId}/${oneClickUnsubscribeToken}>`;
 			headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';

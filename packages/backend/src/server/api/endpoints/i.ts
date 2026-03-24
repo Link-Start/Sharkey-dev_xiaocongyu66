@@ -76,10 +76,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			if (!userProfile.loggedInDates.includes(today)) {
 				trackTask(async () => {
+					// TODO this field should really just be a table...
 					await this.userProfilesRepository.update({ userId: user.id }, {
 						loggedInDates: [...userProfile.loggedInDates, today],
 					});
-					await this.internalEventService.emit('updateUserProfile', { userId: user.id });
+					await this.internalEventService.emit('updateUserProfile', { userId: user.id, keys: ['loggedInDates'] });
 				});
 				userProfile.loggedInDates = [...userProfile.loggedInDates, today];
 			}

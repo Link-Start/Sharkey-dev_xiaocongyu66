@@ -91,9 +91,9 @@ export class InternalEventService extends SkEventSource<InternalEventTypes, Inte
 		await this.redisForPub.publish(this.config.host, JSON.stringify(message));
 	}
 
-	protected filterListener<K extends keyof InternalEventTypes>(type: K, value: InternalEventTypes[K], registration: [EventListener<InternalEventTypes, K>, Partial<InternalEventProps>], context: Partial<InternalEventContext>): boolean {
+	protected filterListener<K extends keyof InternalEventTypes>(type: K, value: InternalEventTypes[K], registration: [EventListener<InternalEventTypes, K, InternalEventContext>, Partial<InternalEventProps>], context: Partial<InternalEventContext> | undefined): boolean {
 		// isLocal is always populated for remote events.
-		const isLocal = context.isLocal ?? true;
+		const isLocal = context?.isLocal ?? true;
 
 		// Filter for local/remote events
 		if (isLocal) {

@@ -46,7 +46,7 @@ export class AchievementService {
 				unlockedAt: date,
 			}],
 		});
-		await this.internalEventService.emit('updateUserProfile', { userId: userId });
+		await this.internalEventService.emit('updateUserProfile', { userId: userId, keys: ['achievements'] });
 
 		this.notificationService.createNotification(userId, 'achievementEarned', {
 			achievement: type,

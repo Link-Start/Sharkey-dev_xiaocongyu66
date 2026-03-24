@@ -28,7 +28,7 @@ import { bindThis } from '@/decorators.js';
 import { toArray } from '@/misc/prelude/array.js';
 import { IsOne } from '@/misc/is-one.js';
 import type { InternalEventTypes } from '@/core/GlobalEventService.js';
-import { InternalEventService } from '@/global/InternalEventService.js';
+import { InternalEventService, type InternalEventContext } from '@/global/InternalEventService.js';
 import { UtilityService } from '@/core/UtilityService.js';
 import * as Acct from '@/misc/acct.js';
 import { IdentifiableError, errorCodes } from '@/misc/identifiable-error.js';
@@ -623,6 +623,7 @@ export class CacheService implements OnApplicationShutdown {
 		this.internalEventService.on('muteRenotes', this.onMuteEvent);
 		this.internalEventService.on('unmuteRenotes', this.onMuteEvent);
 		this.internalEventService.on('userMemoChanged', this.onMemoEvent);
+		this.internalEventService.on('updateUserProfile', this.onProfileEvent);
 
 		// Update quantum caches from local events only, because the cache will automatically produce new sync events.
 		this.internalEventService.on('usersUpdated', this.onUserChangeEvent, { ignoreRemote: true });
@@ -634,7 +635,6 @@ export class CacheService implements OnApplicationShutdown {
 		this.internalEventService.on('userChangeDeletedState', this.onUserDeleteEvent, { ignoreRemote: true });
 		this.internalEventService.on('followChannel', this.onChannelEvent, { ignoreRemote: true });
 		this.internalEventService.on('unfollowChannel', this.onChannelEvent, { ignoreRemote: true });
-		this.internalEventService.on('updateUserProfile', this.onProfileEvent, { ignoreRemote: true });
 		this.internalEventService.on('userListMemberAdded', this.onListMemberEvent, { ignoreRemote: true });
 		this.internalEventService.on('userListMemberUpdated', this.onListMemberEvent, { ignoreRemote: true });
 		this.internalEventService.on('userListMemberRemoved', this.onListMemberEvent, { ignoreRemote: true });
@@ -778,20 +778,24 @@ export class CacheService implements OnApplicationShutdown {
 	}
 
 	@bindThis
-	private async onProfileEvent<E extends 'updateUserProfile'>(body: InternalEventTypes[E]): Promise<void> {
-		// Update the profile cache
-		await this.userProfileCache.delete(body.userId);
-
-		// Reset impacted relation caches
-		// TODO this is not perfect - other instances could have a different subset of relations loaded.
-		//   To fix properly, we need a non-emitting (and non-async) version of refreshMany, and we call it from an event listener attached to the profile cache itself.
-		const relationKeysToClear: string[] = [];
-		for (const [key, relation] of this.userRelationsCache.entries()) {
-			if (relation.userId === body.userId || relation.targetUserId === body.userId) {
-				relationKeysToClear.push(key);
+	private async onProfileEvent<E extends 'updateUserProfile'>(body: InternalEventTypes[E], _type: E, ctx: Partial<InternalEventContext>): Promise<void> {
+		// Update the relation cache for all events, but only if mutedInstances have changed.
+		if (body.keys == null || body.keys.includes('mutedInstances')) {
+			const relationKeysToClear: string[] = [];
+			for (const [key, relation] of this.userRelationsCache.entries()) {
+				if (relation.userId === body.userId || relation.targetUserId === body.userId) {
+					relationKeysToClear.push(key);
+				}
 			}
+
+			this.userRelationsCache.dropMany(relationKeysToClear);
 		}
-		await this.userRelationsCache.refreshMany(relationKeysToClear);
+
+		// Update the profile cache for local events only
+		// (isLocal may be undefined for local events, but will *always* be true for remote ones)
+		if (ctx.isLocal !== true) {
+			await this.userProfileCache.delete(body.userId);
+		}
 	}
 
 	@bindThis

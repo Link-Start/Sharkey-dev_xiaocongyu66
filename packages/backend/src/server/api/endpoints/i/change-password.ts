@@ -74,7 +74,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			await this.userProfilesRepository.update(me.id, {
 				password: hash,
 			});
-			await this.internalEventService.emit('updateUserProfile', { userId: me.id });
+			await this.internalEventService.emit('updateUserProfile', { userId: me.id, keys: ['password'] });
 		});
 	}
 }
