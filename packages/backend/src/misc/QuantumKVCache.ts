@@ -18,6 +18,7 @@ import { DisposedError, DisposingError } from '@/misc/errors/DisposeError.js';
 import { SkEventSource, type EventListener, type ListenerProps, type SkEventEmitter } from '@/misc/SkEventEmitter.js';
 import type { InternalEventService, InternalEventTypes } from '@/global/InternalEventService.js';
 import type { Limiter } from '@/misc/promise-map.js';
+import type { EmptyObject } from '@/types.js';
 
 export interface QuantumKVOpts<TIn, T extends Value<TIn> = Value<TIn>> {
 	/**
@@ -383,6 +384,15 @@ export class QuantumKVCache<TIn, T extends Value<TIn> = Value<TIn>> implements I
 	}
 
 	/**
+	 * Returns true is a key exists in memory.
+	 * This applies to the local subset view, not the cross-cluster cache state.
+	 */
+	@bindThis
+	public has(key: string): boolean {
+		return this.memoryCache.has(key);
+	}
+
+	/**
 	 * Gets a value from the local memory cache, or throws KeyNotFoundError if not found.
 	 * Returns cached data only - does not make any fetches.
 	 */
@@ -495,15 +505,6 @@ export class QuantumKVCache<TIn, T extends Value<TIn> = Value<TIn>> implements I
 	}
 
 	/**
-	 * Returns true is a key exists in memory.
-	 * This applies to the local subset view, not the cross-cluster cache state.
-	 */
-	@bindThis
-	public has(key: string): boolean {
-		return this.memoryCache.has(key);
-	}
-
-	/**
 	 * Deletes a value from the cache, and erases any stale caches across the cluster.
 	 * Emits a changed event after the cache has been updated in all processes.
 	 */
@@ -589,6 +590,38 @@ export class QuantumKVCache<TIn, T extends Value<TIn> = Value<TIn>> implements I
 	}
 
 	/**
+	 * Marks a local cache entry as stale and removes it from memory.
+	 * Does not send any events or update other processes.
+	 */
+	@bindThis
+	public drop(key: string): void {
+		this.throwIfDisposed();
+
+		this.memoryCache.delete(key);
+	}
+
+	/**
+	 * Marks multiple local cache entries as stale and removes then from memory.
+	 * Does not send any events or update other processes.
+	 */
+	@bindThis
+	public dropMany(keys: Iterable<string>): void {
+		this.throwIfDisposed();
+
+		for (const key of keys) {
+			this.memoryCache.delete(key);
+		}
+	}
+
+	/**
+	 * Alias to clear()
+	 */
+	@bindThis
+	public dropAll(): void {
+		this.clear();
+	}
+
+	/**
 	 * Erases all entries from the local memory cache.
 	 * Does not send any events or update other processes.
 	 */
@@ -621,7 +654,7 @@ export class QuantumKVCache<TIn, T extends Value<TIn> = Value<TIn>> implements I
 	 * @param props Optional properties to configure the binding.
 	 */
 	@bindThis
-	public on<K extends keyof QuantumKVCacheEvents<T>>(type: K, listener: EventListener<QuantumKVCacheEvents<T>, K>, props?: ListenerProps): void {
+	public on<K extends keyof QuantumKVCacheEvents<T>>(type: K, listener: EventListener<QuantumKVCacheEvents<T>, K, EmptyObject>, props?: ListenerProps): void {
 		this.eventSource.on(type, listener, props);
 	}
 
@@ -633,7 +666,7 @@ export class QuantumKVCache<TIn, T extends Value<TIn> = Value<TIn>> implements I
 	 * @param listener Listener callback. If using an arrow function, then make sure it points to the same exact instance as before!
 	 */
 	@bindThis
-	public off<K extends keyof QuantumKVCacheEvents<T>>(type: K, listener: EventListener<QuantumKVCacheEvents<T>, K>): void {
+	public off<K extends keyof QuantumKVCacheEvents<T>>(type: K, listener: EventListener<QuantumKVCacheEvents<T>, K, EmptyObject>): void {
 		this.eventSource.off(type, listener);
 	}
 
@@ -646,7 +679,7 @@ export class QuantumKVCache<TIn, T extends Value<TIn> = Value<TIn>> implements I
 	 * @param props Optional properties to configure the binding, excluding "oneShot".
 	 */
 	@bindThis
-	public once<K extends keyof QuantumKVCacheEvents<T>>(type: K, listener: EventListener<QuantumKVCacheEvents<T>, K>, props?: ListenerProps & { oneShot: true | undefined | never }): void {
+	public once<K extends keyof QuantumKVCacheEvents<T>>(type: K, listener: EventListener<QuantumKVCacheEvents<T>, K, EmptyObject>, props?: ListenerProps & { oneShot: true | undefined | never }): void {
 		this.eventSource.once(type, listener, props);
 	}
 
