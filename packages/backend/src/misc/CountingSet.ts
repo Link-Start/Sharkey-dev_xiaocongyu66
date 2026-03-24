@@ -18,8 +18,6 @@ interface Opts {
  * By default, the CountingSet will not count negative.
  * That is to say - calling delete() repeatedly for an item that has already been removed will have no effect.
  * If this is not desired, then the set can be configured to allow debt (negative counts) with a constructor parameter.
- *
- * TODO unit tests!
  */
 export class CountingSet<T> implements Iterable<T> {
 	/** Stores the value for all non-zero items. */
@@ -31,7 +29,11 @@ export class CountingSet<T> implements Iterable<T> {
 	/** Stores all negative-count items. */
 	private readonly debt = new Set<T>();
 
-	private readonly allowDebt: boolean;
+	/**
+	 * If true, item counts may drop below zero and "into debt".
+	 * If false (default), item counts are locked at zero and cannot go lower.
+	 */
+	public readonly allowDebt: boolean;
 
 	constructor(opts?: Opts);
 	constructor(input: Iterable<T>, opts?: Opts);
@@ -85,11 +87,14 @@ export class CountingSet<T> implements Iterable<T> {
 			: Math.max(0, oldCount + delta);
 
 		if (oldCount !== newCount) {
-			// 1. Remove from existing list so we can re-insert (fixes ordering).
-			if (oldCount < 0) {
-				this.debt.delete(item);
-			} else if (oldCount > 0) {
+			// 1. Remove from existing list when value "flips" sides or is incrementing in the correct direction.
+			const removeFromValue = oldCount > 0 && (newCount <= 0 || newCount > oldCount);
+			if (removeFromValue) {
 				this.value.delete(item);
+			}
+			const removeFromDebt = oldCount < 0 && (newCount >= 0 || newCount < oldCount);
+			if (removeFromDebt) {
+				this.debt.delete(item);
 			}
 
 			// 2. Re-insert into the correct list.
@@ -99,7 +104,7 @@ export class CountingSet<T> implements Iterable<T> {
 				this.value.add(item);
 			}
 
-			// 3. Update or remove from map
+			// 3. Update or remove from map.
 			if (newCount === 0) {
 				this.map.delete(item);
 			} else {
@@ -201,8 +206,10 @@ export class CountingSet<T> implements Iterable<T> {
 	 * Returns all items tracked in the set, whether present (having a positive count) or not.
 	 */
 	@bindThis
-	public entries(): MapIterator<[ item: T, count: number ]> {
-		return this.map.entries();
+	public entries(): CountingSetIterator<[ item: T, count: number ]> {
+		const iter = this.map.entries() as CountingSetIterator<[ item: T, count: number ]>;
+		iter.size = this.map.size;
+		return iter;
 	}
 
 	/**
