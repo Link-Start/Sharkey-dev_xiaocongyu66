@@ -119,7 +119,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				.select('read.announcementId', 'announcementId')
 				.addSelect('count(read.userId)', 'userCount')
 				.where({ userId: IsOne(announcementIds) })
-				.groupBy('read.userId')
+				.groupBy('read.announcementId')
 				.getRawMany<{ announcementId: string, userCount: number }>();
 			const reads = new Map(r.map(r => [r.announcementId, r.userCount]));
 
