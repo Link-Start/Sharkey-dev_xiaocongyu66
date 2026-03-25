@@ -64,8 +64,8 @@ export const meta = {
 					items: {
 						type: 'string',
 						optional: false, nullable: false,
-						format: 'misskey:id'
-					}
+						format: 'misskey:id',
+					},
 				},
 			},
 		},
