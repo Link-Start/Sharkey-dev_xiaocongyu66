@@ -111,7 +111,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw e;
 			}
 
-			return await this.userEntityService.pack(followee.id, me);
+			return await this.userEntityService.pack(followee, me);
 		});
 	}
 }
