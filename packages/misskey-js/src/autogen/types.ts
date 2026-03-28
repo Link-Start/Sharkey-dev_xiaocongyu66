@@ -19264,10 +19264,12 @@ export interface operations {
                         isModerator: boolean;
                         isAdministrator: boolean;
                         isSystem: boolean;
+                        isRoot: boolean;
                         isSilenced: boolean;
                         isSuspended: boolean;
                         isHibernated: boolean;
                         lastActiveDate: string | null;
+                        lastFetchedFeaturedAt: string | null;
                         moderationNote: string;
                         signins: components['schemas']['Signin'][];
                         policies: components['schemas']['RolePolicies'];
@@ -19297,6 +19299,7 @@ export interface operations {
                             uri: string;
                             user?: components['schemas']['UserDetailed'] | null;
                         }[] | null;
+                        loggedInDates?: string[];
                     };
                 };
             };

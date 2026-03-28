@@ -4,7 +4,9 @@
  */
 
 import { Inject, Injectable } from '@nestjs/common';
-import type { UsersRepository, SigninsRepository, UserProfilesRepository } from '@/models/_.js';
+import type { SigninsRepository, MiMeta } from '@/models/_.js';
+import type { Schema } from '@/misc/json-schema.js';
+import type { IEndpointMeta } from '@/server/api/endpoints.js';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import { DI } from '@/di-symbols.js';
 import { RoleService } from '@/core/RoleService.js';
@@ -132,6 +134,10 @@ export const meta = {
 				type: 'boolean',
 				optional: false, nullable: false,
 			},
+			isRoot: {
+				type: 'boolean',
+				optional: false, nullable: false,
+			},
 			isSilenced: {
 				type: 'boolean',
 				optional: false, nullable: false,
@@ -145,6 +151,10 @@ export const meta = {
 				optional: false, nullable: false,
 			},
 			lastActiveDate: {
+				type: 'string',
+				optional: false, nullable: true,
+			},
+			lastFetchedFeaturedAt: {
 				type: 'string',
 				optional: false, nullable: true,
 			},
@@ -267,9 +277,17 @@ export const meta = {
 					},
 				},
 			},
+			loggedInDates: {
+				type: 'array',
+				optional: true, nullable: false,
+				items: {
+					type: 'string',
+					optional: false, nullable: false,
+				},
+			},
 		},
 	},
-} as const;
+} as const satisfies IEndpointMeta;
 
 export const paramDef = {
 	type: 'object',
@@ -277,16 +295,13 @@ export const paramDef = {
 		userId: { type: 'string', format: 'misskey:id' },
 	},
 	required: ['userId'],
-} as const;
+} as const satisfies Schema;
 
 @Injectable()
 export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-disable-line import/no-default-export
 	constructor(
-		@Inject(DI.usersRepository)
-		private usersRepository: UsersRepository,
-
-		@Inject(DI.userProfilesRepository)
-		private userProfilesRepository: UserProfilesRepository,
+		@Inject(DI.meta)
+		private readonly serverSettings: MiMeta,
 
 		@Inject(DI.signinsRepository)
 		private signinsRepository: SigninsRepository,
@@ -353,6 +368,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				notificationRecieveConfig: profile.notificationRecieveConfig,
 				isModerator: isModerator,
 				isAdministrator: isAdministrator,
+				isRoot: this.serverSettings.rootUserId === user.id,
 				isSystem: isSystemAccount(user),
 				isSilenced: isSilenced,
 				isSuspended: user.isSuspended,
@@ -372,6 +388,8 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 					totalFollowers: Math.max(user.followersCount, followStats.localFollowers + followStats.remoteFollowers),
 					totalFollowing: Math.max(user.followingCount, followStats.localFollowing + followStats.remoteFollowing),
 				},
+				lastFetchedFeaturedAt: user.lastFetchedFeaturedAt?.toISOString() ?? null,
+				loggedInDates: profile.loggedInDates,
 				movedAt,
 				movedTo,
 				alsoKnownAs,
