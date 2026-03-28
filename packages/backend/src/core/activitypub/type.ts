@@ -284,10 +284,17 @@ export interface IActor extends IObject {
 	'vcard:Address'?: string;
 	hideOnlineStatus?: boolean;
 	noindex?: boolean;
+	indexable?: boolean;
 	enableRss?: boolean;
 	listenbrainz?: string;
 	backgroundUrl?: string;
 	attributionDomains?: string[];
+	isCat?: boolean;
+	speakAsCat?: boolean;
+	requireSigninToViewContents?: boolean;
+	makeNotesFollowersOnlyBefore?: number;
+	makeNotesHiddenBefore?: number;
+	webfinger?: string;
 }
 
 export const isCollection = (object: IObject): object is ICollection =>
