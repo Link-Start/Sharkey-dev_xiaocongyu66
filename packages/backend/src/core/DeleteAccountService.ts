@@ -10,6 +10,7 @@ import { DI } from '@/di-symbols.js';
 import { bindThis } from '@/decorators.js';
 import { isSystemAccount } from '@/misc/is-system-account.js';
 import { isRemoteUser } from '@/models/User.js';
+import { IdentifiableError, errorCodes } from '@/misc/identifiable-error.js';
 import { ModerationLogService } from '@/core/ModerationLogService.js';
 import { InternalEventService } from '@/global/InternalEventService.js';
 import { TimeService } from '@/global/TimeService.js';
@@ -32,18 +33,18 @@ export class DeleteAccountService {
 
 	@bindThis
 	public async deleteAccount(user: MiUser, moderator?: MiUser): Promise<void> {
-		if (this.meta.rootUserId === user.id) throw new Error('cannot delete a root account');
+		if (this.meta.rootUserId === user.id) {
+			throw new IdentifiableError(errorCodes.userProtected, 'Cannot delete the root account');
+		}
 
-		const _user = user;
-
-		if (isSystemAccount(_user)) {
-			throw new Error('cannot delete a system account');
+		if (isSystemAccount(user)) {
+			throw new IdentifiableError(errorCodes.userProtected, 'Cannot delete a system account');
 		}
 
 		if (moderator != null) {
 			await this.moderationLogService.log(moderator, 'deleteAccount', {
 				userId: user.id,
-				userUsername: _user.username,
+				userUsername: user.username,
 				userHost: user.host,
 			});
 		}
