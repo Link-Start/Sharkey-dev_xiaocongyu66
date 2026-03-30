@@ -297,7 +297,7 @@ export class QueueService implements OnModuleInit, OnApplicationBootstrap {
 					type: 'tickQueueCounts',
 				},
 				opts: {
-					removeOnComplete: true,
+					removeOnComplete: 2,
 					removeOnFail: 10,
 				},
 			},
@@ -312,7 +312,7 @@ export class QueueService implements OnModuleInit, OnApplicationBootstrap {
 					type: 'tickServerStats',
 				},
 				opts: {
-					removeOnComplete: true,
+					removeOnComplete: 2,
 					removeOnFail: 10,
 				},
 			},
