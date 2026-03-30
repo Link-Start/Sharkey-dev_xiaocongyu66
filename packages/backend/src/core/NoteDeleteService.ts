@@ -209,11 +209,6 @@ export class NoteDeleteService {
 		}
 
 		await Promise.allSettled(promises);
-
-		// This is deferred to make sure we don't race the enqueue() calls
-		if (immediate) {
-			await this.collapsedQueueService.performAllNow();
-		}
 	}
 
 	@bindThis
