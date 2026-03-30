@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { Job } from 'bullmq';
 import type { Antenna } from '@/server/api/endpoints/i/import-antennas.js';
 import type { MiDriveFile } from '@/models/DriveFile.js';
 import type { MiNote } from '@/models/Note.js';
@@ -34,6 +35,7 @@ export type InboxJobData = {
 };
 
 export type RelationshipJobData = {
+	type: string;
 	from: ThinUser;
 	to: ThinUser;
 	silent?: boolean;
@@ -42,11 +44,17 @@ export type RelationshipJobData = {
 };
 
 export type CleanRemoteFilesJobData = {
+	type: 'cleanRemoteFiles';
 	keepFilesInUse: boolean;
 	olderThanSeconds: number;
 };
 
-export type DbJobData<T extends keyof DbJobMap> = DbJobMap[T];
+export type DbJobType = DbJobTypes[keyof DbJobMap];
+export type DbJobTypes = {
+	[K in keyof DbJobMap]: Job<DbJobData<K>>;
+};
+
+export type DbJobData<T extends keyof DbJobMap> = DbJobMap[T] & { dbJobType: T };
 
 export type DbJobMap = {
 	deleteDriveFiles: DbJobDataWithUser;
@@ -54,6 +62,7 @@ export type DbJobMap = {
 	exportCustomEmojis: DbJobDataWithUser;
 	exportAntennas: DBExportAntennasData;
 	exportNotes: DbJobDataWithUser;
+	exportClips: DbJobDataWithUser;
 	exportFavorites: DbJobDataWithUser;
 	exportFollowing: DbExportFollowingData;
 	exportMuting: DbJobDataWithUser;
@@ -131,9 +140,10 @@ export type DbNoteWithParentImportToDbJobData = {
 	note: MiNote['id'] | null;
 };
 
-export type ObjectStorageJobData = ObjectStorageFileJobData | Record<string, unknown>;
+export type ObjectStorageJobData = ObjectStorageFileJobData | CleanRemoteFilesJobData;
 
 export type ObjectStorageFileJobData = {
+	type: 'deleteFile';
 	key: string;
 };
 

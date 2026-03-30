@@ -37,6 +37,7 @@ import { EnvService } from '@/global/EnvService.js';
 import type Logger from '@/logger.js';
 import { renderInlineError } from '@/misc/render-inline-error.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
+import type { ScheduleNotePostQueue } from '@/core/QueueModule.js';
 import type { Packed } from '@/misc/json-schema.js';
 import type { Config } from '@/config.js';
 
@@ -71,6 +72,9 @@ export class AccountMoveService {
 
 		@Inject(DI.noteScheduleRepository)
 		private noteScheduleRepository: NoteScheduleRepository,
+
+		@Inject(DI.scheduleNotePostQueue)
+		private readonly scheduleNotePostQueue: ScheduleNotePostQueue,
 
 		private userEntityService: UserEntityService,
 		private idService: IdService,
@@ -214,7 +218,7 @@ export class AccountMoveService {
 			this.followingsRepository.find({ where: { followeeId: dst.id }, select: { followerId: true } }).then(fs => new Set(fs.map(f => f.followerId))),
 		]);
 		// reblock the destination account
-		const blockJobs: RelationshipJobData[] = [];
+		const blockJobs: Omit<RelationshipJobData, 'type'>[] = [];
 		for (const blockerId of srcBlockers) {
 			if (dstBlockers.has(blockerId)) continue; // skip if already blocked
 			if (dstFollowers.has(blockerId)) continue; // skip if already following
@@ -272,7 +276,7 @@ export class AccountMoveService {
 		}) as MiNoteSchedule[];
 
 		for (const note of scheduledNotes) {
-			await this.queueService.scheduleNotePostQueue.remove(`schedNote:${note.id}`);
+			await this.scheduleNotePostQueue.remove(`schedNote:${note.id}`);
 		}
 
 		await this.noteScheduleRepository.delete({

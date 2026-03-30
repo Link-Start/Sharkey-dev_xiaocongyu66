@@ -4,8 +4,8 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import * as Misskey from 'misskey-js';
-import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, type OnModuleInit, type OnApplicationBootstrap } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { MetricsTime, type JobType } from 'bullmq';
 import { parse as parseRedisInfo } from 'redis-info';
 import type { IActivity } from '@/core/activitypub/type.js';
@@ -14,6 +14,7 @@ import type { MiWebhook, WebhookEventTypes } from '@/models/Webhook.js';
 import type { MiSystemWebhook, SystemWebhookEventType } from '@/models/SystemWebhook.js';
 import type { Config } from '@/config.js';
 import type { Packed } from '@/misc/json-schema.js';
+import { QUEUE_TYPES, type QueueType } from '@/queue/const.js';
 import { DI } from '@/di-symbols.js';
 import { bindThis } from '@/decorators.js';
 import { awaitAll } from '@/misc/prelude/await-all.js';
@@ -51,39 +52,38 @@ import type {
 import type httpSignature from '@peertube/http-signature';
 import type * as Bull from 'bullmq';
 
-export const QUEUE_TYPES = Misskey.entities.QUEUE_TYPES;
-export type QueueType = Misskey.entities.QueueType;
-
 @Injectable()
-export class QueueService implements OnModuleInit {
+export class QueueService implements OnModuleInit, OnApplicationBootstrap {
 	private readonly logger: Logger;
 
+	private systemQueue: SystemQueue;
+	private systemQueueEvents: Bull.QueueEvents;
+	private endedPollNotificationQueue: EndedPollNotificationQueue;
+	private endedPollNotificationQueueEvents: Bull.QueueEvents;
+	private deliverQueue: DeliverQueue;
+	private deliverQueueEvents: Bull.QueueEvents;
+	private inboxQueue: InboxQueue;
+	private inboxQueueEvents: Bull.QueueEvents;
+	private dbQueue: DbQueue;
+	private dbQueueEvents: Bull.QueueEvents;
+	private relationshipQueue: RelationshipQueue;
+	private relationshipQueueEvents: Bull.QueueEvents;
+	private objectStorageQueue: ObjectStorageQueue;
+	private objectStorageQueueEvents: Bull.QueueEvents;
+	private userWebhookDeliverQueue: UserWebhookDeliverQueue;
+	private userWebhookDeliverQueueEvents: Bull.QueueEvents;
+	private systemWebhookDeliverQueue: SystemWebhookDeliverQueue;
+	private systemWebhookDeliverQueueEvents: Bull.QueueEvents;
+	private scheduleNotePostQueue: ScheduleNotePostQueue;
+	private scheduleNotePostQueueEvents: Bull.QueueEvents;
+	private backgroundTaskQueue: BackgroundTaskQueue;
+	private backgroundTaskQueueEvents: Bull.QueueEvents;
+
 	constructor(
+		protected readonly moduleRef: ModuleRef,
+
 		@Inject(DI.config)
 		private config: Config,
-
-		@Inject('queue:system') public systemQueue: SystemQueue,
-		@Inject('queue:system:events') public systemQueueEvents: Bull.QueueEvents,
-		@Inject('queue:endedPollNotification') public endedPollNotificationQueue: EndedPollNotificationQueue,
-		@Inject('queue:endedPollNotification:events') public endedPollNotificationQueueEvents: Bull.QueueEvents,
-		@Inject('queue:deliver') public deliverQueue: DeliverQueue,
-		@Inject('queue:deliver:events') public deliverQueueEvents: Bull.QueueEvents,
-		@Inject('queue:inbox') public inboxQueue: InboxQueue,
-		@Inject('queue:inbox:events') public inboxQueueEvents: Bull.QueueEvents,
-		@Inject('queue:db') public dbQueue: DbQueue,
-		@Inject('queue:db:events') public dbQueueEvents: Bull.QueueEvents,
-		@Inject('queue:relationship') public relationshipQueue: RelationshipQueue,
-		@Inject('queue:relationship:events') public relationshipQueueEvents: Bull.QueueEvents,
-		@Inject('queue:objectStorage') public objectStorageQueue: ObjectStorageQueue,
-		@Inject('queue:objectStorage:events') public objectStorageQueueEvents: Bull.QueueEvents,
-		@Inject('queue:userWebhookDeliver') public userWebhookDeliverQueue: UserWebhookDeliverQueue,
-		@Inject('queue:userWebhookDeliver:events') public userWebhookDeliverQueueEvents: Bull.QueueEvents,
-		@Inject('queue:systemWebhookDeliver') public systemWebhookDeliverQueue: SystemWebhookDeliverQueue,
-		@Inject('queue:systemWebhookDeliver:events') public systemWebhookDeliverQueueEvents: Bull.QueueEvents,
-		@Inject('queue:scheduleNotePost') public scheduleNotePostQueue: ScheduleNotePostQueue,
-		@Inject('queue:scheduleNotePost:events') public scheduleNotePostQueueEvents: Bull.QueueEvents,
-		@Inject('queue:backgroundTask') public readonly backgroundTaskQueue: BackgroundTaskQueue,
-		@Inject('queue:backgroundTask:events') public readonly backgroundTaskQueueEvents: Bull.QueueEvents,
 
 		private readonly timeService: TimeService,
 
@@ -93,7 +93,16 @@ export class QueueService implements OnModuleInit {
 	}
 
 	@bindThis
-	public async onModuleInit() {
+	public onModuleInit() {
+		// Resolve all queues
+		for (const queueType of QUEUE_TYPES) {
+			this[`${queueType}Queue`] = this.moduleRef.get(`queue:${queueType}`, { strict: false });
+			this[`${queueType}QueueEvents`] = this.moduleRef.get(`queue:${queueType}:events`, { strict: false });
+		}
+	}
+
+	@bindThis
+	public async onApplicationBootstrap() {
 		// Remove any obsolete scheduled jobs
 		const removeScheduleJobs = async (jobs: { key: string, id?: string | null, name?: string | null }[]) => {
 			for (const job of jobs) {
@@ -130,6 +139,9 @@ export class QueueService implements OnModuleInit {
 			{ pattern: '0 * * * *' }, // every hour at :00
 			{
 				name: 'tickCharts',
+				data: {
+					type: 'tickCharts',
+				},
 				opts: {
 					removeOnComplete: 10,
 					removeOnFail: 30,
@@ -141,6 +153,9 @@ export class QueueService implements OnModuleInit {
 			{ pattern: '20 0 * * *' }, // every day at 00:20 (wait for tickCharts)
 			{
 				name: 'resyncCharts',
+				data: {
+					type: 'resyncCharts',
+				},
 				opts: {
 					removeOnComplete: 10,
 					removeOnFail: 30,
@@ -152,6 +167,9 @@ export class QueueService implements OnModuleInit {
 			{ pattern: '40 0 * * *' }, // every day at 00:40 (wait for resyncCharts)
 			{
 				name: 'cleanCharts',
+				data: {
+					type: 'cleanCharts',
+				},
 				opts: {
 					removeOnComplete: 10,
 					removeOnFail: 30,
@@ -163,6 +181,9 @@ export class QueueService implements OnModuleInit {
 			{ pattern: '0 1 * * *' }, // every day at 01:00
 			{
 				name: 'aggregateRetention',
+				data: {
+					type: 'aggregateRetention',
+				},
 				opts: {
 					removeOnComplete: 10,
 					removeOnFail: 30,
@@ -174,6 +195,9 @@ export class QueueService implements OnModuleInit {
 			{ pattern: '10 1 * * *' }, // every day at 01:10 (wait for aggregateRetention)
 			{
 				name: 'clean',
+				data: {
+					type: 'clean',
+				},
 				opts: {
 					removeOnComplete: 10,
 					removeOnFail: 30,
@@ -185,6 +209,9 @@ export class QueueService implements OnModuleInit {
 			{ pattern: '*/5 * * * *' }, // every 5 minutes
 			{
 				name: 'checkExpiredMutings',
+				data: {
+					type: 'checkExpiredMutings',
+				},
 				opts: {
 					removeOnComplete: 10,
 					removeOnFail: 30,
@@ -196,6 +223,9 @@ export class QueueService implements OnModuleInit {
 			{ pattern: '20 1 * * *' }, // every day at 01:40 (wait for clean)
 			{
 				name: 'bakeBufferedReactions',
+				data: {
+					type: 'bakeBufferedReactions',
+				},
 				opts: {
 					removeOnComplete: 10,
 					removeOnFail: 30,
@@ -208,6 +238,9 @@ export class QueueService implements OnModuleInit {
 			{ pattern: '30 * * * *' }, // every hour at :30
 			{
 				name: 'checkModeratorsActivity',
+				data: {
+					type: 'checkModeratorsActivity',
+				},
 				opts: {
 					removeOnComplete: 10,
 					removeOnFail: 30,
@@ -219,6 +252,9 @@ export class QueueService implements OnModuleInit {
 			{ pattern: '*/10 * * *' }, // every 10 minutes
 			{
 				name: 'cleanupApLogs',
+				data: {
+					type: 'cleanupApLogs',
+				},
 				opts: {
 					removeOnComplete: 10,
 					removeOnFail: 30,
@@ -230,6 +266,9 @@ export class QueueService implements OnModuleInit {
 			{ pattern: '30 1 * * *' }, // every day at 01:30 (avoid bakeBufferedReactions)
 			{
 				name: 'hibernateUsers',
+				data: {
+					type: 'hibernateUsers',
+				},
 				opts: {
 					removeOnComplete: 10,
 					removeOnFail: 30,
@@ -241,6 +280,9 @@ export class QueueService implements OnModuleInit {
 			{ every: 2 * 1000 }, // every 2 seconds - https://docs.bullmq.io/guide/job-schedulers/repeat-strategies#every-strategy
 			{
 				name: 'tickQueueCounts',
+				data: {
+					type: 'tickQueueCounts',
+				},
 				opts: {
 					removeOnComplete: true,
 					removeOnFail: 10,
@@ -253,6 +295,9 @@ export class QueueService implements OnModuleInit {
 			{ every: 2 * 1000 }, // every 2 seconds - https://docs.bullmq.io/guide/job-schedulers/repeat-strategies#every-strategy
 			{
 				name: 'tickServerStats',
+				data: {
+					type: 'tickServerStats',
+				},
 				opts: {
 					removeOnComplete: true,
 					removeOnFail: 10,
@@ -377,6 +422,7 @@ export class QueueService implements OnModuleInit {
 	public createDeleteDriveFilesJob(user: ThinUser) {
 		return this.dbQueue.add('deleteDriveFiles', {
 			user: { id: user.id },
+			dbJobType: 'deleteDriveFiles',
 		}, {
 			removeOnComplete: {
 				age: 3600 * 24 * 7, // keep up to 7 days
@@ -396,6 +442,7 @@ export class QueueService implements OnModuleInit {
 	public createExportCustomEmojisJob(user: ThinUser) {
 		return this.dbQueue.add('exportCustomEmojis', {
 			user: { id: user.id },
+			dbJobType: 'exportCustomEmojis',
 		}, {
 			removeOnComplete: {
 				age: 3600 * 24 * 7, // keep up to 7 days
@@ -415,6 +462,7 @@ export class QueueService implements OnModuleInit {
 	public createExportAccountDataJob(user: ThinUser) {
 		return this.dbQueue.add('exportAccountData', {
 			user: { id: user.id },
+			dbJobType: 'exportAccountData',
 		}, {
 			removeOnComplete: true,
 			removeOnFail: true,
@@ -428,6 +476,7 @@ export class QueueService implements OnModuleInit {
 	public createExportNotesJob(user: ThinUser) {
 		return this.dbQueue.add('exportNotes', {
 			user: { id: user.id },
+			dbJobType: 'exportNotes',
 		}, {
 			removeOnComplete: {
 				age: 3600 * 24 * 7, // keep up to 7 days
@@ -447,6 +496,7 @@ export class QueueService implements OnModuleInit {
 	public createExportClipsJob(user: ThinUser) {
 		return this.dbQueue.add('exportClips', {
 			user: { id: user.id },
+			dbJobType: 'exportClips',
 		}, {
 			removeOnComplete: {
 				age: 3600 * 24 * 7, // keep up to 7 days
@@ -466,6 +516,7 @@ export class QueueService implements OnModuleInit {
 	public createExportFavoritesJob(user: ThinUser) {
 		return this.dbQueue.add('exportFavorites', {
 			user: { id: user.id },
+			dbJobType: 'exportFavorites',
 		}, {
 			removeOnComplete: {
 				age: 3600 * 24 * 7, // keep up to 7 days
@@ -487,6 +538,7 @@ export class QueueService implements OnModuleInit {
 			user: { id: user.id },
 			excludeMuting,
 			excludeInactive,
+			dbJobType: 'exportFollowing',
 		}, {
 			removeOnComplete: {
 				age: 3600 * 24 * 7, // keep up to 7 days
@@ -506,6 +558,7 @@ export class QueueService implements OnModuleInit {
 	public createExportMuteJob(user: ThinUser) {
 		return this.dbQueue.add('exportMuting', {
 			user: { id: user.id },
+			dbJobType: 'exportMuting',
 		}, {
 			removeOnComplete: {
 				age: 3600 * 24 * 7, // keep up to 7 days
@@ -525,6 +578,7 @@ export class QueueService implements OnModuleInit {
 	public createExportBlockingJob(user: ThinUser) {
 		return this.dbQueue.add('exportBlocking', {
 			user: { id: user.id },
+			dbJobType: 'exportBlocking',
 		}, {
 			removeOnComplete: {
 				age: 3600 * 24 * 7, // keep up to 7 days
@@ -544,6 +598,7 @@ export class QueueService implements OnModuleInit {
 	public createExportUserListsJob(user: ThinUser) {
 		return this.dbQueue.add('exportUserLists', {
 			user: { id: user.id },
+			dbJobType: 'exportUserLists',
 		}, {
 			removeOnComplete: {
 				age: 3600 * 24 * 7, // keep up to 7 days
@@ -563,6 +618,7 @@ export class QueueService implements OnModuleInit {
 	public createExportAntennasJob(user: ThinUser) {
 		return this.dbQueue.add('exportAntennas', {
 			user: { id: user.id },
+			dbJobType: 'exportAntennas',
 		}, {
 			removeOnComplete: {
 				age: 3600 * 24 * 7, // keep up to 7 days
@@ -584,6 +640,7 @@ export class QueueService implements OnModuleInit {
 			user: { id: user.id },
 			fileId: fileId,
 			withReplies,
+			dbJobType: 'importFollowing',
 		}, {
 			removeOnComplete: {
 				age: 3600 * 24 * 7, // keep up to 7 days
@@ -604,7 +661,8 @@ export class QueueService implements OnModuleInit {
 		return this.dbQueue.add('importNotes', {
 			user: { id: user.id },
 			fileId: fileId,
-			type: type,
+			type: type ?? undefined,
+			dbJobType: 'importNotes',
 		}, {
 			removeOnComplete: true,
 			removeOnFail: true,
@@ -661,6 +719,7 @@ export class QueueService implements OnModuleInit {
 		return this.dbQueue.add('importMuting', {
 			user: { id: user.id },
 			fileId: fileId,
+			dbJobType: 'importMuting',
 		}, {
 			removeOnComplete: {
 				age: 3600 * 24 * 7, // keep up to 7 days
@@ -681,6 +740,7 @@ export class QueueService implements OnModuleInit {
 		return this.dbQueue.add('importBlocking', {
 			user: { id: user.id },
 			fileId: fileId,
+			dbJobType: 'importBlocking',
 		}, {
 			removeOnComplete: {
 				age: 3600 * 24 * 7, // keep up to 7 days
@@ -703,14 +763,17 @@ export class QueueService implements OnModuleInit {
 	}
 
 	@bindThis
-	private generateToDbJobData<T extends 'importFollowingToDb' | 'importBlockingToDb' | 'importTweetsToDb' | 'importIGToDb' | 'importFBToDb' | 'importMastoToDb' | 'importPleroToDb' | 'importKeyNotesToDb', D extends DbJobData<T>>(name: T, data: D): {
+	private generateToDbJobData<T extends 'importFollowingToDb' | 'importBlockingToDb' | 'importTweetsToDb' | 'importIGToDb' | 'importFBToDb' | 'importMastoToDb' | 'importPleroToDb' | 'importKeyNotesToDb', D extends DbJobData<T>>(name: T, data: Omit<D, 'dbJobType'>): {
 		name: string,
 		data: D,
 		opts: Bull.JobsOptions,
 	} {
 		return {
-			name,
-			data,
+			name: `${name}/${data.user.id}/${data.target}`,
+			data: {
+				...data,
+				dbJobType: name,
+			} as D,
 			opts: {
 				removeOnComplete: {
 					age: 3600 * 24 * 7, // keep up to 7 days
@@ -729,6 +792,7 @@ export class QueueService implements OnModuleInit {
 		return this.dbQueue.add('importUserLists', {
 			user: { id: user.id },
 			fileId: fileId,
+			dbJobType: 'importUserLists',
 		}, {
 			removeOnComplete: {
 				age: 3600 * 24 * 7, // keep up to 7 days
@@ -749,6 +813,7 @@ export class QueueService implements OnModuleInit {
 		return this.dbQueue.add('importCustomEmojis', {
 			user: { id: user.id },
 			fileId: fileId,
+			dbJobType: 'importCustomEmojis',
 		}, {
 			removeOnComplete: {
 				age: 3600 * 24 * 7, // keep up to 7 days
@@ -770,6 +835,7 @@ export class QueueService implements OnModuleInit {
 			user: { id: user.id },
 			antenna,
 			fileId,
+			dbJobType: 'importAntennas',
 		}, {
 			removeOnComplete: {
 				age: 3600 * 24 * 7, // keep up to 7 days
@@ -790,6 +856,7 @@ export class QueueService implements OnModuleInit {
 		return this.dbQueue.add('deleteAccount', {
 			user: { id: user.id },
 			soft: opts.soft,
+			dbJobType: 'deleteAccount',
 		}, {
 			removeOnComplete: {
 				age: 3600 * 24 * 7, // keep up to 30 days
@@ -842,7 +909,7 @@ export class QueueService implements OnModuleInit {
 	}
 
 	@bindThis
-	private generateRelationshipJobData(name: 'follow' | 'unfollow' | 'block' | 'unblock' | 'move', data: RelationshipJobData, opts: Bull.JobsOptions = {}): {
+	private generateRelationshipJobData(name: 'follow' | 'unfollow' | 'block' | 'unblock' | 'move', data: Omit<RelationshipJobData, 'type'>, opts: Bull.JobsOptions = {}): {
 		name: string,
 		data: RelationshipJobData,
 		opts: Bull.JobsOptions,
@@ -850,6 +917,7 @@ export class QueueService implements OnModuleInit {
 		return {
 			name,
 			data: {
+				type: name,
 				from: { id: data.from.id },
 				to: { id: data.to.id },
 				silent: data.silent,
@@ -875,7 +943,8 @@ export class QueueService implements OnModuleInit {
 
 	@bindThis
 	public createDeleteObjectStorageFileJob(key: string) {
-		return this.objectStorageQueue.add('deleteFile', {
+		return this.objectStorageQueue.add(`deleteFile/${key}`, {
+			type: 'deleteFile',
 			key: key,
 		}, {
 			removeOnComplete: {
@@ -895,6 +964,7 @@ export class QueueService implements OnModuleInit {
 	@bindThis
 	public createCleanRemoteFilesJob(olderThanSeconds: number = 0, keepFilesInUse: boolean = false) {
 		return this.objectStorageQueue.add('cleanRemoteFiles', {
+			type: 'cleanRemoteFiles',
 			keepFilesInUse,
 			olderThanSeconds,
 		}, {
@@ -993,8 +1063,8 @@ export class QueueService implements OnModuleInit {
 		return await this.createBackgroundTask({ type: 'delete-ap-logs', dataType, data });
 	}
 
-	private async createBackgroundTask<T extends BackgroundTaskJobData>(data: T, duplication?: string | { id: string, ttl?: number }) {
-		return await this.backgroundTaskQueue.add(
+	protected async createBackgroundTask<T extends BackgroundTaskJobData>(data: T, duplication?: string | { id: string, ttl?: number }): Promise<void> {
+		await this.backgroundTaskQueue.add(
 			data.type,
 			data,
 			{

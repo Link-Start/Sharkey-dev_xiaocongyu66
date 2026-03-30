@@ -4,8 +4,13 @@
  */
 
 import { MetricsTime } from 'bullmq';
+import * as Misskey from 'misskey-js';
 import { Config } from '@/config.js';
 import type * as Bull from 'bullmq';
+
+export type QueueType = Misskey.entities.QueueType;
+
+export const QUEUE_TYPES = Misskey.entities.QUEUE_TYPES;
 
 export const QUEUE = {
 	DELIVER: 'deliver',
@@ -19,7 +24,7 @@ export const QUEUE = {
 	SYSTEM_WEBHOOK_DELIVER: 'systemWebhookDeliver',
 	SCHEDULE_NOTE_POST: 'scheduleNotePost',
 	BACKGROUND_TASK: 'backgroundTask',
-};
+} satisfies Record<string, QueueType>;
 
 export function baseQueueOptions(config: Config, queueName: typeof QUEUE[keyof typeof QUEUE]): Bull.QueueOptions {
 	return {

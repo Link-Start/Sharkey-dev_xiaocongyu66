@@ -12,13 +12,13 @@ import { DriveService } from '@/core/DriveService.js';
 import type { MiDriveFile } from '@/models/DriveFile.js';
 import type { MiNote } from '@/models/Note.js';
 import type { MiNoteReaction } from '@/models/NoteReaction.js';
+import type { ScheduleNotePostQueue } from '@/core/QueueModule.js';
 import { EmailService } from '@/core/EmailService.js';
 import { isLocalUser } from '@/models/User.js';
 import { bindThis } from '@/decorators.js';
 import { SearchService } from '@/core/SearchService.js';
 import { ApLogService } from '@/core/ApLogService.js';
 import { ReactionService } from '@/core/ReactionService.js';
-import { QueueService } from '@/core/QueueService.js';
 import { NoteDeleteService } from '@/core/NoteDeleteService.js';
 import { QueueLoggerService } from '@/queue/QueueLoggerService.js';
 import { ApRendererService } from '@/core/activitypub/ApRendererService.js';
@@ -93,7 +93,9 @@ export class DeleteAccountProcessorService {
 		@Inject(DI.registryItemsRepository)
 		private readonly registryItemsRepository: RegistryItemsRepository,
 
-		private queueService: QueueService,
+		@Inject(DI.scheduleNotePostQueue)
+		private readonly scheduleNotePostQueue: ScheduleNotePostQueue,
+
 		private driveService: DriveService,
 		private emailService: EmailService,
 		private queueLoggerService: QueueLoggerService,
@@ -274,7 +276,7 @@ export class DeleteAccountProcessorService {
 			}) as MiNoteSchedule[];
 
 			for (const note of scheduledNotes) {
-				await this.queueService.scheduleNotePostQueue.remove(`schedNote:${note.id}`);
+				await this.scheduleNotePostQueue.remove(`schedNote:${note.id}`);
 			}
 
 			await this.noteScheduleRepository.delete({

@@ -15,6 +15,7 @@ import { SystemWebhookService } from '@/core/SystemWebhookService.js';
 import { UserSearchService } from '@/core/UserSearchService.js';
 import { WebhookTestService } from '@/core/WebhookTestService.js';
 import { FlashService } from '@/core/FlashService.js';
+import { QueueLoggerService } from '@/queue/QueueLoggerService.js';
 import { ApUtilityService } from '@/core/activitypub/ApUtilityService.js';
 import { ApLogService } from '@/core/ApLogService.js';
 import { CollapsedQueueService } from '@/core/CollapsedQueueService.js';
@@ -637,6 +638,10 @@ const $SponsorsService: Provider = { provide: 'SponsorsService', useExisting: Sp
 		//#endregion
 
 		$SponsorsService,
+
+		// This is here so that unit tests can new() up specific queue processors without loading the entire QueueProcessorModule.
+		// Also, to resolve a very specific and complex edge case involving FakeQueueService testing utility.
+		QueueLoggerService,
 	],
 	exports: [
 		QueueModule,

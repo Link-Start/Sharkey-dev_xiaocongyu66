@@ -10,18 +10,22 @@ import { Inject, Injectable, OnApplicationShutdown } from '@nestjs/common';
 import { UnrecoverableError } from 'bullmq';
 import { extractCustomEmojisFromMfm } from '@/misc/extract-custom-emojis-from-mfm.js';
 import { extractHashtags } from '@/misc/extract-hashtags.js';
+import { concat } from '@/misc/prelude/array.js';
+import { isRemoteUser, isLocalUser } from '@/models/User.js';
+import { normalizeForSearch } from '@/misc/normalize-for-search.js';
+import { bindThis } from '@/decorators.js';
+import { isReply } from '@/misc/is-reply.js';
+import { isPureRenote } from '@/misc/is-renote.js';
 import type { IMentionedRemoteUsers } from '@/models/Note.js';
 import { MiNote } from '@/models/Note.js';
 import type { NoteEditsRepository, ChannelFollowingsRepository, ChannelsRepository, FollowingsRepository, InstancesRepository, MiMeta, MutingsRepository, NotesRepository, NoteThreadMutingsRepository, UserListMembershipsRepository, UserProfilesRepository, UsersRepository, PollsRepository, NoteReactionsRepository } from '@/models/_.js';
 import type { MiDriveFile } from '@/models/DriveFile.js';
 import type { MiApp } from '@/models/App.js';
-import { concat } from '@/misc/prelude/array.js';
+import type { EndedPollNotificationQueue } from '@/core/QueueModule.js';
 import { IdService } from '@/core/IdService.js';
 import type { MiUser, MiLocalUser, MiRemoteUser } from '@/models/User.js';
-import { isRemoteUser, isLocalUser } from '@/models/User.js';
 import { MiPoll, type IPoll } from '@/models/Poll.js';
 import type { MiChannel } from '@/models/Channel.js';
-import { normalizeForSearch } from '@/misc/normalize-for-search.js';
 import { RelayService } from '@/core/RelayService.js';
 import { FederatedInstanceService } from '@/core/FederatedInstanceService.js';
 import { DI } from '@/di-symbols.js';
@@ -36,21 +40,17 @@ import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
 import { ApRendererService } from '@/core/activitypub/ApRendererService.js';
 import { ApDeliverManagerService } from '@/core/activitypub/ApDeliverManagerService.js';
 import { RemoteUserResolveService } from '@/core/RemoteUserResolveService.js';
-import { bindThis } from '@/decorators.js';
 import { RoleService } from '@/core/RoleService.js';
 import { SearchService } from '@/core/SearchService.js';
 import { FanoutTimelineService } from '@/core/FanoutTimelineService.js';
 import { UtilityService } from '@/core/UtilityService.js';
 import { UserBlockingService } from '@/core/UserBlockingService.js';
 import { CacheService } from '@/core/CacheService.js';
-import { isReply } from '@/misc/is-reply.js';
-import { isUserRelated } from '@/misc/is-user-related.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
 import { LatestNoteService } from '@/core/LatestNoteService.js';
 import { NoteCreateService } from '@/core/NoteCreateService.js';
 import { TimeService } from '@/global/TimeService.js';
 import { NoteVisibilityService } from '@/core/NoteVisibilityService.js';
-import { isPureRenote } from '@/misc/is-renote.js';
 import { CollapsedQueueService } from '@/core/CollapsedQueueService.js';
 
 type NotificationType = 'reply' | 'renote' | 'quote' | 'mention' | 'edited';
@@ -199,6 +199,9 @@ export class NoteEditService implements OnApplicationShutdown {
 
 		@Inject(DI.noteReactionsRepository)
 		private readonly noteReactionsRepository: NoteReactionsRepository,
+
+		@Inject(DI.endedPollNotificationQueue)
+		private readonly endedPollNotificationQueue: EndedPollNotificationQueue,
 
 		private noteEntityService: NoteEntityService,
 		private idService: IdService,
@@ -630,8 +633,8 @@ export class NoteEditService implements OnApplicationShutdown {
 
 		if (data.poll && data.poll.expiresAt) {
 			const delay = data.poll.expiresAt.getTime() - this.timeService.now;
-			await this.queueService.endedPollNotificationQueue.remove(`pollEnd:${note.id}`);
-			await this.queueService.endedPollNotificationQueue.add(note.id, {
+			await this.endedPollNotificationQueue.remove(`pollEnd:${note.id}`);
+			await this.endedPollNotificationQueue.add(note.id, {
 				noteId: note.id,
 			}, {
 				jobId: `pollEnd_${note.id}`,

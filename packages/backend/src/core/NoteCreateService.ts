@@ -5,7 +5,7 @@
 
 import { setImmediate } from 'node:timers/promises';
 import * as mfm from 'mfm-js';
-import { In, DataSource, IsNull, LessThan } from 'typeorm';
+import { DataSource, IsNull } from 'typeorm';
 import * as Redis from 'ioredis';
 import { Inject, Injectable, OnApplicationShutdown } from '@nestjs/common';
 import { extractCustomEmojisFromMfm } from '@/misc/extract-custom-emojis-from-mfm.js';
@@ -15,10 +15,10 @@ import { MiNote } from '@/models/Note.js';
 import type { ChannelFollowingsRepository, ChannelsRepository, FollowingsRepository, InstancesRepository, MiFollowing, MiMeta, MutingsRepository, NotesRepository, NoteThreadMutingsRepository, UserListMembershipsRepository, UserProfilesRepository, UsersRepository } from '@/models/_.js';
 import type { MiDriveFile } from '@/models/DriveFile.js';
 import type { MiApp } from '@/models/App.js';
+import type { EndedPollNotificationQueue } from '@/core/QueueModule.js';
 import { concat } from '@/misc/prelude/array.js';
 import { IdService } from '@/core/IdService.js';
 import type { MiUser, MiLocalUser, MiRemoteUser } from '@/models/User.js';
-import { isLocalUser, isRemoteUser } from '@/models/User.js';
 import type { IPoll } from '@/models/Poll.js';
 import { MiPoll } from '@/models/Poll.js';
 import { isDuplicateKeyValueError } from '@/misc/is-duplicate-key-value-error.js';
@@ -43,6 +43,8 @@ import { ApRendererService } from '@/core/activitypub/ApRendererService.js';
 import { ApDeliverManagerService } from '@/core/activitypub/ApDeliverManagerService.js';
 import { RemoteUserResolveService } from '@/core/RemoteUserResolveService.js';
 import { bindThis } from '@/decorators.js';
+import { promiseMap } from '@/misc/promise-map.js';
+import { isLocalUser, isRemoteUser } from '@/models/User.js';
 import { RoleService } from '@/core/RoleService.js';
 import { SearchService } from '@/core/SearchService.js';
 import { FeaturedService } from '@/core/FeaturedService.js';
@@ -58,7 +60,6 @@ import { TimeService } from '@/global/TimeService.js';
 import { MfmService } from '@/core/MfmService.js';
 import { NoteVisibilityService } from '@/core/NoteVisibilityService.js';
 import { CollapsedQueueService } from '@/core/CollapsedQueueService.js';
-import { promiseMap } from '@/misc/promise-map.js';
 
 type NotificationType = 'reply' | 'renote' | 'quote' | 'mention';
 
@@ -197,6 +198,9 @@ export class NoteCreateService implements OnApplicationShutdown {
 
 		@Inject(DI.channelFollowingsRepository)
 		private channelFollowingsRepository: ChannelFollowingsRepository,
+
+		@Inject(DI.endedPollNotificationQueue)
+		private readonly endedPollNotificationQueue: EndedPollNotificationQueue,
 
 		private noteEntityService: NoteEntityService,
 		private idService: IdService,
@@ -689,7 +693,7 @@ export class NoteCreateService implements OnApplicationShutdown {
 
 		if (data.poll && data.poll.expiresAt) {
 			const delay = data.poll.expiresAt.getTime() - this.timeService.now;
-			await this.queueService.endedPollNotificationQueue.add(note.id, {
+			await this.endedPollNotificationQueue.add(note.id, {
 				noteId: note.id,
 			}, {
 				jobId: `pollEnd_${note.id}`,

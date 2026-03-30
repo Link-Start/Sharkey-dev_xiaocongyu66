@@ -3,16 +3,19 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { Inject, Module, OnApplicationShutdown } from '@nestjs/common';
+import { Module, type OnApplicationShutdown, type Provider } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import * as Bull from 'bullmq';
 import { DI } from '@/di-symbols.js';
 import type { Config } from '@/config.js';
-import { baseQueueOptions, QUEUE } from '@/queue/const.js';
-import { allSettled } from '@/misc/promise-tracker.js';
-import Logger from '@/logger.js';
-import { bindThis } from '@/decorators.js';
+import { baseQueueOptions, QUEUE, QUEUE_TYPES } from '@/queue/const.js';
 import { renderInlineError } from '@/misc/render-inline-error.js';
-import {
+import { allSettled } from '@/misc/promise-tracker.js';
+import { promiseTry } from '@/misc/promise-try.js';
+import { bindThis } from '@/decorators.js';
+import { Logger } from '@/logger.js';
+import { LoggerService } from '@/core/LoggerService.js';
+import type {
 	DeliverJobData,
 	EndedPollNotificationJobData,
 	InboxJobData,
@@ -21,16 +24,17 @@ import {
 	SystemWebhookDeliverJobData,
 	ScheduleNotePostJobData,
 	BackgroundTaskJobData,
+	ObjectStorageJobData,
+	DbJobType,
 } from '../queue/types.js';
-import type { Provider } from '@nestjs/common';
 
-export type SystemQueue = Bull.Queue<Record<string, unknown>>;
+export type SystemQueue = Bull.Queue<{ type: string }>;
 export type EndedPollNotificationQueue = Bull.Queue<EndedPollNotificationJobData>;
 export type DeliverQueue = Bull.Queue<DeliverJobData>;
 export type InboxQueue = Bull.Queue<InboxJobData>;
-export type DbQueue = Bull.Queue;
+export type DbQueue = Bull.Queue<DbJobType>;
 export type RelationshipQueue = Bull.Queue<RelationshipJobData>;
-export type ObjectStorageQueue = Bull.Queue;
+export type ObjectStorageQueue = Bull.Queue<ObjectStorageJobData>;
 export type UserWebhookDeliverQueue = Bull.Queue<UserWebhookDeliverJobData>;
 export type SystemWebhookDeliverQueue = Bull.Queue<SystemWebhookDeliverJobData>;
 export type ScheduleNotePostQueue = Bull.Queue<ScheduleNotePostJobData>;
@@ -243,74 +247,32 @@ const $backgroundTask: Provider[] = [{
 	].flat(),
 })
 export class QueueModule implements OnApplicationShutdown {
-	private readonly logger = new Logger('queue');
+	private readonly logger: Logger;
 
 	constructor(
-		@Inject('queue:system') public systemQueue: SystemQueue,
-		@Inject('queue:system:events') public systemQueueEvents: Bull.QueueEvents,
-		@Inject('queue:endedPollNotification') public endedPollNotificationQueue: EndedPollNotificationQueue,
-		@Inject('queue:endedPollNotification:events') public endedPollNotificationQueueEvents: Bull.QueueEvents,
-		@Inject('queue:deliver') public deliverQueue: DeliverQueue,
-		@Inject('queue:deliver:events') public deliverQueueEvents: Bull.QueueEvents,
-		@Inject('queue:inbox') public inboxQueue: InboxQueue,
-		@Inject('queue:inbox:events') public inboxQueueEvents: Bull.QueueEvents,
-		@Inject('queue:db') public dbQueue: DbQueue,
-		@Inject('queue:db:events') public dbQueueEvents: Bull.QueueEvents,
-		@Inject('queue:relationship') public relationshipQueue: RelationshipQueue,
-		@Inject('queue:relationship:events') public relationshipQueueEvents: Bull.QueueEvents,
-		@Inject('queue:objectStorage') public objectStorageQueue: ObjectStorageQueue,
-		@Inject('queue:objectStorage:events') public objectStorageQueueEvents: Bull.QueueEvents,
-		@Inject('queue:userWebhookDeliver') public userWebhookDeliverQueue: UserWebhookDeliverQueue,
-		@Inject('queue:userWebhookDeliver:events') public userWebhookDeliverQueueEvents: Bull.QueueEvents,
-		@Inject('queue:systemWebhookDeliver') public systemWebhookDeliverQueue: SystemWebhookDeliverQueue,
-		@Inject('queue:systemWebhookDeliver:events') public systemWebhookDeliverQueueEvents: Bull.QueueEvents,
-		@Inject('queue:scheduleNotePost') public scheduleNotePostQueue: ScheduleNotePostQueue,
-		@Inject('queue:scheduleNotePost:events') public scheduleNotePostQueueEvents: Bull.QueueEvents,
-		@Inject('queue:backgroundTask') public readonly backgroundTaskQueue: BackgroundTaskQueue,
-		@Inject('queue:backgroundTask:events') public readonly backgroundTaskQueueEvents: Bull.QueueEvents,
-	) {}
+		private readonly moduleRef: ModuleRef,
 
-	public async dispose(): Promise<void> {
-		// Wait for all potential queue jobs
-		this.logger.info('Finalizing active promises...');
-		await allSettled();
-		// And then close all queues
-		this.logger.info('Closing BullMQ queues...');
-		await Promise.allSettled([
-			this.systemQueue.close(),
-			this.systemQueueEvents.close(),
-			this.endedPollNotificationQueue.close(),
-			this.endedPollNotificationQueueEvents.close(),
-			this.deliverQueue.close(),
-			this.deliverQueueEvents.close(),
-			this.inboxQueue.close(),
-			this.inboxQueueEvents.close(),
-			this.dbQueue.close(),
-			this.dbQueueEvents.close(),
-			this.relationshipQueue.close(),
-			this.relationshipQueueEvents.close(),
-			this.objectStorageQueue.close(),
-			this.objectStorageQueueEvents.close(),
-			this.userWebhookDeliverQueue.close(),
-			this.userWebhookDeliverQueueEvents.close(),
-			this.systemWebhookDeliverQueue.close(),
-			this.systemWebhookDeliverQueueEvents.close(),
-			this.scheduleNotePostQueue.close(),
-			this.scheduleNotePostQueueEvents.close(),
-			this.backgroundTaskQueue.close(),
-			this.backgroundTaskQueueEvents.close(),
-		]).then(res => {
-			for (const result of res) {
-				if (result.status === 'rejected') {
-					this.logger.error(`Error closing queue: ${renderInlineError(result.reason)}`);
-				}
-			}
-		});
-		this.logger.info('Queue module disposed.');
+		loggerService: LoggerService,
+	) {
+		this.logger = loggerService.getLogger('queue');
 	}
 
 	@bindThis
-	async onApplicationShutdown(signal: string): Promise<void> {
-		await this.dispose();
+	async onApplicationShutdown(): Promise<void> {
+		// Wait for all potential queue jobs
+		this.logger.info('Finalizing active promises...');
+		await allSettled();
+
+		// And then close all queues in parallel
+		this.logger.info('Closing BullMQ queue connections...');
+		// TODO move QUEUE_TYPES to this class
+		const tasks = QUEUE_TYPES.flatMap(qt => [
+			promiseTry(() => this.moduleRef.get<Bull.Queue>(`queue:${qt}`).disconnect())
+				.catch(err => this.logger.error(`Error closing queue ${qt}: ${renderInlineError(err)}`)),
+			promiseTry(() => this.moduleRef.get<Bull.QueueEvents>(`queue:${qt}:events`).disconnect())
+				.catch(err => this.logger.error(`Error closing events for queue ${qt}: ${renderInlineError(err)}`)),
+		]);
+		await Promise.all(tasks);
+		this.logger.info('Queue module disposed.');
 	}
 }

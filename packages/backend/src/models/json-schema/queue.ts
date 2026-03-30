@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { QUEUE_TYPES, type QueueType } from '@/core/QueueService.js';
+import { QUEUE_TYPES, type QueueType } from '@/queue/const.js';
 
 export const packedQueueCountSchema = {
 	type: 'object',

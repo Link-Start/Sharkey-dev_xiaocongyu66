@@ -5,7 +5,8 @@
 
 import { Injectable } from '@nestjs/common';
 import { Endpoint } from '@/server/api/endpoint-base.js';
-import { QueueService, QUEUE_TYPES } from '@/core/QueueService.js';
+import { QueueService } from '@/core/QueueService.js';
+import { QUEUE_TYPES } from '@/queue/const.js';
 import type { IEndpointMeta } from '@/server/api/endpoints.js';
 import type { Schema } from '@/misc/json-schema.js';
 

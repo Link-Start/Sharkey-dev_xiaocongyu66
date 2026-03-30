@@ -157,7 +157,7 @@ export class UserSuspendService {
 			select: { followerId: true },
 		});
 
-		const jobs: RelationshipJobData[] = [];
+		const jobs: Omit<RelationshipJobData, 'type'>[] = [];
 		for (const following of followings) {
 			if (following.followeeId) {
 				jobs.push({
