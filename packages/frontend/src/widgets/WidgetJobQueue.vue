@@ -72,7 +72,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { onUnmounted, reactive, ref } from 'vue';
+import { onMounted, onUnmounted, reactive, ref } from 'vue';
 import { useWidgetPropsManager } from './widget.js';
 import type { WidgetComponentEmits, WidgetComponentExpose, WidgetComponentProps } from './widget.js';
 import type { GetFormResultType } from '@/utility/form.js';
@@ -107,7 +107,7 @@ const { widgetProps, configure } = useWidgetPropsManager(name,
 	emit,
 );
 
-const connection = useStream().useChannel('queueStats');
+const connection = ref<Misskey.IChannelConnection<Misskey.Channels['queueStats']> | undefined>();
 const current = reactive<Pick<Misskey.entities.QueueLogs, 'inbox' | 'deliver' | 'backgroundTask'>>({
 	inbox: {
 		activeSincePrevTick: 0,
@@ -145,10 +145,6 @@ if (prefer.s['sound.masterVolume']) {
 	});
 }
 
-for (const domain of ['inbox', 'deliver', 'backgroundTask']) {
-	prev[domain] = deepClone(current[domain]);
-}
-
 const onStats = (stats: Misskey.entities.QueueLogs) => {
 	for (const domain of ['inbox', 'deliver', 'backgroundTask']) {
 		prev[domain] = deepClone(current[domain]);
@@ -174,17 +170,19 @@ const onStatsLog = (statsLog: Misskey.entities.QueueLogs[]) => {
 	}
 };
 
-connection.on('stats', onStats);
-connection.on('statsLog', onStatsLog);
-
-connection.send('requestLog', {
-	length: 1,
+onMounted(() => {
+	connection.value = useStream().useChannel('queueStats');
+	connection.value.on('stats', onStats);
+	connection.value.on('statsLog', onStatsLog);
+	connection.value.send('requestLog', {
+		length: 1,
+	});
 });
 
 onUnmounted(() => {
-	connection.off('stats', onStats);
-	connection.off('statsLog', onStatsLog);
-	connection.dispose();
+	connection.value?.off('stats', onStats);
+	connection.value?.off('statsLog', onStatsLog);
+	connection.value?.dispose();
 });
 
 defineExpose<WidgetComponentExpose>({
