@@ -22,6 +22,7 @@ import type { Antenna } from '@/server/api/endpoints/i/import-antennas.js';
 import { ApRequestCreator } from '@/core/activitypub/ApRequestService.js';
 import { TimeService } from '@/global/TimeService.js';
 import { LoggerService } from '@/core/LoggerService.js';
+import { EnvService } from '@/global/EnvService.js';
 import type Logger from '@/logger.js';
 import type { SystemWebhookPayload } from '@/core/SystemWebhookService.js';
 import type { MiNote } from '@/models/Note.js';
@@ -86,6 +87,7 @@ export class QueueService implements OnModuleInit, OnApplicationBootstrap {
 		private config: Config,
 
 		private readonly timeService: TimeService,
+		private readonly envService: EnvService,
 
 		loggerService: LoggerService,
 	) {
@@ -103,6 +105,17 @@ export class QueueService implements OnModuleInit, OnApplicationBootstrap {
 
 	@bindThis
 	public async onApplicationBootstrap() {
+		if (this.envService.env.NODE_ENV === 'test') {
+			this.logger.debug('Skipping scheduled job maintenance in TEST');
+			return;
+		}
+
+		this.logger.info('Upserting scheduled jobs...');
+		await this.upsertScheduledJobs();
+	}
+
+	@bindThis
+	private async upsertScheduledJobs() {
 		// Remove any obsolete scheduled jobs
 		const removeScheduleJobs = async (jobs: { key: string, id?: string | null, name?: string | null }[]) => {
 			for (const job of jobs) {

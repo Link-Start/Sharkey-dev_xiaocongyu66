@@ -11,6 +11,7 @@ import { BackgroundTaskProcessorService } from '@/queue/processors/BackgroundTas
 import { LoggerService } from '@/core/LoggerService.js';
 import { TimeService } from '@/global/TimeService.js';
 import { QueueService } from '@/core/QueueService.js';
+import { EnvService } from '@/global/EnvService.js';
 import { bindThis } from '@/decorators.js';
 import { DI } from '@/di-symbols.js';
 
@@ -26,9 +27,10 @@ export class FakeQueueService extends QueueService implements OnApplicationBoots
 		config: Config,
 
 		timeService: TimeService,
+		envService: EnvService,
 		loggerService: LoggerService,
 	) {
-		super(moduleRef, config, timeService, loggerService);
+		super(moduleRef, meta, config, timeService, envService, loggerService);
 	}
 
 	@bindThis
