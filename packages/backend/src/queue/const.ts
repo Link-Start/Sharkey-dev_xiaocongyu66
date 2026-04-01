@@ -71,6 +71,11 @@ export const QueueDefaults: Partial<Config> = {
 	inboxJobConcurrency: 16,
 	inboxJobMaxAttempts: 8,
 
+	systemJobConcurrency: 2,
+
+	endedPollNotificationJobConcurrency: 4,
+	endedPollNotificationJobMaxAttempts: 4,
+
 	relationshipJobConcurrency: 16,
 	relationshipJobPerSec: 64,
 
@@ -84,7 +89,7 @@ export const QueueDefaults: Partial<Config> = {
 	systemWebhookDeliverJobMaxAttempts: 4,
 
 	backgroundTaskJobConcurrency: 32,
-	backgroundTaskJobMaxAttempts: 8,
+	backgroundTaskJobMaxAttempts: 4,
 };
 
 export const DefaultMaxAttempts = 1;

@@ -334,14 +334,14 @@ id: 'aidx'
 #inboxJobMaxAttempts: 8
 #
 ## System queue - processes scheduled maintenance and operational tasks.
-#systemJobConcurrency: 1
+#systemJobConcurrency: 2
 #systemJobPerSec: 0
 #systemJobMaxAttempts: 1
 #
 ## Ended Poll Notification queue - refreshes completed polls and notifies all interested users.
-#endedPollNotificationJobConcurrency: 1
+#endedPollNotificationJobConcurrency: 4
 #endedPollNotificationJobPerSec: 0
-#endedPollNotificationJobMaxAttempts: 1
+#endedPollNotificationJobMaxAttempts: 4
 #
 ## DB queue - processes bulk database updates.
 #dbJobConcurrency: 1
@@ -376,10 +376,10 @@ id: 'aidx'
 ## Background Task queue - processes background synchronization tasks that need to happen soon (but not immediately), such as remote user updates and instance metadata updates.
 #backgroundTaskJobConcurrency: 32
 #backgroundTaskJobPerSec: 0
-#backgroundTaskJobMaxAttempts: 8
+#backgroundTaskJobMaxAttempts: 4
 #
 ## Backfill queue - processes user and note backfill operations.
-#backfillJobConcurrency: 4
+#backfillJobConcurrency: 2
 #backfillJobPerSec: 0
 #backfillJobMaxAttempts: 1
 
