@@ -6,8 +6,9 @@
 import { Injectable, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import { InternalEventService } from '@/global/InternalEventService.js';
 import { QueueService } from '@/core/QueueService.js';
-import { QUEUE_TYPES, type QueueType } from '@/queue/const.js';
+import { QUEUE_TYPES } from '@/queue/const.js';
 import { bindThis } from '@/decorators.js';
+import type { QueueType } from '@/queue/types.js';
 import type * as Misskey from 'misskey-js';
 
 export const QueueStatsLogSize = 200;

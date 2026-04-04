@@ -21,7 +21,7 @@ import { MiNote } from '@/models/Note.js';
 import type { NoteEditsRepository, ChannelFollowingsRepository, ChannelsRepository, FollowingsRepository, InstancesRepository, MiMeta, MutingsRepository, NotesRepository, NoteThreadMutingsRepository, UserListMembershipsRepository, UserProfilesRepository, UsersRepository, PollsRepository, NoteReactionsRepository } from '@/models/_.js';
 import type { MiDriveFile } from '@/models/DriveFile.js';
 import type { MiApp } from '@/models/App.js';
-import type { EndedPollNotificationQueue } from '@/core/QueueModule.js';
+import type { Queues } from '@/queue/types.js';
 import { IdService } from '@/core/IdService.js';
 import type { MiUser, MiLocalUser, MiRemoteUser } from '@/models/User.js';
 import { MiPoll, type IPoll } from '@/models/Poll.js';
@@ -200,8 +200,8 @@ export class NoteEditService implements OnApplicationShutdown {
 		@Inject(DI.noteReactionsRepository)
 		private readonly noteReactionsRepository: NoteReactionsRepository,
 
-		@Inject(DI.endedPollNotificationQueue)
-		private readonly endedPollNotificationQueue: EndedPollNotificationQueue,
+		@Inject('queue:endedPollNotification')
+		private readonly endedPollNotificationQueue: Queues['endedPollNotification'],
 
 		private noteEntityService: NoteEntityService,
 		private idService: IdService,

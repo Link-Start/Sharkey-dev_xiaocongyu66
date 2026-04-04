@@ -6,8 +6,7 @@
 import { URL } from 'node:url';
 import { Inject, Injectable } from '@nestjs/common';
 import { Endpoint } from '@/server/api/endpoint-base.js';
-import type { InboxQueue } from '@/core/QueueModule.js';
-import { DI } from '@/di-symbols.js';
+import type { Queues } from '@/queue/types.js';
 
 export const meta = {
 	tags: ['admin'],
@@ -48,7 +47,8 @@ export const paramDef = {
 @Injectable()
 export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-disable-line import/no-default-export
 	constructor(
-		@Inject(DI.inboxQueue) public inboxQueue: InboxQueue,
+		@Inject('queue:inbox')
+		private readonly inboxQueue: Queues['inbox'],
 	) {
 		super(meta, paramDef, async (ps, me) => {
 			const jobs = await this.inboxQueue.getJobs(['delayed']);

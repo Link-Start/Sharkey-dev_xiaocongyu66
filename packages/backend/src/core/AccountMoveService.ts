@@ -11,7 +11,7 @@ import { DI } from '@/di-symbols.js';
 import type { MiLocalUser, MiRemoteUser, MiUser } from '@/models/User.js';
 import { isLocalUser } from '@/models/User.js';
 import type { BlockingsRepository, FollowingsRepository, InstancesRepository, MiMeta, MutingsRepository, UserListMembershipsRepository, UsersRepository, NoteScheduleRepository, MiNoteSchedule } from '@/models/_.js';
-import type { RelationshipJobData, ThinUser } from '@/queue/types.js';
+import type { Queues, RelationshipJobData, ThinUser } from '@/queue/types.js';
 
 import { IdService } from '@/core/IdService.js';
 import { GlobalEventService } from '@/core/GlobalEventService.js';
@@ -37,7 +37,6 @@ import { EnvService } from '@/global/EnvService.js';
 import type Logger from '@/logger.js';
 import { renderInlineError } from '@/misc/render-inline-error.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
-import type { ScheduleNotePostQueue } from '@/core/QueueModule.js';
 import type { Packed } from '@/misc/json-schema.js';
 import type { Config } from '@/config.js';
 
@@ -73,8 +72,8 @@ export class AccountMoveService {
 		@Inject(DI.noteScheduleRepository)
 		private noteScheduleRepository: NoteScheduleRepository,
 
-		@Inject(DI.scheduleNotePostQueue)
-		private readonly scheduleNotePostQueue: ScheduleNotePostQueue,
+		@Inject('queue:scheduleNotePost')
+		private readonly scheduleNotePostQueue: Queues['scheduleNotePost'],
 
 		private userEntityService: UserEntityService,
 		private idService: IdService,

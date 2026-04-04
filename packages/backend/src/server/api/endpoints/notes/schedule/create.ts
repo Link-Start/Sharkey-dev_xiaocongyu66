@@ -15,7 +15,7 @@ import type {
 	DriveFilesRepository,
 	NoteScheduleRepository,
 } from '@/models/_.js';
-import type { ScheduleNotePostQueue } from '@/core/QueueModule.js';
+import type { Queues } from '@/queue/types.js';
 import type { MiDriveFile } from '@/models/DriveFile.js';
 import type { MiNote } from '@/models/Note.js';
 import { Endpoint } from '@/server/api/endpoint-base.js';
@@ -209,8 +209,8 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		@Inject(DI.driveFilesRepository)
 		private driveFilesRepository: DriveFilesRepository,
 
-		@Inject(DI.scheduleNotePostQueue)
-		private readonly scheduleNotePostQueue: ScheduleNotePostQueue,
+		@Inject('queue:scheduleNotePost')
+		private readonly scheduleNotePostQueue: Queues['scheduleNotePost'],
 
 		private queueService: QueueService,
 		private roleService: RoleService,

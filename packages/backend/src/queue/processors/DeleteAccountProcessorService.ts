@@ -12,7 +12,7 @@ import { DriveService } from '@/core/DriveService.js';
 import type { MiDriveFile } from '@/models/DriveFile.js';
 import type { MiNote } from '@/models/Note.js';
 import type { MiNoteReaction } from '@/models/NoteReaction.js';
-import type { ScheduleNotePostQueue } from '@/core/QueueModule.js';
+import type { Queues } from '@/queue/types.js';
 import { EmailService } from '@/core/EmailService.js';
 import { isLocalUser } from '@/models/User.js';
 import { bindThis } from '@/decorators.js';
@@ -93,8 +93,8 @@ export class DeleteAccountProcessorService {
 		@Inject(DI.registryItemsRepository)
 		private readonly registryItemsRepository: RegistryItemsRepository,
 
-		@Inject(DI.scheduleNotePostQueue)
-		private readonly scheduleNotePostQueue: ScheduleNotePostQueue,
+		@Inject('queue:scheduleNotePost')
+		private readonly scheduleNotePostQueue: Queues['scheduleNotePost'],
 
 		private driveService: DriveService,
 		private emailService: EmailService,

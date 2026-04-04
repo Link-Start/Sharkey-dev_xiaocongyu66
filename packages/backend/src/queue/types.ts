@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import type { Job } from 'bullmq';
 import type { Antenna } from '@/server/api/endpoints/i/import-antennas.js';
 import type { MiDriveFile } from '@/models/DriveFile.js';
 import type { MiNote } from '@/models/Note.js';
@@ -14,7 +13,38 @@ import type { IActivity } from '@/core/activitypub/type.js';
 import type { SystemWebhookPayload } from '@/core/SystemWebhookService.js';
 import type { UserWebhookPayload } from '@/core/UserWebhookService.js';
 import type { MinimalNote } from '@/misc/is-renote.js';
+import type { QUEUE_TYPES } from '@/queue/const.js';
+import type * as Bull from 'bullmq';
 import type httpSignature from '@peertube/http-signature';
+
+export type QueueType = typeof QUEUE_TYPES[number];
+
+export type QueueData = {
+	deliver: DeliverJobData;
+	inbox: InboxJobData;
+	system: { type: string };
+	endedPollNotification: EndedPollNotificationJobData;
+	db: DbJobType;
+	relationship: RelationshipJobData;
+	objectStorage: ObjectStorageJobData;
+	userWebhookDeliver: UserWebhookDeliverJobData;
+	systemWebhookDeliver: SystemWebhookDeliverJobData;
+	scheduleNotePost: ScheduleNotePostJobData;
+	backgroundTask: BackgroundTaskJobData;
+};
+
+export type Queues = {
+	// <data type, result type, name type>
+	[QT in QueueType]: Bull.Queue<QueueData[QT], FIXME, string>;
+};
+
+export type QueueEvents = {
+	[QT in QueueType]: Bull.QueueEvents;
+};
+
+export type Jobs = {
+	[QT in QueueType]: Bull.Job<QueueData[QT]>;
+};
 
 export type DeliverJobData = {
 	/** Actor */
@@ -51,7 +81,7 @@ export type CleanRemoteFilesJobData = {
 
 export type DbJobType = DbJobTypes[keyof DbJobMap];
 export type DbJobTypes = {
-	[K in keyof DbJobMap]: Job<DbJobData<K>>;
+	[K in keyof DbJobMap]: Bull.Job<DbJobData<K>>;
 };
 
 export type DbJobData<T extends keyof DbJobMap> = DbJobMap[T] & { dbJobType: T };

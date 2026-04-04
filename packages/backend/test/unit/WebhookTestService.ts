@@ -6,7 +6,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { beforeAll, describe, jest } from '@jest/globals';
 import { FakeQueueService } from '../misc/FakeQueueService.js';
-import type { SystemWebhookDeliverQueue, UserWebhookDeliverQueue } from '@/core/QueueModule.js';
+import type { Queues } from '@/queue/types.js';
 import { WebhookTestService } from '@/core/WebhookTestService.js';
 import { UserWebhookPayload, UserWebhookService } from '@/core/UserWebhookService.js';
 import { SystemWebhookPayload, SystemWebhookService } from '@/core/SystemWebhookService.js';
@@ -27,8 +27,8 @@ describe('WebhookTestService', () => {
 
 	let usersRepository: UsersRepository;
 	let userProfilesRepository: UserProfilesRepository;
-	let userWebhookDeliverQueue: UserWebhookDeliverQueue;
-	let systemWebhookDeliverQueue: SystemWebhookDeliverQueue;
+	let userWebhookDeliverQueue: Queues['userWebhookDeliver'];
+	let systemWebhookDeliverQueue: Queues['systemWebhookDeliver'];
 	let userWebhookService: jest.Mocked<UserWebhookService>;
 	let systemWebhookService: jest.Mocked<SystemWebhookService>;
 	let idService: IdService;
@@ -82,8 +82,8 @@ describe('WebhookTestService', () => {
 		service = app.get(WebhookTestService);
 		idService = app.get(IdService);
 		cacheManagementService = app.get(CacheManagementService);
-		userWebhookDeliverQueue = app.get<UserWebhookDeliverQueue>(DI.userWebhookDeliverQueue);
-		systemWebhookDeliverQueue = app.get<SystemWebhookDeliverQueue>(DI.systemWebhookDeliverQueue);
+		userWebhookDeliverQueue = app.get<Queues['userWebhookDeliver']>('queue:userWebhookDeliver');
+		systemWebhookDeliverQueue = app.get<Queues['systemWebhookDeliver']>('queue:systemWebhookDeliver');
 		userWebhookService = app.get(UserWebhookService) as jest.Mocked<UserWebhookService>;
 		systemWebhookService = app.get(SystemWebhookService) as jest.Mocked<SystemWebhookService>;
 

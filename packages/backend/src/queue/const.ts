@@ -5,18 +5,7 @@
 
 import { MetricsTime } from 'bullmq';
 import type { Config } from '@/config.js';
-import type {
-	DeliverJobData,
-	EndedPollNotificationJobData,
-	InboxJobData,
-	RelationshipJobData,
-	UserWebhookDeliverJobData,
-	SystemWebhookDeliverJobData,
-	ScheduleNotePostJobData,
-	BackgroundTaskJobData,
-	ObjectStorageJobData,
-	DbJobType,
-} from '@/queue/types.js';
+import type { QueueType } from '@/queue/types.js';
 import type * as Bull from 'bullmq';
 
 export const QUEUE_TYPES = [
@@ -33,8 +22,6 @@ export const QUEUE_TYPES = [
 	'backgroundTask',
 ] as const;
 
-export type QueueType = typeof QUEUE_TYPES[number];
-
 export const QUEUE = {
 	DELIVER: 'deliver',
 	INBOX: 'inbox',
@@ -48,20 +35,6 @@ export const QUEUE = {
 	SCHEDULE_NOTE_POST: 'scheduleNotePost',
 	BACKGROUND_TASK: 'backgroundTask',
 } satisfies Record<string, QueueType>;
-
-export type QueueData = {
-	deliver: DeliverJobData;
-	inbox: InboxJobData;
-	system: { type: string };
-	endedPollNotification: EndedPollNotificationJobData;
-	db: DbJobType;
-	relationship: RelationshipJobData;
-	objectStorage: ObjectStorageJobData;
-	userWebhookDeliver: UserWebhookDeliverJobData;
-	systemWebhookDeliver: SystemWebhookDeliverJobData;
-	scheduleNotePost: ScheduleNotePostJobData;
-	backgroundTask: BackgroundTaskJobData;
-};
 
 // Keep in sync with all the YML configs!
 export const QueueDefaults: Partial<Config> = {
@@ -95,11 +68,6 @@ export const QueueDefaults: Partial<Config> = {
 export const DefaultMaxAttempts = 1;
 export const DefaultJobPerSec = 0;
 export const DefaultJobConcurrency = 1;
-
-export type Queues = {
-	// <data type, result type, name type>
-	[QT in QueueType]: Bull.Queue<QueueData[QT], FIXME, string>;
-};
 
 export function baseQueueOptions<QT extends QueueType>(config: Config, queueName: QT) {
 	return {

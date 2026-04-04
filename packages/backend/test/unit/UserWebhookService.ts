@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, jest } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { randomString } from '../utils.js';
 import { FakeQueueService } from '../misc/FakeQueueService.js';
-import type { UserWebhookDeliverQueue } from '@/core/QueueModule.js';
+import type { Queues } from '@/queue/types.js';
 import { MiUser } from '@/models/User.js';
 import { MiWebhook, UsersRepository, WebhooksRepository } from '@/models/_.js';
 import { IdService } from '@/core/IdService.js';
@@ -30,7 +30,7 @@ describe('UserWebhookService', () => {
 	let userWebhooksRepository: WebhooksRepository;
 	let idService: IdService;
 	let cacheManagementService: CacheManagementService;
-	let userWebhookDeliverQueue: UserWebhookDeliverQueue;
+	let userWebhookDeliverQueue: Queues['userWebhookDeliver'];
 
 	// --------------------------------------------------------------------------------------
 
@@ -83,7 +83,7 @@ describe('UserWebhookService', () => {
 		service = app.get(UserWebhookService);
 		idService = app.get(IdService);
 		cacheManagementService = app.get(CacheManagementService);
-		userWebhookDeliverQueue = app.get<UserWebhookDeliverQueue>(DI.userWebhookDeliverQueue);
+		userWebhookDeliverQueue = app.get<Queues['userWebhookDeliver']>('queue:userWebhookDeliver');
 
 		await userWebhookDeliverQueue.drain(true);
 	});

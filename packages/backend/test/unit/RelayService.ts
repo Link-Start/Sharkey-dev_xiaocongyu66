@@ -10,19 +10,18 @@ import { ModuleMocker } from 'jest-mock';
 import { FakeQueueService } from '../misc/FakeQueueService.js';
 import type { TestingModule } from '@nestjs/testing';
 import type { MockMetadata } from 'jest-mock';
-import type { DeliverQueue } from '@/core/QueueModule.js';
+import type { Queues } from '@/queue/types.js';
 import { QueueService } from '@/core/QueueService.js';
 import { RelayService } from '@/core/RelayService.js';
 import { GlobalModule } from '@/GlobalModule.js';
 import { CoreModule } from '@/core/CoreModule.js';
-import { DI } from '@/di-symbols.js';
 
 const moduleMocker = new ModuleMocker(global);
 
 describe('RelayService', () => {
 	let app: TestingModule;
 	let relayService: RelayService;
-	let deliverQueue: DeliverQueue;
+	let deliverQueue: Queues['deliver'];
 
 	beforeAll(async () => {
 		app = await Test.createTestingModule({
@@ -45,7 +44,7 @@ describe('RelayService', () => {
 		app.enableShutdownHooks();
 
 		relayService = app.get<RelayService>(RelayService);
-		deliverQueue = app.get<DeliverQueue>(DI.deliverQueue);
+		deliverQueue = app.get<Queues['deliver']>('queue:deliver');
 
 		await deliverQueue.drain(true);
 	});

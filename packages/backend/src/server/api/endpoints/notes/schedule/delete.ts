@@ -6,7 +6,7 @@
 import ms from 'ms';
 import { Inject, Injectable } from '@nestjs/common';
 import type { NoteScheduleRepository } from '@/models/_.js';
-import type { ScheduleNotePostQueue } from '@/core/QueueModule.js';
+import type { Queues } from '@/queue/types.js';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import { DI } from '@/di-symbols.js';
 import { ApiError } from '@/server/api/error.js';
@@ -51,8 +51,8 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		@Inject(DI.noteScheduleRepository)
 		private readonly noteScheduleRepository: NoteScheduleRepository,
 
-		@Inject(DI.scheduleNotePostQueue)
-		private readonly scheduleNotePostQueue: ScheduleNotePostQueue,
+		@Inject('queue:scheduleNotePost')
+		private readonly scheduleNotePostQueue: Queues['scheduleNotePost'],
 	) {
 		super(meta, paramDef, async (ps, me) => {
 			const note = await this.noteScheduleRepository.findOneBy({ id: ps.noteId });

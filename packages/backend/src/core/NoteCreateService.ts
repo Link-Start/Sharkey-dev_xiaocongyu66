@@ -15,7 +15,6 @@ import { MiNote } from '@/models/Note.js';
 import type { ChannelFollowingsRepository, ChannelsRepository, FollowingsRepository, InstancesRepository, MiFollowing, MiMeta, MutingsRepository, NotesRepository, NoteThreadMutingsRepository, UserListMembershipsRepository, UserProfilesRepository, UsersRepository } from '@/models/_.js';
 import type { MiDriveFile } from '@/models/DriveFile.js';
 import type { MiApp } from '@/models/App.js';
-import type { EndedPollNotificationQueue } from '@/core/QueueModule.js';
 import { concat } from '@/misc/prelude/array.js';
 import { IdService } from '@/core/IdService.js';
 import type { MiUser, MiLocalUser, MiRemoteUser } from '@/models/User.js';
@@ -198,9 +197,6 @@ export class NoteCreateService implements OnApplicationShutdown {
 
 		@Inject(DI.channelFollowingsRepository)
 		private channelFollowingsRepository: ChannelFollowingsRepository,
-
-		@Inject(DI.endedPollNotificationQueue)
-		private readonly endedPollNotificationQueue: EndedPollNotificationQueue,
 
 		private noteEntityService: NoteEntityService,
 		private idService: IdService,

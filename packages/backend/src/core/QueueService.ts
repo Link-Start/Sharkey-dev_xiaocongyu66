@@ -14,13 +14,7 @@ import type { MiWebhook, WebhookEventTypes } from '@/models/Webhook.js';
 import type { MiSystemWebhook, SystemWebhookEventType } from '@/models/SystemWebhook.js';
 import type { Config } from '@/config.js';
 import type { Packed } from '@/misc/json-schema.js';
-import {
-	baseJobOptions,
-	QUEUE_TYPES,
-	type QueueData,
-	type Queues,
-	type QueueType,
-} from '@/queue/const.js';
+import { baseJobOptions, QUEUE_TYPES } from '@/queue/const.js';
 import { DI } from '@/di-symbols.js';
 import { bindThis } from '@/decorators.js';
 import { awaitAll } from '@/misc/prelude/await-all.js';
@@ -35,6 +29,10 @@ import type { MiNote } from '@/models/Note.js';
 import type { MinimalNote } from '@/misc/is-renote.js';
 import type { UserWebhookPayload } from '@/core/UserWebhookService.js';
 import type {
+	Queues,
+	QueueEvents,
+	QueueType,
+	QueueData,
 	BackgroundTaskJobData,
 	DbJobData,
 	DeliverJobData,

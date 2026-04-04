@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, jest } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { randomString } from '../utils.js';
 import { FakeQueueService } from '../misc/FakeQueueService.js';
-import { QueueModule, SystemWebhookDeliverQueue } from '@/core/QueueModule.js';
+import type { Queues } from '@/queue/types.js';
 import { MiUser } from '@/models/User.js';
 import { MiSystemWebhook, SystemWebhookEventType } from '@/models/SystemWebhook.js';
 import { SystemWebhooksRepository, UsersRepository } from '@/models/_.js';
@@ -34,7 +34,7 @@ describe('SystemWebhookService', () => {
 	let systemWebhooksRepository: SystemWebhooksRepository;
 	let idService: IdService;
 	let cacheManagementService: CacheManagementService;
-	let systemWebhookDeliverQueue: SystemWebhookDeliverQueue;
+	let systemWebhookDeliverQueue: Queues['systemWebhookDeliver'];
 
 	// --------------------------------------------------------------------------------------
 
@@ -87,7 +87,7 @@ describe('SystemWebhookService', () => {
 		service = app.get(SystemWebhookService);
 		idService = app.get(IdService);
 		cacheManagementService = app.get(CacheManagementService);
-		systemWebhookDeliverQueue = app.get<SystemWebhookDeliverQueue>(DI.systemWebhookDeliverQueue);
+		systemWebhookDeliverQueue = app.get<Queues['systemWebhookDeliver']>('queue:systemWebhookDeliver');
 
 		await systemWebhookDeliverQueue.drain(true);
 	});
