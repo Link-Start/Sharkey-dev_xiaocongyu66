@@ -85,11 +85,11 @@ const cleanTasks = process.argv
 			return builtDirs.map(builtDir => nodeFs.rm(builtDir, rmOpts));
 		} else if (mode === 'deps') {
 			console.log('Cleaning dependencies...');
-			return [
-				...appendToRoots('node_modules')
-					.map(depDir => nodeFs.rm(depDir, rmOpts)),
-				exec('git', 'submodule', 'deinit', '--all'),
-			];
+			return appendToRoots('node_modules')
+				.map(depDir => nodeFs.rm(depDir, rmOpts));
+		} if (mode === 'submodules') {
+			console.log('Cleaning submodules...');
+			return exec('git', 'submodule', 'deinit', '--all');
 		} else if (mode === 'gen') {
 			console.log('Cleaning generated code...');
 			return ['locales/index.d.ts', 'packages/misskey-js/src/autogen']
