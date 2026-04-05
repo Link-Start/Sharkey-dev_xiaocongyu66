@@ -121,7 +121,7 @@ export class WebAuthnService {
 				expectedRPID: relyingParty.rpId,
 				requireUserVerification: false, // don't require the user to enter a PIN or swipe fingerprint
 				requireUserPresence: false, // don't require Human Presence detection
-				attestationSafetyNetEnforceCTSCheck: false, // don't require strict root detection
+				attestationSafetyNetEnforceCTSCheck: false, // allow login from rooted devices
 			});
 		} catch (error) {
 			this.logger.error(error as Error, 'Error authenticating webauthn');
