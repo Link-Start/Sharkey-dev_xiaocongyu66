@@ -36,6 +36,7 @@ function cleanup() {
 		} catch (error) {
 			console.error('Error in cleanup:', error);
 		} finally {
+			process.exitCode = exitCode;
 			process.exit(exitCode);
 		}
 	});
