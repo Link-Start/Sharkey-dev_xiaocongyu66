@@ -62,7 +62,6 @@ build: &build
     pull_policy: if-not-present
   variables:
     POSTGRES_PASSWORD: 'ci'
-    COREPACK_DEFAULT_TO_LATEST: '0'
   # Arm64 is recommended for CI
   tags:
     - arm64
