@@ -1985,6 +1985,7 @@ declare namespace entities {
         IImportFollowingRequest,
         IImportMutingRequest,
         IImportNotesRequest,
+        IImportNotesResponse,
         IImportUserListsRequest,
         IMoveRequest,
         IMoveResponse,
@@ -2681,6 +2682,9 @@ type IImportMutingRequest = operations['i___import-muting']['requestBody']['cont
 
 // @public (undocumented)
 type IImportNotesRequest = operations['i___import-notes']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
+type IImportNotesResponse = operations['i___import-notes']['responses']['200']['content']['application/json'];
 
 // @public (undocumented)
 type IImportUserListsRequest = operations['i___import-user-lists']['requestBody']['content']['application/json'];

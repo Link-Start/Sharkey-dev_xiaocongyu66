@@ -11143,7 +11143,7 @@ export type components = {
         };
         QueueStat: {
             /** @enum {string} */
-            name: 'system' | 'endedPollNotification' | 'deliver' | 'inbox' | 'db' | 'relationship' | 'objectStorage' | 'userWebhookDeliver' | 'systemWebhookDeliver' | 'scheduleNotePost' | 'backgroundTask';
+            name: 'deliver' | 'inbox' | 'system' | 'daemon' | 'endedPollNotification' | 'db' | 'relationship' | 'objectStorage' | 'userWebhookDeliver' | 'systemWebhookDeliver' | 'scheduleNotePost' | 'backgroundTask';
             qualifiedName: string;
             counts: {
                 [key: string]: number;
@@ -11191,10 +11191,11 @@ export type components = {
             };
         };
         QueueStats: {
-            system: components['schemas']['QueueStat'];
-            endedPollNotification: components['schemas']['QueueStat'];
             deliver: components['schemas']['QueueStat'];
             inbox: components['schemas']['QueueStat'];
+            system: components['schemas']['QueueStat'];
+            daemon: components['schemas']['QueueStat'];
+            endedPollNotification: components['schemas']['QueueStat'];
             db: components['schemas']['QueueStat'];
             relationship: components['schemas']['QueueStat'];
             objectStorage: components['schemas']['QueueStat'];
@@ -11207,10 +11208,11 @@ export type components = {
             activeSincePrevTick: number;
         };
         QueueLogs: {
-            system: components['schemas']['QueueLog'];
-            endedPollNotification: components['schemas']['QueueLog'];
             deliver: components['schemas']['QueueLog'];
             inbox: components['schemas']['QueueLog'];
+            system: components['schemas']['QueueLog'];
+            daemon: components['schemas']['QueueLog'];
+            endedPollNotification: components['schemas']['QueueLog'];
             db: components['schemas']['QueueLog'];
             relationship: components['schemas']['QueueLog'];
             objectStorage: components['schemas']['QueueLog'];
@@ -11228,10 +11230,11 @@ export type components = {
             activeSincePrevTick?: number;
         };
         QueueCounts: {
-            system: components['schemas']['QueueCount'];
-            endedPollNotification: components['schemas']['QueueCount'];
             deliver: components['schemas']['QueueCount'];
             inbox: components['schemas']['QueueCount'];
+            system: components['schemas']['QueueCount'];
+            daemon: components['schemas']['QueueCount'];
+            endedPollNotification: components['schemas']['QueueCount'];
             db: components['schemas']['QueueCount'];
             relationship: components['schemas']['QueueCount'];
             objectStorage: components['schemas']['QueueCount'];
@@ -11525,6 +11528,7 @@ export type components = {
             ltlAvailable: boolean;
             btlAvailable: boolean;
             canPublicNote: boolean;
+            scheduleNoteMax: number;
             mentionLimit: number;
             canInvite: boolean;
             inviteLimit: number;
@@ -11548,13 +11552,13 @@ export type components = {
             userListLimit: number;
             userEachUserListsLimit: number;
             rateLimitFactor: number;
+            canImportNotes: boolean;
             avatarDecorationLimit: number;
             canImportAntennas: boolean;
             canImportBlocking: boolean;
             canImportFollowing: boolean;
             canImportMuting: boolean;
             canImportUserLists: boolean;
-            scheduleNoteMax: number;
             /** @enum {string} */
             chatAvailability: 'available' | 'readonly' | 'unavailable';
             canTrend: boolean;
@@ -16712,7 +16716,7 @@ export interface operations {
             content: {
                 'application/json': {
                     /** @enum {string} */
-                    queue: 'system' | 'endedPollNotification' | 'deliver' | 'inbox' | 'db' | 'relationship' | 'objectStorage' | 'userWebhookDeliver' | 'systemWebhookDeliver' | 'scheduleNotePost' | 'backgroundTask';
+                    queue: 'deliver' | 'inbox' | 'system' | 'daemon' | 'endedPollNotification' | 'db' | 'relationship' | 'objectStorage' | 'userWebhookDeliver' | 'systemWebhookDeliver' | 'scheduleNotePost' | 'backgroundTask';
                     /** @enum {string} */
                     state: '*' | 'completed' | 'wait' | 'active' | 'paused' | 'prioritized' | 'delayed' | 'failed';
                 };
@@ -16920,7 +16924,7 @@ export interface operations {
             content: {
                 'application/json': {
                     /** @enum {string} */
-                    queue: 'system' | 'endedPollNotification' | 'deliver' | 'inbox' | 'db' | 'relationship' | 'objectStorage' | 'userWebhookDeliver' | 'systemWebhookDeliver' | 'scheduleNotePost' | 'backgroundTask';
+                    queue: 'deliver' | 'inbox' | 'system' | 'daemon' | 'endedPollNotification' | 'db' | 'relationship' | 'objectStorage' | 'userWebhookDeliver' | 'systemWebhookDeliver' | 'scheduleNotePost' | 'backgroundTask';
                     state: ('active' | 'paused' | 'wait' | 'delayed' | 'completed' | 'failed')[];
                     search?: string;
                 };
@@ -17014,7 +17018,7 @@ export interface operations {
             content: {
                 'application/json': {
                     /** @enum {string} */
-                    queue: 'system' | 'endedPollNotification' | 'deliver' | 'inbox' | 'db' | 'relationship' | 'objectStorage' | 'userWebhookDeliver' | 'systemWebhookDeliver' | 'scheduleNotePost' | 'backgroundTask';
+                    queue: 'deliver' | 'inbox' | 'system' | 'daemon' | 'endedPollNotification' | 'db' | 'relationship' | 'objectStorage' | 'userWebhookDeliver' | 'systemWebhookDeliver' | 'scheduleNotePost' | 'backgroundTask';
                 };
             };
         };
@@ -17084,7 +17088,7 @@ export interface operations {
             content: {
                 'application/json': {
                     /** @enum {string} */
-                    queue: 'system' | 'endedPollNotification' | 'deliver' | 'inbox' | 'db' | 'relationship' | 'objectStorage' | 'userWebhookDeliver' | 'systemWebhookDeliver' | 'scheduleNotePost' | 'backgroundTask';
+                    queue: 'deliver' | 'inbox' | 'system' | 'daemon' | 'endedPollNotification' | 'db' | 'relationship' | 'objectStorage' | 'userWebhookDeliver' | 'systemWebhookDeliver' | 'scheduleNotePost' | 'backgroundTask';
                 };
             };
         };
@@ -17221,7 +17225,7 @@ export interface operations {
             content: {
                 'application/json': {
                     /** @enum {string} */
-                    queue: 'system' | 'endedPollNotification' | 'deliver' | 'inbox' | 'db' | 'relationship' | 'objectStorage' | 'userWebhookDeliver' | 'systemWebhookDeliver' | 'scheduleNotePost' | 'backgroundTask';
+                    queue: 'deliver' | 'inbox' | 'system' | 'daemon' | 'endedPollNotification' | 'db' | 'relationship' | 'objectStorage' | 'userWebhookDeliver' | 'systemWebhookDeliver' | 'scheduleNotePost' | 'backgroundTask';
                     jobId: string;
                 };
             };
@@ -17292,7 +17296,7 @@ export interface operations {
             content: {
                 'application/json': {
                     /** @enum {string} */
-                    queue: 'system' | 'endedPollNotification' | 'deliver' | 'inbox' | 'db' | 'relationship' | 'objectStorage' | 'userWebhookDeliver' | 'systemWebhookDeliver' | 'scheduleNotePost' | 'backgroundTask';
+                    queue: 'deliver' | 'inbox' | 'system' | 'daemon' | 'endedPollNotification' | 'db' | 'relationship' | 'objectStorage' | 'userWebhookDeliver' | 'systemWebhookDeliver' | 'scheduleNotePost' | 'backgroundTask';
                     jobId: string;
                 };
             };
@@ -17363,7 +17367,7 @@ export interface operations {
             content: {
                 'application/json': {
                     /** @enum {string} */
-                    queue: 'system' | 'endedPollNotification' | 'deliver' | 'inbox' | 'db' | 'relationship' | 'objectStorage' | 'userWebhookDeliver' | 'systemWebhookDeliver' | 'scheduleNotePost' | 'backgroundTask';
+                    queue: 'deliver' | 'inbox' | 'system' | 'daemon' | 'endedPollNotification' | 'db' | 'relationship' | 'objectStorage' | 'userWebhookDeliver' | 'systemWebhookDeliver' | 'scheduleNotePost' | 'backgroundTask';
                     jobId: string;
                 };
             };
@@ -35815,17 +35819,20 @@ export interface operations {
                 'application/json': {
                     /** Format: misskey:id */
                     fileId: string;
-                    type?: string | null;
+                    /** @enum {string} */
+                    type: 'Misskey' | 'Mastodon' | 'Pleroma' | 'Twitter' | 'Instagram' | 'Facebook';
                 };
             };
         };
         responses: {
-            /** @description OK (without any results) */
-            204: {
+            /** @description OK (with results) */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    'application/json': unknown;
+                };
             };
             /** @description Client error */
             400: {
