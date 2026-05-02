@@ -700,6 +700,11 @@ export class ApRendererService {
 			noindex: user.noindex,
 			indexable: !user.noindex,
 			enableRss: user.enableRss,
+
+			// Placeholder images to pass anti-spam measures on some remote software. (brid.gy, for example)
+			icon: this.renderSystemAvatar(user),
+			image: this.renderSystemBanner(),
+			backgroundUrl: this.renderSystemBackground(),
 		};
 	}
 
