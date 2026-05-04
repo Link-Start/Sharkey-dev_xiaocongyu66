@@ -751,10 +751,10 @@ describe('ActivityPub', () => {
 				expect(result.id).toBeTruthy();
 				expect(result.inbox).toBeTruthy();
 				expect(result.sharedInbox).toBeTruthy();
-				expect(result.endpoints.sharedInbox).toBeTruthy();
+				expect(result.endpoints?.sharedInbox).toBeTruthy();
 				expect(result.url).toBeTruthy();
 				expect(result.preferredUsername).toBe(author.username);
-				expect(result.publicKey.owner).toBe(result.id);
+				expect(result.publicKey?.owner).toBe(result.id);
 				expect(result._misskey_requireSigninToViewContents).toBe(author.requireSigninToViewContents);
 				expect(result._misskey_makeNotesFollowersOnlyBefore).toBe(author.makeNotesFollowersOnlyBefore);
 				expect(result._misskey_makeNotesHiddenBefore).toBe(author.makeNotesHiddenBefore);
@@ -882,6 +882,7 @@ describe('ActivityPub', () => {
 			it('should trim publicKey', async () => {
 				const actor = createRandomActor();
 				actor.publicKey = {
+					type: 'Key',
 					id: `${actor.id}#main-key`,
 					publicKeyPem: '  key material\t\n\r\n \n',
 				};

@@ -583,7 +583,7 @@ export class ApNoteService implements OnModuleInit {
 		// eslint-disable-next-line no-param-reassign
 		host = this.utilityService.toPuny(host);
 
-		const eomjiTags: (IApEmoji & { name: string })[] = toArray(tags)
+		const eomjiTags: IApEmoji[] = toArray(tags)
 			.filter(tag => isEmoji(tag))
 			.map(tag => ({
 				...tag,
@@ -597,7 +597,7 @@ export class ApNoteService implements OnModuleInit {
 		return await promiseMap(eomjiTags, async tag => {
 			const name = tag.name.replaceAll(':', '');
 
-			const icon = toSingle(tag.icon);
+			const icon = tag.icon;
 			const newUrl = icon.url;
 
 			const now = this.timeService.date;
