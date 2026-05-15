@@ -74,7 +74,7 @@ collapseAllCws: "折叠所有回复的内容"
 attachAsFileQuestion: "剪贴板内文本很长。你要将文本粘贴为一个文本文件，再附加到帖子吗？"
 signinOrContinueOnRemote: "若要继续，需要转到您的服务器来执行这个操作，或者在您尝试互动的服务器上注册或登录。"
 disableDrawer: "不显示抽屉菜单"
-showReactionsCount: "在帖子中展示「回应」的数量"
+showReactionsCount: "显示帖子的回应数"
 cornerRadius: "圆角边框"
 warnForMissingAltText: "当你忘记填写替代文本时发出警告"
 deeplFreeMode: "使用 DeepLX-JS（无须密钥）"
@@ -98,7 +98,7 @@ i18nInfoSharkey: "Sharkey 独有的变更在它自己的 {link} 中翻译。"
 renotesCount: "已发送的转贴数量"
 renotedCount: "已接收的转贴数量"
 showTickerOnReplies: "在回复中展示远程服务器横幅"
-disableCatSpeak: "禁用像猫一样说话"
+disableCatSpeak: "禁用像猫猫一样说话"
 searchEngine: "查询 MFM 的搜索引擎"
 searchEngineOther: "其他"
 searchEngineCustomURIDescription: "自定义 URI 必须像这样填写「https://www.google.com/search?q=\\{query}」或「https://www.google.com/search?q=%s」。"
@@ -141,7 +141,7 @@ uncollapseCW: "展开帖子的内容警告 (CW)"
 expandLongNote: "总是展开长的帖子"
 autoloadConversation: "回复时加载整个对话"
 approvalRequiredToRegister: "这个实例仅允许提供注册理由的用户注册。"
-limitWidthOfReaction: "限制回应的最大宽度，缩小显示它们。"
+limitWidthOfReaction: "限制回应的最大宽度，并将其缩小显示"
 oneko: "你的猫猫朋友 :3"
 renotesList: "转发列表"
 lookupConfirm: "确定查询？"
@@ -208,7 +208,7 @@ _initialTutorial:
     reactDone: "通过按下「{undo}」按钮，可以取消已经添加的回应。"
   _timeline:
     description1: "Sharkey 提供多种基于使用情况的时间线（根据服务器设定的策略，一些可能不可用）。"
-    bubble: "你可以查看管理员们从已连接的服务器中精选的帖子。"
+    bubble: "可以查看管理员们从已连接的服务器中精选的帖子。"
   _postNote:
     description1: "在 Sharkey 发布帖子时，您可以设置各种选项。发帖窗口看起来是这样的。"
     _visibility:
@@ -265,7 +265,7 @@ _role:
     isFromInstanceHost: "主机名（大小写不敏感）"
     isFromInstanceSubdomains: "匹配子域名"
     fromBubbleInstance: "用户来自精选 (bubble) 服务器"
-    localFollowersLessThanOrEq: "有 X 或更少的本地关注者"
+    localFollowersLessThanOrEq: "有 X 或更少本地关注者"
     localFollowersMoreThanOrEq: "有 X 或更多本地关注者"
     localFollowingLessThanOrEq: "关注了 X 或更少本地账户"
     localFollowingMoreThanOrEq: "关注了 X 或更多本地账户"
@@ -593,7 +593,7 @@ _followRequest:
 
 deleted: "已删除"
 
-enableProxyAccount: "启用代理账户。Enable the proxy account."
+enableProxyAccount: "启用代理账户。"
 enableProxyAccountDescription: "如果禁用，代理账户将不会被使用。用户列表仅会包含来自本地或关注中的用户的帖子。"
 
 _confirmPollEdit:
@@ -601,12 +601,12 @@ _confirmPollEdit:
   text: 编辑投票会导致其失去所有已经收到的投票
 
 wordMuteTestLabel: "测试规则"
-wordMuteTestDescription: "在此处输入一些文本，来测试你的文本规则。如果匹配到了敏感词，那么会展示在下面。"
+wordMuteTestDescription: "在此处输入一些文本，来测试你的文本规则。如果匹配到了目标文本，那么会展示在下面。"
 wordMuteTestTest: "测试"
 wordMuteTestMatch: "匹配到的词：{words}"
 wordMuteTestNoResults: "暂时没有结果。输入一些文本然后点击「测试」来检查它。"
 wordMuteTestNoMatch: "文本并未匹配到任何规则。"
-wordMuteWarning: "所有敏感词都是*大小写敏感*的，并且会匹配任何子字符串（包括更长的词或名字的一部分）。你可以使用正则表达式，来更精确地控制它。"
+wordMuteWarning: "所有敏感词都是*大小写敏感*的，并且会匹配任何子字符串（包括更长的词或名字的一部分）。你可以使用正则表达式，来更精确地控制。"
 
 bubbleTimeline: "精选 (Bubble) 时间线"
 bubbleTimelineDescription: "选择这个时间线应该展示的服务器。"
@@ -662,7 +662,7 @@ hibernated: "已停用"
 keepCwDescription: "当回应一个包含内容警告 (CW) 的帖子时，自动在回复中使用相同的内容警告。"
 keepCwDisabled: "禁用（不复制内容警告）"
 keepCwEnabled: "启用（按原样复制内容警告）"
-keepCwPrependRe: "启用（按复制内容警告，并在开头附加「RE:」）"
+keepCwPrependRe: "启用（按原样复制内容警告，并在开头附加「RE:」）"
 
 noteFooterLabel: "帖子控制"
 
