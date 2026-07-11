@@ -92,7 +92,7 @@ vite.config.local-dev.ts.timestamp-*
 .tsbuildinfo
 *.tsbuildinfo
 .config/
-files/
+/files/
 built/
 packages/*/built/
 packages/*/*/built/
