@@ -378,9 +378,11 @@ function showMenu(ev: MouseEvent, contextmenu = false) {
 	scroll-margin: 80px;
 	border-radius: 12px;
 	transition: background-color 0.35s ease, box-shadow 0.35s ease;
-	/* Skip layout/paint for off-screen rows (TG-like performance) */
-	content-visibility: auto;
-	contain-intrinsic-size: auto 72px;
+	/*
+	  Do NOT use content-visibility:auto here.
+	  Estimated intrinsic height (e.g. 72px) vs real media rows (~200px)
+	  makes the timeline jump while scrolling up OR down.
+	*/
 
 	&.isMe {
 		flex-direction: row-reverse;
