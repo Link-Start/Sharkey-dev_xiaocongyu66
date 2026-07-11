@@ -14207,6 +14207,188 @@ export interface Locale extends ILocale {
      * Root
      */
     "root": string;
+    "_apiErrors": {
+        /**
+         * Operation failed
+         */
+        "title": string;
+        /**
+         * Something went wrong. Please try again later.
+         */
+        "generic": string;
+        /**
+         * Network error or server unreachable. Please check your connection and try again.
+         */
+        "network": string;
+        /**
+         * Request cancelled.
+         */
+        "aborted": string;
+        /**
+         * User not found.
+         */
+        "NO_SUCH_USER": string;
+        /**
+         * User not found.
+         */
+        "USER_NOT_FOUND": string;
+        /**
+         * Note not found.
+         */
+        "NO_SUCH_NOTE": string;
+        /**
+         * File not found.
+         */
+        "NO_SUCH_FILE": string;
+        /**
+         * Folder not found.
+         */
+        "NO_SUCH_FOLDER": string;
+        /**
+         * Chat room not found.
+         */
+        "NO_SUCH_ROOM": string;
+        /**
+         * Message not found.
+         */
+        "NO_SUCH_MESSAGE": string;
+        /**
+         * Channel not found.
+         */
+        "NO_SUCH_CHANNEL": string;
+        /**
+         * Clip not found.
+         */
+        "NO_SUCH_CLIP": string;
+        /**
+         * List not found.
+         */
+        "NO_SUCH_LIST": string;
+        /**
+         * List not found.
+         */
+        "NO_SUCH_USER_LIST": string;
+        /**
+         * Antenna not found.
+         */
+        "NO_SUCH_ANTENNA": string;
+        /**
+         * Page not found.
+         */
+        "NO_SUCH_PAGE": string;
+        /**
+         * Role not found.
+         */
+        "NO_SUCH_ROLE": string;
+        /**
+         * Reply target not found.
+         */
+        "NO_SUCH_REPLY": string;
+        /**
+         * Access denied.
+         */
+        "ACCESS_DENIED": string;
+        /**
+         * Permission denied.
+         */
+        "PERMISSION_DENIED": string;
+        /**
+         * Permission denied.
+         */
+        "ROLE_PERMISSION_DENIED": string;
+        /**
+         * Please sign in to continue.
+         */
+        "CREDENTIAL_REQUIRED": string;
+        /**
+         * Please sign in to continue.
+         */
+        "SIGNIN_REQUIRED": string;
+        /**
+         * Too many requests. Please wait and try again.
+         */
+        "RATE_LIMIT_EXCEEDED": string;
+        /**
+         * Sending too fast. Please wait a moment.
+         */
+        "ROOM_RATE_LIMITED": string;
+        /**
+         * This room is muted for all members.
+         */
+        "ROOM_MUTED_ALL": string;
+        /**
+         * Invalid request parameters.
+         */
+        "INVALID_PARAM": string;
+        /**
+         * Internal server error. Please try again later.
+         */
+        "INTERNAL_ERROR": string;
+        /**
+         * Content is required.
+         */
+        "CONTENT_REQUIRED": string;
+        /**
+         * Empty file is not allowed.
+         */
+        "EMPTY_FILE": string;
+        /**
+         * File is too large.
+         */
+        "TOO_BIG_FILE": string;
+        /**
+         * Unsupported file type.
+         */
+        "UNEXPECTED_FILE_TYPE": string;
+        /**
+         * Text is too long.
+         */
+        "MAX_LENGTH": string;
+        /**
+         * You have been blocked by this user.
+         */
+        "YOU_HAVE_BEEN_BLOCKED": string;
+        /**
+         * Already following this user.
+         */
+        "ALREADY_FOLLOWING": string;
+        /**
+         * Already favorited.
+         */
+        "ALREADY_FAVORITED": string;
+        /**
+         * You are not following this user.
+         */
+        "NOT_FOLLOWING": string;
+        /**
+         * Incorrect password.
+         */
+        "INCORRECT_PASSWORD": string;
+        /**
+         * Incorrect two-factor code.
+         */
+        "INCORRECT_TOTP": string;
+        /**
+         * This feature is unavailable.
+         */
+        "UNAVAILABLE": string;
+        /**
+         * Contains prohibited words.
+         */
+        "PROHIBITED_WORD": string;
+        /**
+         * Contains prohibited words.
+         */
+        "CONTAINS_PROHIBITED_WORDS": string;
+        /**
+         * You are not a member of this room.
+         */
+        "NOT_A_MEMBER": string;
+        /**
+         * Failed to send. Check your connection and try again.
+         */
+        "SEND_FAILED": string;
+    };
 }
 export type Locales = {
     [lang: string]: Locale;
