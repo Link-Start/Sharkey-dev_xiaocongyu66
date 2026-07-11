@@ -246,6 +246,7 @@ import { makeDateSeparatedTimelineComputedRef } from '@/utility/timeline-date-se
 import { pleaseLogin } from '@/utility/please-login.js';
 import { chatT, chatFb, ensureChatLocaleFresh } from './chat-i18n.js';
 import { chatWsKey, createChatWsFromConnection } from './chat-ws.js';
+import { formatApiError } from '@/utility/format-api-error.js';
 
 const router = useRouter();
 const signedIn = computed(() => $i != null);
@@ -539,7 +540,12 @@ function onMsgError(err: { message?: string; code?: string; remainingSeconds?: n
 		DELETE_FAILED: tChat('wsSendFailed'),
 		CLEAR_FAILED: tChat('wsSendFailed'),
 	};
-	let text = map[code] || err?.message || err?.code || tChat('wsSendFailed');
+	let text = map[code];
+	if (!text) {
+		// Prefer localized API error map over raw English backend message
+		const formatted = formatApiError(err);
+		text = formatted.text || err?.message || err?.code || tChat('wsSendFailed');
+	}
 	if (code === 'ROOM_RATE_LIMITED' && err?.remainingSeconds) {
 		text = `${text} (${err.remainingSeconds}s)`;
 	}

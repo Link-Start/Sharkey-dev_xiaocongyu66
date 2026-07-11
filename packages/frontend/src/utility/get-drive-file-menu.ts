@@ -10,6 +10,7 @@ import { i18n } from '@/i18n.js';
 import { copyToClipboard } from '@/utility/copy-to-clipboard.js';
 import * as os from '@/os.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
+import { formatApiError } from '@/utility/format-api-error.js';
 import { prefer } from '@/preferences.js';
 
 function rename(file: Misskey.entities.DriveFile) {
@@ -55,10 +56,11 @@ function toggleSensitive(file: Misskey.entities.DriveFile) {
 		fileId: file.id,
 		isSensitive: !file.isSensitive,
 	}).catch(err => {
+		const formatted = formatApiError(err);
 		os.alert({
 			type: 'error',
-			title: i18n.ts.error,
-			text: err.message,
+			title: formatted.title || i18n.ts.error,
+			text: formatted.text,
 		});
 	});
 }

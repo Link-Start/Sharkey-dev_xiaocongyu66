@@ -31,6 +31,7 @@ import { pleaseLogin } from '@/utility/please-login.js';
 import { showMovedDialog } from '@/utility/show-moved-dialog.js';
 import { getHTMLElementOrNull } from '@/utility/get-dom-node-or-null.js';
 import { focusParent } from '@/utility/focus.js';
+import { formatApiError } from '@/utility/format-api-error.js';
 
 export const openingWindowsCount = ref(0);
 
@@ -48,16 +49,22 @@ export const apiWithDialog = (<
 ): Promise<_ResT> => {
 	const promise = misskeyApi<ResT, E, P, _ResT>(endpoint, data, token);
 	promiseDialog(promise, null, async (err) => {
-		let title: string | undefined;
-		let text = err.message + '\n' + err.id;
-		if (err.code === 'INTERNAL_ERROR') {
-			title = i18n.ts.internalServerError;
-			text = i18n.ts.internalServerErrorDescription;
+		// Per-endpoint custom map (by error id) still wins
+		if (customErrors && err?.id != null && customErrors[err.id] != null) {
+			alert({
+				type: 'error',
+				title: customErrors[err.id].title,
+				text: customErrors[err.id].text,
+			});
+			return;
+		}
+
+		if (err?.code === 'INTERNAL_ERROR') {
 			const date = new Date().toISOString();
 			const { result } = await actions({
 				type: 'error',
-				title,
-				text,
+				title: i18n.ts.internalServerError,
+				text: i18n.ts.internalServerErrorDescription,
 				actions: [{
 					value: 'ok',
 					text: i18n.ts.gotIt,
@@ -68,32 +75,16 @@ export const apiWithDialog = (<
 				}],
 			});
 			if (result === 'copy') {
-				copyToClipboard(`Endpoint: ${endpoint}\nInfo: ${JSON.stringify(err.info)}\nDate: ${date}`);
+				copyToClipboard(`Endpoint: ${endpoint}\nInfo: ${JSON.stringify(err.info)}\nDate: ${date}\nId: ${err.id ?? ''}\nCode: ${err.code ?? ''}`);
 			}
 			return;
-		} else if (err.code === 'RATE_LIMIT_EXCEEDED') {
-			title = i18n.ts.cannotPerformTemporary;
-			text = i18n.ts.cannotPerformTemporaryDescription;
-		} else if (err.code === 'INVALID_PARAM') {
-			title = i18n.ts.invalidParamError;
-			text = i18n.ts.invalidParamErrorDescription;
-		} else if (err.code === 'ROLE_PERMISSION_DENIED') {
-			title = i18n.ts.permissionDeniedError;
-			text = i18n.ts.permissionDeniedErrorDescription;
-		} else if (err.code.startsWith('TOO_MANY')) {
-			title = i18n.ts.youCannotCreateAnymore;
-			text = `${i18n.ts.error}: ${err.id}`;
-		} else if (err.message.startsWith('Unexpected token')) {
-			title = i18n.ts.gotInvalidResponseError;
-			text = i18n.ts.gotInvalidResponseErrorDescription;
-		} else if (customErrors && customErrors[err.id] != null) {
-			title = customErrors[err.id].title;
-			text = customErrors[err.id].text;
 		}
+
+		const formatted = formatApiError(err, { endpoint: String(endpoint) });
 		alert({
 			type: 'error',
-			title,
-			text,
+			title: formatted.title,
+			text: formatted.text,
 		});
 	});
 
@@ -128,17 +119,12 @@ export function promiseDialog<T extends Promise<any>>(
 		if (onFailure) {
 			onFailure(err);
 		} else {
-			if (err.message) {
-				alert({
-					type: 'error',
-					text: err.message,
-				});
-			} else {
-				alert({
-					type: 'error',
-					text: err,
-				});
-			}
+			const formatted = formatApiError(err);
+			alert({
+				type: 'error',
+				title: formatted.title,
+				text: formatted.text,
+			});
 		}
 	});
 

@@ -128,6 +128,7 @@ import { extractMentions, type MfmMention } from '@/utility/extract-mentions.js'
 import { Autocomplete } from '@/utility/autocomplete.js';
 import * as os from '@/os.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
+import { formatApiError } from '@/utility/format-api-error.js';
 import { selectFiles } from '@/utility/select-file.js';
 import { store } from '@/store.js';
 import MkInfo from '@/components/MkInfo.vue';
@@ -1045,9 +1046,11 @@ async function post(ev?: MouseEvent) {
 		});
 	}).catch(err => {
 		posting.value = false;
+		const formatted = formatApiError(err);
 		os.alert({
 			type: 'error',
-			text: err.message + '\n' + (err as any).id,
+			title: formatted.title,
+			text: formatted.text,
 		});
 	});
 }

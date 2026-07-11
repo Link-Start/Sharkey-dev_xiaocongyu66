@@ -75,6 +75,7 @@ import { showSuspendedDialog } from '@/utility/show-suspended-dialog.js';
 import { i18n } from '@/i18n.js';
 import { showSystemAccountDialog } from '@/utility/show-system-account-dialog.js';
 import * as os from '@/os.js';
+import { formatApiError } from '@/utility/format-api-error.js';
 
 import XInput from '@/components/MkSignin.input.vue';
 import XPassword from '@/components/MkSignin.password.vue';
@@ -363,14 +364,11 @@ function onSigninApiError(err?: any): void {
 		}
 		default: {
 			console.error(err);
-			const msg =
-				(typeof err?.message === 'string' && err.message) ||
-				(typeof err === 'string' && err) ||
-				i18n.ts.signinFailed;
-			// Avoid dumping raw JSON / "Internal Server Error" blobs to the user
-			const text = msg === 'Internal Server Error'
-				? i18n.ts.signinFailed
-				: msg;
+			const formatted = formatApiError(err);
+			const text =
+				formatted.code === 'INTERNAL_ERROR' || formatted.text === 'Internal Server Error'
+					? (i18n.ts.signinFailed || formatted.text)
+					: formatted.text;
 			os.alert({
 				type: 'error',
 				title: i18n.ts.loginFailed,

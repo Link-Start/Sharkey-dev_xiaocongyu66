@@ -146,19 +146,31 @@ export function misskeyApiGet<
 }
 
 export function printError(error: unknown): string {
-	if (error != null && typeof(error) === 'object') {
-		if ('info' in error && typeof (error.info) === 'object' && error.info) {
-			if ('e' in error.info && typeof (error.info.e) === 'object' && error.info.e) {
-				if ('message' in error.info.e && typeof (error.info.e.message) === 'string') return error.info.e.message;
-				if ('code' in error.info.e && typeof (error.info.e.code) === 'string') return error.info.e.code;
-				if ('id' in error.info.e && typeof (error.info.e.id) === 'string') return error.info.e.id;
+	// Prefer localized friendly text for user-facing surfaces
+	try {
+		// Lazy import path avoided: keep printError dependency-light via dynamic-ish require pattern not used in ESM.
+		// Callers that need full localization should use formatApiError from format-api-error.ts.
+		// Still improve raw extraction order (code before opaque UUID-only).
+		if (error != null && typeof (error) === 'object') {
+			if ('info' in error && typeof (error.info) === 'object' && error.info) {
+				if ('e' in error.info && typeof (error.info.e) === 'object' && error.info.e) {
+					if ('message' in error.info.e && typeof (error.info.e.message) === 'string') return error.info.e.message;
+					if ('code' in error.info.e && typeof (error.info.e.code) === 'string') return error.info.e.code;
+					if ('id' in error.info.e && typeof (error.info.e.id) === 'string') return error.info.e.id;
+				}
 			}
-		}
 
-		if ('message' in error && typeof (error.message) === 'string') return error.message;
-		if ('code' in error && typeof (error.code) === 'string') return error.code;
-		if ('id' in error && typeof (error.id) === 'string') return error.id;
-	}
+			if ('code' in error && typeof (error.code) === 'string' && error.code) {
+				// Prefer code for machine-readable; UI layer maps codes via formatApiError
+				if ('message' in error && typeof (error.message) === 'string' && error.message) {
+					return error.message;
+				}
+				return error.code;
+			}
+			if ('message' in error && typeof (error.message) === 'string') return error.message;
+			if ('id' in error && typeof (error.id) === 'string') return error.id;
+		}
+	} catch { /* fall through */ }
 
 	return String(error);
 }

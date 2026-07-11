@@ -8,6 +8,7 @@ import * as os from '@/os.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import { i18n } from '@/i18n.js';
 import { mainRouter } from '@/router.js';
+import { formatApiError } from '@/utility/format-api-error.js';
 
 export async function lookup(router?: Router) {
 	const _router = router ?? mainRouter;
@@ -48,7 +49,7 @@ export async function apLookup(query: string) {
 
 	os.promiseDialog(promise, null, (err) => {
 		let title = i18n.ts.somethingHappened;
-		let text = err.message + '\n' + err.id;
+		let text = formatApiError(err).text;
 
 		switch (err.id) {
 			case '974b799e-1a29-4889-b706-18d4dd93e266':
@@ -71,6 +72,12 @@ export async function apLookup(query: string) {
 				title = i18n.ts._remoteLookupErrors._noSuchObject.title;
 				text = i18n.ts._remoteLookupErrors._noSuchObject.description;
 				break;
+			default: {
+				const formatted = formatApiError(err);
+				title = formatted.title;
+				text = formatted.text;
+				break;
+			}
 		}
 
 		os.alert({

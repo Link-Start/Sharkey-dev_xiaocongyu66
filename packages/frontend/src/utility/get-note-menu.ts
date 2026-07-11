@@ -77,9 +77,12 @@ export async function getNoteClipMenu(props: {
 							text: i18n.ts.clipNoteLimitExceeded,
 						});
 					} else {
+						const { formatApiError } = await import('@/utility/format-api-error.js');
+						const formatted = formatApiError(err);
 						os.alert({
 							type: 'error',
-							text: err.message + '\n' + err.id,
+							title: formatted.title,
+							text: formatted.text,
 						});
 					}
 				},

@@ -47,6 +47,7 @@ import * as os from '@/os.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import { i18n } from '@/i18n.js';
 import { login } from '@/accounts.js';
+import { formatApiError } from '@/utility/format-api-error.js';
 
 const username = ref('');
 const password = ref('');
@@ -67,7 +68,7 @@ function submit() {
 		submitting.value = false;
 
 		let title = i18n.ts.somethingHappened;
-		let text = err.message + '\n' + err.id;
+		let text = formatApiError(err).text;
 
 		if (err.code === 'ACCESS_DENIED') {
 			title = i18n.ts.permissionDeniedError;
@@ -75,6 +76,10 @@ function submit() {
 		} else if (err.code === 'INCORRECT_INITIAL_PASSWORD') {
 			title = i18n.ts.permissionDeniedError;
 			text = i18n.ts.incorrectPassword;
+		} else {
+			const formatted = formatApiError(err);
+			title = formatted.title;
+			text = formatted.text;
 		}
 
 		os.alert({
