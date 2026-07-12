@@ -65,6 +65,8 @@ async function rankNotes(body) {
 	const pipeline = body.pipeline || {};
 	const includeIn = pipeline.includeInNetwork !== false;
 	const includeOut = pipeline.includeOutOfNetwork !== false;
+	const untilId = body.untilId || null;
+	const sinceId = body.sinceId || null;
 
 	const following = await pool.query(
 		`SELECT "followeeId" FROM following WHERE "followerId" = $1`,
@@ -74,63 +76,103 @@ async function rankNotes(body) {
 	const network = new Set(followeeIds);
 	network.add(userId);
 
-	// Candidate pull: recent public notes
+	// Candidate pull: recent public notes (single query, no N+1 subselects)
 	const params = [];
-	const where = [`n.visibility = 'public'`, `n."deletedAt" IS NULL`, `n."userHost" IS NULL`];
-	if (filters.withFiles) where.push(`n."fileIds" <> '{}'`);
-	if (filters.withRenotes === false) where.push(`n."renoteId" IS NULL`);
-	if (filters.withReplies === false) where.push(`n."replyId" IS NULL`);
+	const where = [
+		`n.visibility IN ('public', 'home')`,
+		`(n."isHidden" = false OR n."isHidden" IS NULL)`,
+		`n."userHost" IS NULL`,
+	];
 
-	let sql = `
-		SELECT n.id, n."userId", n."replyId", n."renoteId", n."fileIds",
-			n."score", n."reactionAcceptance",
-			COALESCE((SELECT COUNT(*) FROM note_reaction nr WHERE nr."noteId" = n.id), 0)::int AS reactions,
-			COALESCE((SELECT COUNT(*) FROM note r WHERE r."replyId" = n.id), 0)::int AS replies,
-			COALESCE((SELECT COUNT(*) FROM note rn WHERE rn."renoteId" = n.id), 0)::int AS renotes
-		FROM note n
-		WHERE ${where.join(' AND ')}
-	`;
+	if (filters.withFiles) where.push(`n."fileIds" <> '{}'`);
+	if (filters.withRenotes === false) {
+		where.push(`NOT (n."renoteId" IS NOT NULL AND (n.text IS NULL OR n.text = '') AND (n."fileIds" IS NULL OR n."fileIds" = '{}'))`);
+	}
+	if (filters.withReplies === false) where.push(`n."replyId" IS NULL`);
+	if (filters.withBots === false) where.push(`(u."isBot" IS NULL OR u."isBot" = false)`);
+
+	if (untilId) {
+		params.push(untilId);
+		where.push(`n.id < $${params.length}`);
+	}
+	if (sinceId) {
+		params.push(sinceId);
+		where.push(`n.id > $${params.length}`);
+	}
 
 	if (source === 'home' && includeIn && !includeOut) {
 		params.push(Array.from(network));
-		sql += ` AND n."userId" = ANY($${params.length})`;
+		where.push(`n."userId" = ANY($${params.length})`);
 	}
 
-	sql += ` ORDER BY n.id DESC LIMIT 800`;
+	// Pull a pool larger than limit for ranking; cap for latency
+	const poolSize = Math.min(Math.max(limit * 6, 120), 500);
+
+	// reactions is jsonb map {emoji: count} — sum values in JS, not SQL cardinality
+	const sql = `
+		SELECT n.id, n."userId", n."replyId", n."renoteId",
+			COALESCE(n."repliesCount", 0)::int AS replies,
+			COALESCE(n."renoteCount", 0)::int AS renotes,
+			COALESCE(n.reactions, '{}'::jsonb) AS reactions
+		FROM note n
+		LEFT JOIN "user" u ON u.id = n."userId"
+		WHERE ${where.join(' AND ')}
+		ORDER BY n.id DESC
+		LIMIT ${poolSize}
+	`;
 
 	const { rows } = await pool.query(sql, params);
 	const now = Date.now();
 	const authorCount = new Map();
 
-	const scored = rows.map((row) => {
-		const ageH = Math.max(0.1, (now - idTimeMs(row.id)) / 3_600_000);
-		const engagement =
-			Number(row.reactions) * 1.0 +
-			Number(row.replies) * 1.5 +
-			Number(row.renotes) * 2.0 +
-			Number(row.score || 0) * 0.01;
-		const recency = 1 / Math.pow(ageH + 2, 1.15);
-		const inNetwork = network.has(row.userId) ? 1.25 : 1.0;
-		if (source === 'home' && includeIn && !includeOut && !network.has(row.userId)) {
-			return null;
-		}
-		if (!includeIn && network.has(row.userId) && row.userId !== userId) return null;
-		if (!includeOut && !network.has(row.userId)) return null;
+	const reactionSum = (reactions) => {
+		if (!reactions || typeof reactions !== 'object') return 0;
+		return Object.values(reactions).reduce((s, v) => s + (Number(v) || 0), 0);
+	};
 
-		const base = engagement * recency * inNetwork;
-		return { id: row.id, userId: row.userId, score: base };
-	}).filter(Boolean);
+	const scored = [];
+	for (const row of rows) {
+		const inNet = network.has(row.userId);
+		if (source === 'home' && includeIn && !includeOut && !inNet) continue;
+		if (!includeIn && inNet && row.userId !== userId) continue;
+		if (!includeOut && !inNet) continue;
+
+		const ageH = Math.max(0.05, (now - idTimeMs(row.id)) / 3_600_000);
+		const engagement =
+			reactionSum(row.reactions) * 1.0 +
+			Number(row.replies) * 1.4 +
+			Number(row.renotes) * 1.8;
+		const recency = 1 / Math.pow(ageH + 1.5, 1.1);
+		const networkBoost = inNet ? 1.35 : 0.85;
+		// Slight boost for original posts vs pure renotes
+		const originalBoost = row.renoteId && !row.replyId ? 0.9 : 1.05;
+		const base = (0.35 + engagement) * recency * networkBoost * originalBoost;
+		scored.push({ id: row.id, userId: row.userId, score: base, inNet });
+	}
 
 	scored.sort((a, b) => b.score - a.score);
 
-	// Author diversity: penalize repeated authors
+	// Author diversity + mild in-network quota for home
 	const out = [];
+	let outOfNetwork = 0;
+	const maxOon = includeOut ? Math.ceil(limit * 0.35) : 0;
 	for (const item of scored) {
 		const c = authorCount.get(item.userId) || 0;
 		if (c >= 3) continue;
+		if (!item.inNet && outOfNetwork >= maxOon) continue;
 		authorCount.set(item.userId, c + 1);
+		if (!item.inNet) outOfNetwork++;
 		out.push(item.id);
 		if (out.length >= limit) break;
+	}
+
+	// If too few results (empty following), fill with top scored regardless of network
+	if (out.length < Math.min(limit, 10) && includeOut) {
+		for (const item of scored) {
+			if (out.includes(item.id)) continue;
+			out.push(item.id);
+			if (out.length >= limit) break;
+		}
 	}
 
 	return out;

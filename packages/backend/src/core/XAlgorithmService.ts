@@ -8,6 +8,8 @@ import type { MiMeta } from '@/models/Meta.js';
 import type { MiLocalUser } from '@/models/User.js';
 import { DI } from '@/di-symbols.js';
 import { bindThis } from '@/decorators.js';
+import { LoggerService } from '@/core/LoggerService.js';
+import type { Logger } from '@/logger.js';
 
 export type XAlgorithmTimelineSource = 'home' | 'hybrid';
 
@@ -23,12 +25,26 @@ export type XAlgorithmTimelineRequest = {
 	withBots: boolean;
 };
 
+type CacheEntry = {
+	ids: string[];
+	expiresAt: number;
+};
+
 @Injectable()
 export class XAlgorithmService {
+	private readonly logger: Logger;
+	/** Short TTL cache to absorb rapid refreshes / parallel home+hybrid */
+	private readonly cache = new Map<string, CacheEntry>();
+	private readonly CACHE_TTL_MS = 8_000;
+	private readonly CACHE_MAX = 200;
+
 	constructor(
 		@Inject(DI.meta)
 		private readonly meta: MiMeta,
+
+		loggerService: LoggerService,
 	) {
+		this.logger = loggerService.getLogger('x-algo');
 	}
 
 	@bindThis
@@ -38,7 +54,9 @@ export class XAlgorithmService {
 
 	@bindThis
 	public shouldFallbackToSharkeyTimeline(): boolean {
-		return this.meta.xAlgorithmConfig?.fallbackToSharkeyTimeline === true;
+		// Default true when unset so a dead gateway never black-holes the home TL
+		const v = this.meta.xAlgorithmConfig?.fallbackToSharkeyTimeline;
+		return v !== false;
 	}
 
 	@bindThis
@@ -52,7 +70,15 @@ export class XAlgorithmService {
 			throw new Error('X Algorithm endpoint is not configured');
 		}
 
-		return await this.fetchTimelineNoteIds(request, config, endpoint);
+		const cacheKey = this.cacheKey(request);
+		const hit = this.cache.get(cacheKey);
+		if (hit && hit.expiresAt > Date.now()) {
+			return hit.ids.slice(0, request.limit);
+		}
+
+		const ids = await this.fetchTimelineNoteIds(request, config, endpoint);
+		this.setCache(cacheKey, ids);
+		return ids.slice(0, request.limit);
 	}
 
 	@bindThis
@@ -66,26 +92,65 @@ export class XAlgorithmService {
 			throw new Error('X Algorithm endpoint is not configured');
 		}
 
+		// Bypass cache for admin tests
 		return await this.fetchTimelineNoteIds(request, config, endpoint);
 	}
 
 	@bindThis
+	private cacheKey(request: XAlgorithmTimelineRequest): string {
+		return [
+			request.user.id,
+			request.source,
+			request.limit,
+			request.sinceId ?? '',
+			request.untilId ?? '',
+			request.withFiles ? '1' : '0',
+			request.withRenotes ? '1' : '0',
+			request.withReplies ? '1' : '0',
+			request.withBots ? '1' : '0',
+		].join('|');
+	}
+
+	@bindThis
+	private setCache(key: string, ids: string[]): void {
+		if (this.cache.size >= this.CACHE_MAX) {
+			// Drop oldest ~25%
+			const n = Math.ceil(this.CACHE_MAX / 4);
+			let i = 0;
+			for (const k of this.cache.keys()) {
+				this.cache.delete(k);
+				if (++i >= n) break;
+			}
+		}
+		this.cache.set(key, { ids, expiresAt: Date.now() + this.CACHE_TTL_MS });
+	}
+
+	@bindThis
 	private async fetchTimelineNoteIds(request: XAlgorithmTimelineRequest, config: NonNullable<MiMeta['xAlgorithmConfig']>, endpoint: string): Promise<string[]> {
+		const timeoutMs = Math.max(500, Math.min(config.requestTimeoutMs || 3000, 15_000));
 		const controller = new AbortController();
-		const timeout = setTimeout(() => controller.abort(), config.requestTimeoutMs);
+		const timeout = setTimeout(() => controller.abort(), timeoutMs);
+		const started = Date.now();
 
 		try {
+			const candidates = Math.min(
+				Math.max(config.candidatesPerRequest || request.limit, request.limit),
+				Math.max(request.limit, 50),
+				200,
+			);
+
 			const response = await fetch(endpoint, {
 				method: 'POST',
 				headers: {
 					'content-type': 'application/json',
+					accept: 'application/json',
 					...(config.apiKey ? { authorization: `Bearer ${config.apiKey}` } : {}),
 				},
 				body: JSON.stringify({
 					product: 'sharkey',
 					source: request.source,
 					userId: request.user.id,
-					limit: Math.min(config.candidatesPerRequest, request.limit),
+					limit: candidates,
 					sinceId: request.sinceId,
 					untilId: request.untilId,
 					filters: {
@@ -110,11 +175,19 @@ export class XAlgorithmService {
 			});
 
 			if (!response.ok) {
-				throw new Error(`X Algorithm responded with HTTP ${response.status}`);
+				const body = await response.text().catch(() => '');
+				throw new Error(`X Algorithm HTTP ${response.status}${body ? `: ${body.slice(0, 200)}` : ''}`);
 			}
 
 			const result = await response.json() as unknown;
-			return this.extractNoteIds(result).slice(0, request.limit);
+			const ids = this.extractNoteIds(result);
+			this.logger.debug(`x-algo ok user=${request.user.id} n=${ids.length} ${Date.now() - started}ms`);
+			return ids;
+		} catch (err) {
+			const name = err instanceof Error ? err.name : 'Error';
+			const msg = err instanceof Error ? err.message : String(err);
+			this.logger.warn(`x-algo fail user=${request.user.id} ${name}: ${msg} (${Date.now() - started}ms)`);
+			throw err;
 		} finally {
 			clearTimeout(timeout);
 		}
@@ -135,10 +208,15 @@ export class XAlgorithmService {
 				}
 			}
 
-			for (const key of ['posts', 'tweets', 'candidates', 'items']) {
+			for (const key of ['posts', 'tweets', 'candidates', 'items', 'data']) {
 				const value = record[key];
 				if (Array.isArray(value)) {
 					return value.map(item => this.extractIdFromObject(item)).filter((id): id is string => id != null);
+				}
+				// Nested { data: { noteIds: [] } }
+				if (value && typeof value === 'object') {
+					const nested = this.extractNoteIds(value);
+					if (nested.length) return nested;
 				}
 			}
 		}
@@ -148,7 +226,8 @@ export class XAlgorithmService {
 
 	@bindThis
 	private extractIdFromObject(item: unknown): string | null {
-		if (!item || typeof item !== 'object') return null;
+		if (!item || typeof item === 'string') return typeof item === 'string' ? item : null;
+		if (typeof item !== 'object') return null;
 		const record = item as Record<string, unknown>;
 		for (const key of ['noteId', 'postId', 'tweetId', 'id']) {
 			if (typeof record[key] === 'string') return record[key];

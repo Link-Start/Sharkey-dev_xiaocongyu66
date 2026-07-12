@@ -465,25 +465,97 @@ function onRoomCleared() {
 	canFetchMore.value = false;
 }
 
-/** Prefer WebSocket for room + 1:1 messages; returns true if handed to WS */
+/**
+ * Send via WebSocket and wait until:
+ * 1) server acks (msgAck), and
+ * 2) our own message appears in the local timeline (or short timeout).
+ * Spinner stays aligned with when the bubble actually shows.
+ */
 function wsSendMessage(payload: {
 	text?: string;
 	fileId?: string;
 	replyId?: string;
 	isE2ee?: boolean;
 	ciphertext?: string;
-}): boolean {
+}): Promise<boolean> | false {
 	if (!connection.value) return false;
 	if (!props.roomId && !props.userId) return false;
+	const conn = connection.value as any;
+	const meId = $i?.id;
+	const expectText = payload.text ?? null;
+	const expectFile = payload.fileId ?? null;
+	const countBefore = messages.value.length;
+	const newestBefore = messages.value[0]?.id ?? null;
+
 	try {
-		(connection.value as any).send('msg', {
-			text: payload.text ?? null,
-			fileId: payload.fileId ?? null,
-			replyId: payload.replyId ?? null,
-			isE2ee: payload.isE2ee === true,
-			ciphertext: payload.ciphertext ?? null,
+		return new Promise<boolean>((resolve) => {
+			let settled = false;
+			let acked = false;
+
+			const cleanup = () => {
+				clearTimeout(hardTimer);
+				clearInterval(pollTimer);
+				try {
+					conn.off?.('msgAck', onAck);
+					conn.off?.('msgError', onErr);
+				} catch { /* ignore */ }
+			};
+
+			const finish = (ok: boolean) => {
+				if (settled) return;
+				settled = true;
+				cleanup();
+				resolve(ok);
+			};
+
+			const ownMessageVisible = () => {
+				if (!$i) return messages.value.length > countBefore;
+				const head = messages.value.slice(0, 8);
+				return head.some(m => {
+					if (m.fromUserId !== meId) return false;
+					if (newestBefore && m.id <= newestBefore) return false;
+					if (expectFile && m.fileId === expectFile) return true;
+					if (expectText != null && m.text === expectText) return true;
+					// E2EE / empty text with only timing match
+					if (expectText == null && !expectFile) return true;
+					return expectText == null && !!m.fileId;
+				});
+			};
+
+			const onAck = () => {
+				acked = true;
+				// Don't finish yet — wait for bubble (or poll timeout below)
+				if (ownMessageVisible()) finish(true);
+			};
+			const onErr = (err: any) => {
+				try { onMsgError(err); } catch { /* ignore */ }
+				finish(false);
+			};
+
+			// Poll for own message after ack (stream may lag slightly behind msgAck)
+			const pollTimer = window.setInterval(() => {
+				if (ownMessageVisible()) finish(true);
+			}, 40);
+
+			// Hard cap so spinner never sticks forever
+			const hardTimer = window.setTimeout(() => finish(acked || ownMessageVisible()), 6000);
+
+			try {
+				conn.on?.('msgAck', onAck);
+				conn.on?.('msgError', onErr);
+			} catch { /* ignore */ }
+			try {
+				conn.send('msg', {
+					text: payload.text ?? null,
+					fileId: payload.fileId ?? null,
+					replyId: payload.replyId ?? null,
+					isE2ee: payload.isE2ee === true,
+					ciphertext: payload.ciphertext ?? null,
+				});
+			} catch {
+				finish(false);
+			}
 		});
-		return true;
 	} catch {
 		return false;
 	}
@@ -1471,19 +1543,37 @@ definePage(computed(() => {
 	gap: 6px !important;
 }
 
-/* Compact sticky header: less padding under room name on mobile */
+/* Compact sticky header: shorter "chin" under room name (esp. mobile) */
 .chatPage {
 	:global([class*='lower']) {
-		--height: 34px !important;
+		--height: 28px !important;
 	}
 	:global([class*='upper']) {
-		--height: 42px !important;
+		--height: 38px !important;
 	}
 	:global([class*='titleContainer']) {
-		margin-left: 8px !important;
+		margin-left: 6px !important;
 	}
 	:global([class*='titleAvatarContainer']) {
-		padding: 4px !important;
+		padding: 2px !important;
+	}
+	/* Tabs row: smaller icons / less vertical padding */
+	:global([class*='tab']) {
+		min-height: 28px !important;
+	}
+}
+
+@media (max-width: 500px) {
+	.chatPage {
+		:global([class*='lower']) {
+			--height: 26px !important;
+		}
+		:global([class*='upper']) {
+			--height: 36px !important;
+		}
+	}
+	.chatSpacer {
+		padding-top: 0 !important;
 	}
 }
 

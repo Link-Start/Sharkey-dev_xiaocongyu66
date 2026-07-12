@@ -49,23 +49,25 @@ const expanded = ref(false);
 <style lang="scss" module>
 .root {
 	position: sticky;
-	top: 0;
-	z-index: 15;
-	border-radius: 10px;
+	/* Sit below PageWithHeader sticky chrome (title + tabs), not under it */
+	top: var(--MI-stickyTop, 0px);
+	z-index: 5;
+	border-radius: 8px;
 	background: color-mix(in srgb, var(--MI_THEME-accent) 10%, var(--MI_THEME-panel));
 	border: 1px solid color-mix(in srgb, var(--MI_THEME-accent) 22%, var(--MI_THEME-divider));
 	overflow: hidden;
-	/* keep compact when collapsed */
-	margin-bottom: 2px;
+	margin: 0 0 4px;
+	/* Avoid being covered by fixed mobile header */
+	box-shadow: 0 1px 0 color-mix(in srgb, var(--MI_THEME-bg) 80%, transparent);
 }
 
 .main {
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: 6px;
 	width: 100%;
-	min-height: 44px;
-	padding: 6px 10px 6px 0;
+	min-height: 36px;
+	padding: 4px 8px 4px 0;
 	text-align: left;
 	color: inherit;
 }
@@ -80,15 +82,15 @@ const expanded = ref(false);
 
 .iconWrap {
 	flex-shrink: 0;
-	width: 28px;
-	height: 28px;
+	width: 24px;
+	height: 24px;
 	border-radius: 999px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	background: color-mix(in srgb, var(--MI_THEME-accent) 18%, transparent);
 	color: var(--MI_THEME-accent);
-	font-size: 0.95em;
+	font-size: 0.85em;
 }
 
 .content {
@@ -101,16 +103,16 @@ const expanded = ref(false);
 }
 
 .title {
-	font-size: 11px;
+	font-size: 10px;
 	font-weight: 700;
-	line-height: 1.2;
+	line-height: 1.15;
 	letter-spacing: 0.02em;
 	color: var(--MI_THEME-accent);
 }
 
 .body {
-	font-size: 13px;
-	line-height: 1.35;
+	font-size: 12px;
+	line-height: 1.3;
 	white-space: pre-wrap;
 	word-break: break-word;
 	color: var(--MI_THEME-fg);

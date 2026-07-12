@@ -113,14 +113,19 @@ const props = defineProps<{
 	user?: Misskey.entities.UserDetailed | null;
 	room?: Misskey.entities.ChatRoom | null;
 	replyTo?: Misskey.entities.ChatMessageLite | null;
-	/** Prefer WebSocket when provided; returns true if handled */
+	/**
+	 * Prefer WebSocket when provided.
+	 * - false: not available, fall back to REST
+	 * - true: handled (legacy sync)
+	 * - Promise: wait until server acks so spinner matches real send time
+	 */
 	wsSend?: (payload: {
 		text?: string;
 		fileId?: string;
 		replyId?: string;
 		isE2ee?: boolean;
 		ciphertext?: string;
-	}) => boolean;
+	}) => boolean | Promise<boolean>;
 }>();
 
 const emit = defineEmits<{
@@ -359,15 +364,18 @@ async function sendPayload(payload: { text?: string; fileId?: string }) {
 			ciphertext,
 		};
 
-		// Prefer WebSocket (room + 1:1)
+		// Prefer WebSocket (room + 1:1) — keep spinner until msgAck + bubble visible
 		if (props.wsSend) {
-			const ok = props.wsSend(wsPayload);
-			if (ok) {
-				clear();
-				showStickers.value = false;
-				// Brief busy state so rapid re-taps cannot double-send over WS
-				await new Promise<void>(r => window.setTimeout(() => r(), 280));
-				return;
+			const handed = props.wsSend(wsPayload);
+			if (handed !== false) {
+				const ok = handed === true ? true : await handed;
+				if (ok) {
+					// Clear only after server accepted and message is (or should be) on screen
+					clear();
+					showStickers.value = false;
+					return;
+				}
+				// WS rejected → try REST below
 			}
 		}
 
