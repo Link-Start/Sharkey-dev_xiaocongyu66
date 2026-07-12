@@ -20,6 +20,8 @@ export const meta = {
 		properties: {
 			userId: { type: 'string', optional: false, nullable: false },
 			publicKey: { type: 'string', optional: false, nullable: true },
+			keyId: { type: 'string', optional: false, nullable: true },
+			updatedAt: { type: 'string', format: 'date-time', optional: false, nullable: true },
 		},
 	},
 	errors: {
@@ -52,6 +54,8 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			return {
 				userId: ps.userId,
 				publicKey: row?.publicKey ?? null,
+				keyId: row?.keyId ?? null,
+				updatedAt: row?.updatedAt ? row.updatedAt.toISOString() : null,
 			};
 		});
 	}

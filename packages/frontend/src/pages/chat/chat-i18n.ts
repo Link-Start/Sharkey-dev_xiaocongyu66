@@ -358,6 +358,18 @@ export const chatFb = {
 		'zh-TW': '對方尚未啟用端到端加密。請對方先打開一次此私聊。',
 		ja: '相手が E2EE をまだ有効にしていません。相手にこのチャットを一度開いてもらってください。',
 	},
+	e2eeFingerprint: {
+		en: 'Peer key fingerprint (compare out-of-band)',
+		zh: '对方密钥指纹（请线下核对）',
+		'zh-TW': '對方金鑰指紋（請線下核對）',
+		ja: '相手の鍵フィンガープリント（別経路で照合）',
+	},
+	e2eeKeyRotated: {
+		en: 'Peer encryption key was updated. Messages re-sync with the new key.',
+		zh: '对方加密密钥已更新，将使用新密钥同步。',
+		'zh-TW': '對方加密金鑰已更新，將使用新金鑰同步。',
+		ja: '相手の暗号鍵が更新されました。新しい鍵で同期します。',
+	},
 	e2eePlaceholder: {
 		en: 'Encrypted message…',
 		zh: '加密消息…',

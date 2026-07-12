@@ -89,6 +89,12 @@ export interface MainEventTypes {
 		announcement: Packed<'Announcement'>;
 	};
 	edited: Packed<'Note'>;
+	/** Peer published / rotated chat E2EE public key */
+	e2eeKeyUpdated: {
+		userId: MiUser['id'];
+		keyId: string | null;
+		updatedAt: string;
+	};
 }
 
 export interface DriveEventTypes {
@@ -189,6 +195,12 @@ export interface ChatEventTypes {
 	memberUnbanned: {
 		userId: MiUser['id'];
 		byUserId: MiUser['id'];
+	};
+	/** Peer published/rotated E2EE public key (1:1 stream) */
+	e2eeKeyUpdated: {
+		userId: MiUser['id'];
+		keyId: string | null;
+		updatedAt: string;
 	};
 }
 

@@ -641,6 +641,22 @@ function openAnnouncementEdit() {
 async function refreshRoom() {
 	if (!props.roomId) return;
 	try {
+		// Prefer WS roomShow when chat channel is open
+		if (chatWs.ready()) {
+			const res = await chatWs.request<{ room?: any }>(
+				'roomShow',
+				{},
+				'room',
+				'roomError',
+				'chat/rooms/show',
+				{ roomId: props.roomId },
+			);
+			const r = (res as any)?.room ?? res;
+			if (r?.id) {
+				room.value = r as Misskey.entities.ChatRoom;
+				return;
+			}
+		}
 		const r = await misskeyApi('chat/rooms/show', { roomId: props.roomId }) as any;
 		room.value = r as Misskey.entities.ChatRoom;
 	} catch { /* ignore */ }
@@ -1075,6 +1091,14 @@ function bindChatChannelEvents() {
 	conn.on?.('memberKicked', onMemberKicked);
 	conn.on?.('memberBanned', onMemberBanned);
 	conn.on?.('memberMuted', onMemberMuted);
+	// E2EE: peer rotated public key — drop cache so next encrypt/decrypt refetches
+	conn.on?.('e2eeKeyUpdated', (body: { userId?: string }) => {
+		if (body?.userId) {
+			import('./chat-e2ee.js').then(({ invalidatePeerKey }) => {
+				invalidatePeerKey(body.userId!);
+			}).catch(() => { /* ignore */ });
+		}
+	});
 }
 
 function onMemberKicked(body: { userId?: string }) {

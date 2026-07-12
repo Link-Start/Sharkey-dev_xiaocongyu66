@@ -3,16 +3,18 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { DI } from '@/di-symbols.js';
 import { bindThis } from '@/decorators.js';
-import type { ChatMessagesRepository, DriveFilesRepository, MiDriveFile } from '@/models/_.js';
+import type { ChatE2eeKeysRepository, ChatMessagesRepository, DriveFilesRepository, MiDriveFile } from '@/models/_.js';
 import type { ChatEventPayload } from '@/core/GlobalEventService.js';
 import type { JsonObject } from '@/misc/json-value.js';
 import type { Config } from '@/config.js';
 import { ChatService } from '@/core/ChatService.js';
 import { ChatEntityService } from '@/core/entities/ChatEntityService.js';
 import { CacheService } from '@/core/CacheService.js';
+import { GlobalEventService } from '@/core/GlobalEventService.js';
 import { Channel, type MiChannelService } from '../channel.js';
 
 class ChatUserChannel extends Channel {
@@ -28,9 +30,11 @@ class ChatUserChannel extends Channel {
 
 		private chatMessagesRepository: ChatMessagesRepository,
 		private driveFilesRepository: DriveFilesRepository,
+		private chatE2eeKeysRepository: ChatE2eeKeysRepository,
 		private chatService: ChatService,
 		private chatEntityService: ChatEntityService,
 		private cacheService: CacheService,
+		private globalEventService: GlobalEventService,
 		private config: Config,
 	) {
 		super(id, connection);
@@ -208,6 +212,80 @@ class ChatUserChannel extends Channel {
 				}
 				break;
 			}
+
+			// E2EE: fetch peer public key over open chat channel (no extra REST)
+			case 'e2eeKeyGet': {
+				try {
+					await this.chatService.checkChatAvailability(this.user.id, 'read');
+					const targetId = typeof body?.userId === 'string' ? body.userId : this.otherId;
+					const reqId = typeof body?.reqId === 'string' ? body.reqId : null;
+					const row = await this.chatE2eeKeysRepository.findOneBy({ userId: targetId });
+					this.send('e2eeKey', {
+						reqId,
+						userId: targetId,
+						publicKey: row?.publicKey ?? null,
+						keyId: row?.keyId ?? null,
+						updatedAt: row?.updatedAt ? row.updatedAt.toISOString() : null,
+					});
+				} catch (e) {
+					const msg = e instanceof Error ? e.message : 'error';
+					this.send('e2eeKeyError', { code: 'KEY_FAILED', message: msg, reqId: body?.reqId ?? null });
+				}
+				break;
+			}
+
+			// E2EE: publish own public key over WS + notify self (other devices)
+			case 'e2eeKeySet': {
+				try {
+					await this.chatService.checkChatAvailability(this.user.id, 'write');
+					const publicKey = typeof body?.publicKey === 'string' ? body.publicKey : null;
+					const reqId = typeof body?.reqId === 'string' ? body.reqId : null;
+					if (!publicKey) {
+						this.send('e2eeKeyError', { code: 'CONTENT_REQUIRED', message: 'publicKey required', reqId });
+						return;
+					}
+					let parsed: any;
+					try {
+						parsed = JSON.parse(publicKey);
+					} catch {
+						this.send('e2eeKeyError', { code: 'INVALID_KEY', message: 'invalid json', reqId });
+						return;
+					}
+					if (parsed?.kty !== 'EC' || !parsed?.x || !parsed?.y || parsed.d) {
+						this.send('e2eeKeyError', { code: 'INVALID_KEY', message: 'invalid jwk', reqId });
+						return;
+					}
+					const keyId = (typeof body?.keyId === 'string' && body.keyId.trim())
+						? body.keyId.trim().slice(0, 64)
+						: createHash('sha256').update(publicKey).digest('hex').slice(0, 16);
+					const updatedAt = new Date();
+					const existing = await this.chatE2eeKeysRepository.findOneBy({ userId: this.user.id });
+					if (existing) {
+						await this.chatE2eeKeysRepository.update(this.user.id, { publicKey, keyId, updatedAt });
+					} else {
+						await this.chatE2eeKeysRepository.insert({
+							userId: this.user.id,
+							publicKey,
+							keyId,
+							updatedAt,
+						});
+					}
+					const payload = {
+						userId: this.user.id,
+						keyId,
+						updatedAt: updatedAt.toISOString(),
+					};
+					await this.globalEventService.publishMainStream(this.user.id, 'e2eeKeyUpdated', payload);
+					// Both stream directions so either side of the 1:1 channel receives it
+					await this.globalEventService.publishChatUserStream(this.user.id, this.otherId, 'e2eeKeyUpdated', payload);
+					await this.globalEventService.publishChatUserStream(this.otherId, this.user.id, 'e2eeKeyUpdated', payload);
+					this.send('e2eeKeySetAck', { reqId, ok: true, keyId });
+				} catch (e) {
+					const msg = e instanceof Error ? e.message : 'error';
+					this.send('e2eeKeyError', { code: 'KEY_SET_FAILED', message: msg, reqId: body?.reqId ?? null });
+				}
+				break;
+			}
 		}
 	}
 
@@ -232,12 +310,16 @@ export class ChatUserChannelService implements MiChannelService<true> {
 		@Inject(DI.driveFilesRepository)
 		private readonly driveFilesRepository: DriveFilesRepository,
 
+		@Inject(DI.chatE2eeKeysRepository)
+		private readonly chatE2eeKeysRepository: ChatE2eeKeysRepository,
+
 		@Inject(DI.config)
 		private readonly config: Config,
 
 		private readonly chatService: ChatService,
 		private readonly chatEntityService: ChatEntityService,
 		private readonly cacheService: CacheService,
+		private readonly globalEventService: GlobalEventService,
 	) {
 	}
 
@@ -248,9 +330,11 @@ export class ChatUserChannelService implements MiChannelService<true> {
 			connection,
 			this.chatMessagesRepository,
 			this.driveFilesRepository,
+			this.chatE2eeKeysRepository,
 			this.chatService,
 			this.chatEntityService,
 			this.cacheService,
+			this.globalEventService,
 			this.config,
 		);
 	}

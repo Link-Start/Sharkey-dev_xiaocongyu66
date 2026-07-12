@@ -64,6 +64,12 @@ export type Channels = {
 			receiveFollowRequest: (payload: User) => void;
 			announcementCreated: (payload: AnnouncementCreated) => void;
 			edited: (payload: Note) => void;
+			/** Own (or watched) E2EE public key published/rotated */
+			e2eeKeyUpdated: (payload: {
+				userId: string;
+				keyId: string | null;
+				updatedAt: string;
+			}) => void;
 			/** Response to requestNotifications over main WS */
 			notifications: (payload: {
 				reqId?: string | null;
@@ -283,6 +289,20 @@ export type Channels = {
 				untilId?: string | null;
 			}) => void;
 			historyError: (payload: { code?: string; message?: string; reqId?: string | null }) => void;
+			e2eeKey: (payload: {
+				reqId?: string | null;
+				userId: string;
+				publicKey: string | null;
+				keyId?: string | null;
+				updatedAt?: string | null;
+			}) => void;
+			e2eeKeyError: (payload: { code?: string; message?: string; reqId?: string | null }) => void;
+			e2eeKeySetAck: (payload: { reqId?: string | null; ok: boolean; keyId?: string | null }) => void;
+			e2eeKeyUpdated: (payload: {
+				userId: string;
+				keyId: string | null;
+				updatedAt: string;
+			}) => void;
 			react: (payload: {
 				reaction: string;
 				user?: UserLite;
@@ -320,6 +340,15 @@ export type Channels = {
 				limit?: number;
 				untilId?: string | null;
 				sinceId?: string | null;
+				reqId?: string;
+			};
+			e2eeKeyGet: {
+				userId?: string;
+				reqId?: string;
+			};
+			e2eeKeySet: {
+				publicKey: string;
+				keyId?: string;
 				reqId?: string;
 			};
 		};

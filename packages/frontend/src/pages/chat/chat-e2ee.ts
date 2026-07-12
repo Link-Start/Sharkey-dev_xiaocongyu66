@@ -7,6 +7,7 @@
  * Chat E2EE (1:1) using Web Crypto:
  * - ECDH P-256 long-term keypair (private key stays in IndexedDB / localStorage)
  * - AES-GCM message encryption with derived shared secret
+ * - keyId fingerprint for rotation detection
  * Server only stores ciphertext + public keys.
  */
 
@@ -22,6 +23,13 @@ type StoredKeyPair = {
 	userId: string;
 	publicKeyJwk: JsonWebKey;
 	privateKeyJwk: JsonWebKey;
+	keyId?: string;
+};
+
+type PeerKeyRecord = {
+	jwk: JsonWebKey;
+	keyId: string | null;
+	updatedAt: string | null;
 };
 
 function storageKey(userId: string) {
@@ -40,6 +48,19 @@ function b64decode(s: string): Uint8Array {
 	const out = new Uint8Array(bin.length);
 	for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
 	return out;
+}
+
+/** Short fingerprint from public JWK (matches server when keyId omitted). */
+export async function fingerprintPublicKey(publicKeyJwk: JsonWebKey): Promise<string> {
+	const raw = JSON.stringify({
+		crv: publicKeyJwk.crv,
+		kty: publicKeyJwk.kty,
+		x: publicKeyJwk.x,
+		y: publicKeyJwk.y,
+	});
+	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+	const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+	return hex.slice(0, 16);
 }
 
 async function openDb(): Promise<IDBDatabase | null> {
@@ -69,7 +90,6 @@ async function idbGet(userId: string): Promise<StoredKeyPair | null> {
 async function idbSet(pair: StoredKeyPair): Promise<void> {
 	const db = await openDb();
 	if (!db) {
-		// fallback localStorage
 		localStorage.setItem(storageKey(pair.userId), JSON.stringify(pair));
 		return;
 	}
@@ -93,7 +113,12 @@ async function loadStored(userId: string): Promise<StoredKeyPair | null> {
 	return null;
 }
 
-export async function ensureE2eeKeyPair(): Promise<{ publicKeyJwk: JsonWebKey; privateKey: CryptoKey; publicKey: CryptoKey } | null> {
+export async function ensureE2eeKeyPair(): Promise<{
+	publicKeyJwk: JsonWebKey;
+	privateKey: CryptoKey;
+	publicKey: CryptoKey;
+	keyId: string;
+} | null> {
 	if (!$i || !crypto?.subtle) return null;
 	const userId = $i.id;
 	let stored = await loadStored(userId);
@@ -102,47 +127,118 @@ export async function ensureE2eeKeyPair(): Promise<{ publicKeyJwk: JsonWebKey; p
 		const kp = await crypto.subtle.generateKey(ALGO_ECDH, true, ['deriveBits', 'deriveKey']);
 		const publicKeyJwk = await crypto.subtle.exportKey('jwk', kp.publicKey);
 		const privateKeyJwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
-		// strip private from public jwk just in case
 		delete (publicKeyJwk as any).d;
-		stored = { userId, publicKeyJwk, privateKeyJwk };
+		const keyId = await fingerprintPublicKey(publicKeyJwk);
+		stored = { userId, publicKeyJwk, privateKeyJwk, keyId };
+		await idbSet(stored);
+	} else if (!stored.keyId) {
+		stored.keyId = await fingerprintPublicKey(stored.publicKeyJwk);
 		await idbSet(stored);
 	}
 
 	const publicKey = await crypto.subtle.importKey('jwk', stored.publicKeyJwk, ALGO_ECDH, true, []);
 	const privateKey = await crypto.subtle.importKey('jwk', stored.privateKeyJwk, ALGO_ECDH, false, ['deriveBits', 'deriveKey']);
-	return { publicKeyJwk: stored.publicKeyJwk, privateKey, publicKey };
+	return { publicKeyJwk: stored.publicKeyJwk, privateKey, publicKey, keyId: stored.keyId! };
 }
 
-export async function publishE2eePublicKey(): Promise<boolean> {
+export type E2eeWsApi = {
+	ready: () => boolean;
+	request: <T = unknown>(
+		wsType: string,
+		wsBody: Record<string, unknown>,
+		okEvent: string,
+		errEvent: string,
+		apiEndpoint?: string,
+		apiBody?: Record<string, unknown>,
+		timeoutMs?: number,
+	) => Promise<T>;
+};
+
+export async function publishE2eePublicKey(ws?: E2eeWsApi | null): Promise<{ ok: boolean; keyId?: string | null }> {
 	const pair = await ensureE2eeKeyPair();
-	if (!pair) return false;
+	if (!pair) return { ok: false };
+	const body = {
+		publicKey: JSON.stringify(pair.publicKeyJwk),
+		keyId: pair.keyId,
+	};
 	try {
-		await misskeyApi('chat/e2ee/keys/set' as any, {
-			publicKey: JSON.stringify(pair.publicKeyJwk),
-		} as any);
-		return true;
+		if (ws?.ready()) {
+			const res = await ws.request<{ ok?: boolean; keyId?: string }>(
+				'e2eeKeySet',
+				body,
+				'e2eeKeySetAck',
+				'e2eeKeyError',
+				'chat/e2ee/keys/set',
+				body as any,
+			);
+			return { ok: !!(res as any)?.ok || true, keyId: (res as any)?.keyId ?? pair.keyId };
+		}
+		const res = await misskeyApi('chat/e2ee/keys/set' as any, body as any) as { ok?: boolean; keyId?: string };
+		return { ok: true, keyId: res?.keyId ?? pair.keyId };
 	} catch {
-		return false;
+		return { ok: false };
 	}
 }
 
-const peerKeyCache = new Map<string, JsonWebKey | null>();
+const peerKeyCache = new Map<string, PeerKeyRecord | null>();
 
-export async function fetchPeerPublicKey(userId: string): Promise<JsonWebKey | null> {
-	if (peerKeyCache.has(userId)) return peerKeyCache.get(userId) ?? null;
+export async function fetchPeerPublicKey(
+	userId: string,
+	opts?: { force?: boolean; ws?: E2eeWsApi | null },
+): Promise<JsonWebKey | null> {
+	if (!opts?.force && peerKeyCache.has(userId)) {
+		return peerKeyCache.get(userId)?.jwk ?? null;
+	}
 	try {
-		const res = await misskeyApi('chat/e2ee/keys/get' as any, { userId } as any) as { publicKey: string | null };
-		if (!res.publicKey) {
+		let res: { publicKey: string | null; keyId?: string | null; updatedAt?: string | null };
+		if (opts?.ws?.ready()) {
+			res = await opts.ws.request(
+				'e2eeKeyGet',
+				{ userId },
+				'e2eeKey',
+				'e2eeKeyError',
+				'chat/e2ee/keys/get',
+				{ userId },
+			) as any;
+		} else {
+			res = await misskeyApi('chat/e2ee/keys/get' as any, { userId } as any) as any;
+		}
+		if (!res?.publicKey) {
 			peerKeyCache.set(userId, null);
 			return null;
 		}
 		const jwk = JSON.parse(res.publicKey) as JsonWebKey;
-		peerKeyCache.set(userId, jwk);
+		peerKeyCache.set(userId, {
+			jwk,
+			keyId: res.keyId ?? null,
+			updatedAt: res.updatedAt ?? null,
+		});
 		return jwk;
 	} catch {
 		peerKeyCache.set(userId, null);
 		return null;
 	}
+}
+
+export function invalidatePeerKey(userId: string) {
+	peerKeyCache.delete(userId);
+}
+
+export function clearPeerKeyCache() {
+	peerKeyCache.clear();
+}
+
+export function getCachedPeerKeyId(userId: string): string | null {
+	return peerKeyCache.get(userId)?.keyId ?? null;
+}
+
+/** Human-readable short fingerprint for verification UI */
+export async function peerKeyFingerprintLabel(userId: string): Promise<string | null> {
+	const rec = peerKeyCache.get(userId);
+	if (!rec?.jwk) return null;
+	const id = rec.keyId || await fingerprintPublicKey(rec.jwk);
+	// Group hex into 4-char chunks
+	return id.replace(/(.{4})/g, '$1 ').trim().toUpperCase();
 }
 
 async function deriveAesKey(myPrivate: CryptoKey, peerPublicJwk: JsonWebKey): Promise<CryptoKey> {
@@ -157,10 +253,14 @@ async function deriveAesKey(myPrivate: CryptoKey, peerPublicJwk: JsonWebKey): Pr
 }
 
 /** Ciphertext wire format: v1.<ivB64>.<ctB64> */
-export async function encryptChatText(peerUserId: string, plaintext: string): Promise<string | null> {
+export async function encryptChatText(
+	peerUserId: string,
+	plaintext: string,
+	ws?: E2eeWsApi | null,
+): Promise<string | null> {
 	const me = await ensureE2eeKeyPair();
 	if (!me) return null;
-	const peerJwk = await fetchPeerPublicKey(peerUserId);
+	const peerJwk = await fetchPeerPublicKey(peerUserId, { ws });
 	if (!peerJwk) return null;
 
 	const aes = await deriveAesKey(me.privateKey, peerJwk);
@@ -173,11 +273,15 @@ export async function encryptChatText(peerUserId: string, plaintext: string): Pr
 	return `v1.${b64encode(iv)}.${b64encode(ct)}`;
 }
 
-export async function decryptChatText(fromUserId: string, ciphertext: string): Promise<string | null> {
+export async function decryptChatText(
+	fromUserId: string,
+	ciphertext: string,
+	ws?: E2eeWsApi | null,
+): Promise<string | null> {
 	if (!ciphertext.startsWith('v1.')) return null;
 	const me = await ensureE2eeKeyPair();
 	if (!me) return null;
-	const peerJwk = await fetchPeerPublicKey(fromUserId);
+	const peerJwk = await fetchPeerPublicKey(fromUserId, { ws });
 	if (!peerJwk) return null;
 
 	const parts = ciphertext.split('.');
@@ -193,10 +297,19 @@ export async function decryptChatText(fromUserId: string, ciphertext: string): P
 		);
 		return new TextDecoder().decode(pt);
 	} catch {
-		return null;
+		// Force refresh peer key once (rotation) then retry
+		const peerJwk2 = await fetchPeerPublicKey(fromUserId, { force: true, ws });
+		if (!peerJwk2) return null;
+		try {
+			const aes = await deriveAesKey(me.privateKey, peerJwk2);
+			const pt = await crypto.subtle.decrypt(
+				{ name: 'AES-GCM', iv },
+				aes,
+				ct,
+			);
+			return new TextDecoder().decode(pt);
+		} catch {
+			return null;
+		}
 	}
-}
-
-export function clearPeerKeyCache() {
-	peerKeyCache.clear();
 }

@@ -39,6 +39,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<i :class="e2eeEnabled ? 'ti ti-lock' : 'ti ti-lock-open'"></i>
 			<span>{{ e2eeEnabled ? tChat('e2eeOn') : tChat('e2eeOff') }}</span>
 		</button>
+		<span v-if="e2eeEnabled && peerFingerprint" :class="$style.e2eeFp" :title="tChat('e2eeFingerprint')">
+			{{ peerFingerprint }}
+		</span>
 		<span v-if="e2eeEnabled && !peerHasKey" :class="$style.e2eeWarn">{{ tChat('e2eePeerNoKey') }}</span>
 	</div>
 	<textarea
@@ -91,7 +94,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { onMounted, watch, ref, shallowRef, computed, nextTick, readonly, onBeforeUnmount } from 'vue';
+import { onMounted, watch, ref, shallowRef, computed, nextTick, readonly, onBeforeUnmount, inject } from 'vue';
 import * as Misskey from 'misskey-js';
 //import insertTextAtCursor from 'insert-text-at-cursor';
 import { formatTimeString } from '@@/js/format-time-string.js';
@@ -107,7 +110,10 @@ import { emojiPicker } from '@/utility/emoji-picker.js';
 import { $i } from '@/i.js';
 import StickerPicker from './StickerPicker.vue';
 import { chatT, chatFb, ensureChatLocaleFresh } from './chat-i18n.js';
-import { encryptChatText, fetchPeerPublicKey, publishE2eePublicKey } from './chat-e2ee.js';
+import { encryptChatText, fetchPeerPublicKey, publishE2eePublicKey, invalidatePeerKey, peerKeyFingerprintLabel } from './chat-e2ee.js';
+import { chatWsKey } from './chat-ws.js';
+
+const chatWs = inject(chatWsKey, null);
 
 const props = defineProps<{
 	user?: Misskey.entities.UserDetailed | null;
@@ -143,7 +149,20 @@ const showStickers = ref(false);
 /** 1:1 E2EE on by default when peer has a key */
 const e2eeEnabled = ref(false);
 const peerHasKey = ref(false);
+const peerFingerprint = ref('');
 let autocompleteInstance: Autocomplete | null = null;
+
+async function refreshPeerKeyState() {
+	if (!props.user) {
+		peerHasKey.value = false;
+		peerFingerprint.value = '';
+		return;
+	}
+	const pk = await fetchPeerPublicKey(props.user.id, { force: true, ws: chatWs });
+	peerHasKey.value = !!pk;
+	peerFingerprint.value = pk ? (await peerKeyFingerprintLabel(props.user.id) ?? '') : '';
+	if (e2eeEnabled.value && !pk) e2eeEnabled.value = false;
+}
 
 /** false when room is muted-all and current user is not owner/admin/instance mod */
 const canCompose = computed(() => {
@@ -346,7 +365,7 @@ async function sendPayload(payload: { text?: string; fileId?: string }) {
 	try {
 		// 1:1 E2EE: encrypt client-side; server only stores ciphertext
 		if (props.user && e2eeEnabled.value && payload.text) {
-			const ct = await encryptChatText(props.user.id, payload.text);
+			const ct = await encryptChatText(props.user.id, payload.text, chatWs);
 			if (!ct) {
 				os.alert({ type: 'error', text: tChat('e2eeEncryptFailed') });
 				return;
@@ -417,10 +436,9 @@ async function sendPayload(payload: { text?: string; fileId?: string }) {
 async function toggleE2ee() {
 	if (!props.user) return;
 	if (!e2eeEnabled.value) {
-		await publishE2eePublicKey();
-		const pk = await fetchPeerPublicKey(props.user.id);
-		peerHasKey.value = !!pk;
-		if (!pk) {
+		await publishE2eePublicKey(chatWs);
+		await refreshPeerKeyState();
+		if (!peerHasKey.value) {
 			os.alert({ type: 'warning', text: tChat('e2eePeerNoKey') });
 			return;
 		}
@@ -523,12 +541,11 @@ onMounted(async () => {
 		file.value = draft.data.file;
 	}
 
-	// 1:1: publish our E2EE key + enable if peer also has one
+	// 1:1: publish our E2EE key (WS preferred) + enable if peer also has one
 	if (props.user) {
-		await publishE2eePublicKey();
-		const pk = await fetchPeerPublicKey(props.user.id);
-		peerHasKey.value = !!pk;
-		e2eeEnabled.value = !!pk;
+		await publishE2eePublicKey(chatWs);
+		await refreshPeerKeyState();
+		e2eeEnabled.value = peerHasKey.value;
 	}
 });
 
@@ -537,6 +554,11 @@ onBeforeUnmount(() => {
 		autocompleteInstance.detach();
 		autocompleteInstance = null;
 	}
+});
+
+// Peer rotated key while this chat is open
+watch(() => props.user?.id, () => {
+	if (props.user) void refreshPeerKeyState();
 });
 </script>
 
@@ -643,6 +665,14 @@ onBeforeUnmount(() => {
 	font-size: 11px;
 	opacity: 0.75;
 	color: var(--MI_THEME-warn);
+}
+
+.e2eeFp {
+	font-size: 10px;
+	font-family: ui-monospace, monospace;
+	opacity: 0.7;
+	letter-spacing: 0.02em;
+	user-select: all;
 }
 
 .stickerPanel {

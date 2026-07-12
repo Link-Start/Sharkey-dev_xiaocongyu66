@@ -26,6 +26,16 @@ export class MiChatE2eeKey {
 	@Column('text')
 	public publicKey: string;
 
+	/**
+	 * Short public key fingerprint / version id (client-supplied or hashed).
+	 * Used so peers can detect rotation without re-fetching every message.
+	 */
+	@Column('varchar', {
+		length: 64,
+		nullable: true,
+	})
+	public keyId: string | null;
+
 	@Column('timestamptz')
 	public updatedAt: Date;
 }

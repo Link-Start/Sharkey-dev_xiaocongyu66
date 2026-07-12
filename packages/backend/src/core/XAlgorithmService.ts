@@ -33,10 +33,15 @@ type CacheEntry = {
 @Injectable()
 export class XAlgorithmService {
 	private readonly logger: Logger;
-	/** Short TTL cache to absorb rapid refreshes / parallel home+hybrid */
+	/**
+	 * Short TTL cache to absorb rapid refreshes / parallel home+hybrid.
+	 * First page (no untilId) uses a slightly longer TTL so pull-to-refresh
+	 * doesn't thrash the gateway; paginated slices stay short.
+	 */
 	private readonly cache = new Map<string, CacheEntry>();
-	private readonly CACHE_TTL_MS = 8_000;
-	private readonly CACHE_MAX = 200;
+	private readonly CACHE_TTL_MS = 6_000;
+	private readonly CACHE_TTL_FIRST_PAGE_MS = 12_000;
+	private readonly CACHE_MAX = 300;
 
 	constructor(
 		@Inject(DI.meta)
@@ -77,7 +82,8 @@ export class XAlgorithmService {
 		}
 
 		const ids = await this.fetchTimelineNoteIds(request, config, endpoint);
-		this.setCache(cacheKey, ids);
+		const firstPage = !request.untilId && !request.sinceId;
+		this.setCache(cacheKey, ids, firstPage);
 		return ids.slice(0, request.limit);
 	}
 
@@ -112,7 +118,7 @@ export class XAlgorithmService {
 	}
 
 	@bindThis
-	private setCache(key: string, ids: string[]): void {
+	private setCache(key: string, ids: string[], firstPage = false): void {
 		if (this.cache.size >= this.CACHE_MAX) {
 			// Drop oldest ~25%
 			const n = Math.ceil(this.CACHE_MAX / 4);
@@ -122,7 +128,8 @@ export class XAlgorithmService {
 				if (++i >= n) break;
 			}
 		}
-		this.cache.set(key, { ids, expiresAt: Date.now() + this.CACHE_TTL_MS });
+		const ttl = firstPage ? this.CACHE_TTL_FIRST_PAGE_MS : this.CACHE_TTL_MS;
+		this.cache.set(key, { ids, expiresAt: Date.now() + ttl });
 	}
 
 	@bindThis
