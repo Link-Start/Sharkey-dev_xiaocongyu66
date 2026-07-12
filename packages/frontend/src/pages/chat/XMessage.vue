@@ -13,15 +13,20 @@ SPDX-License-Identifier: AGPL-3.0-only
 	<div :class="$style.body" @contextmenu.stop="onContextmenu">
 		<!-- name + time + message action menu (selector under bubble moved here; no reply hook) -->
 		<div :class="$style.header">
-			<MkUserName v-if="prefer.s['chat.showSenderName'] && message.fromUser != null" :user="message.fromUser"/>
-			<MkTime :class="$style.time" :time="message.createdAt"/>
+			<div :class="$style.headerMeta">
+				<MkUserName v-if="prefer.s['chat.showSenderName'] && message.fromUser != null" :user="message.fromUser"/>
+				<MkTime :class="$style.time" :time="message.createdAt"/>
+			</div>
+			<!-- Always on top of sticky avatars / media so others' ⋯ stays tappable -->
 			<div :class="$style.headerActions">
 				<button
-					class="_textButton"
+					type="button"
+					class="_button"
 					:class="$style.headerAction"
-					@click.stop="showMenu"
+					aria-label="menu"
+					@click.stop.prevent="showMenu"
 				>
-					<i class="ti ti-dots-circle-horizontal"></i>
+					<i class="ti ti-dots"></i>
 				</button>
 			</div>
 		</div>
@@ -423,6 +428,8 @@ function showMenu(ev: MouseEvent, contextmenu = false) {
 	  Estimated intrinsic height (e.g. 72px) vs real media rows (~200px)
 	  makes the timeline jump while scrolling up OR down.
 	*/
+	/* Keep this message's chrome above previous sticky leftovers */
+	isolation: isolate;
 
 	&.isMe {
 		flex-direction: row-reverse;
@@ -436,9 +443,14 @@ function showMenu(ev: MouseEvent, contextmenu = false) {
 			flex-direction: row-reverse;
 		}
 
+		.headerMeta {
+			flex-direction: row-reverse;
+		}
+
 		.headerActions {
 			margin-left: 0;
-			margin-right: 0.15em;
+			margin-right: 0;
+			order: -1;
 		}
 
 		.reactions {
@@ -458,11 +470,17 @@ function showMenu(ev: MouseEvent, contextmenu = false) {
 }
 
 .avatar {
-	position: sticky;
-	top: calc(16px + var(--MI-stickyTop, 0px));
+	/*
+	  No sticky: sticky avatars sit under the header and cover the next
+	  message's ⋯ menu (others only — own avatar is hidden on narrow).
+	*/
+	position: relative;
+	z-index: 0;
 	display: block;
+	flex-shrink: 0;
 	width: 50px;
 	height: 50px;
+	align-self: flex-start;
 }
 
 @container (max-width: 450px) {
@@ -486,44 +504,71 @@ function showMenu(ev: MouseEvent, contextmenu = false) {
 
 .body {
 	margin: 0 12px;
-
 	// https://stackoverflow.com/questions/36230944/prevent-flex-items-from-overflowing-a-container
 	min-width: 0;
+	flex: 1;
+	position: relative;
+	z-index: 1;
 }
 
 .header {
-	min-height: 4px; // fukidashiの位置調整も兼ねるため
+	min-height: 28px; // touch-friendly row for ⋯
 	font-size: 80%;
 	display: flex;
 	align-items: center;
-	gap: 0.5em;
+	gap: 0.35em;
 	margin-bottom: 2px;
-	flex-wrap: wrap;
+	/* Don't wrap ⋯ under the name where sticky/media can cover it */
+	flex-wrap: nowrap;
+	position: relative;
+	z-index: 2;
+}
+
+.headerMeta {
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+	min-width: 0;
+	flex: 1;
+	overflow: hidden;
 }
 
 .headerActions {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.15em;
-	margin-left: 0.15em;
-	opacity: 0.55;
+	justify-content: center;
+	flex-shrink: 0;
+	margin-left: auto;
+	opacity: 0.75;
+	position: relative;
+	z-index: 3;
+	pointer-events: auto;
 }
 
 .headerAction {
-	padding: 0 4px;
-	line-height: 1.2;
-	font-size: 1.05em;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	/* Larger hit target so mobile taps register on others' messages */
+	min-width: 36px;
+	min-height: 36px;
+	padding: 0 6px;
+	line-height: 1;
+	font-size: 1.15em;
 	color: inherit;
+	border-radius: 999px;
 
-	&:hover {
+	&:hover,
+	&:active {
 		opacity: 1;
 		color: var(--MI_THEME-accent);
+		background: color-mix(in srgb, var(--MI_THEME-accent) 12%, transparent);
 	}
 }
 
 .root:hover .headerActions,
 .root:focus-within .headerActions {
-	opacity: 0.9;
+	opacity: 1;
 }
 
 .bubbleInner {

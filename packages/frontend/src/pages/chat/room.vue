@@ -693,7 +693,12 @@ function getChatScrollContainer(): HTMLElement | null {
 }
 
 /** Distance from bottom under which we treat as "at live edge" (newest) */
-const LIVE_EDGE_PX = 80;
+const LIVE_EDGE_PX = 48;
+/** Near top of normal scroll → may load older history */
+const HISTORY_TOP_PX = 80;
+/** Ignore stick-to-live for a moment after user scrolls (stops twitch on finger-up) */
+let userScrollUntil = 0;
+let lastScrollTop = 0;
 
 function distanceFromLiveEdge(container: HTMLElement): number {
 	// Normal scroll: bottom = live edge
@@ -703,6 +708,20 @@ function distanceFromLiveEdge(container: HTMLElement): number {
 function isNearLiveEdge(container: HTMLElement | null): boolean {
 	if (!container) return false;
 	return distanceFromLiveEdge(container) <= LIVE_EDGE_PX;
+}
+
+function isNearHistoryTop(container: HTMLElement | null): boolean {
+	if (!container) return false;
+	return container.scrollTop <= HISTORY_TOP_PX;
+}
+
+function markUserScrolling(container: HTMLElement) {
+	const top = container.scrollTop;
+	// Any real movement → user is in control; suppress auto stick briefly after stop
+	if (Math.abs(top - lastScrollTop) > 1) {
+		userScrollUntil = Date.now() + 450;
+	}
+	lastScrollTop = top;
 }
 
 /** User is reading history (search jump pin, or scrolled away from newest) */
@@ -770,7 +789,9 @@ function bindScrollLiveClear() {
 	if (scrollListenCleanup) return;
 	const sc = getChatScrollContainer();
 	if (!sc) return;
+	lastScrollTop = sc.scrollTop;
 	const onScroll = () => {
+		markUserScrolling(sc);
 		clearPinnedViewIfAtLive();
 	};
 	sc.addEventListener('scroll', onScroll, { passive: true });
@@ -803,15 +824,15 @@ function setupLoadMoreIo() {
 			if (!e.isIntersecting) continue;
 			if (!canFetchMore.value || moreFetching.value || historyLoading.value) continue;
 			if (Date.now() < loadMoreCooldownUntil) continue;
-			// Don't auto-load while still parked at live edge (short chats)
 			const sc = root ?? getScrollContainer(sentinel);
+			// Only when truly at the top — large rootMargin was loading mid-scroll → jump/twitch
+			if (sc && !isNearHistoryTop(sc)) continue;
 			if (sc && isNearLiveEdge(sc) && !pinnedViewMessageId.value) continue;
 			void fetchMore();
 		}
 	}, {
 		root: root ?? null,
-		// Modest margin: load a bit before the top edge, not mid-list
-		rootMargin: '120px 0px 0px 0px',
+		rootMargin: '0px',
 		threshold: 0,
 	});
 	loadMoreIo.observe(sentinel);
@@ -1075,6 +1096,7 @@ async function fetchMore() {
 		await new Promise<void>(r => requestAnimationFrame(() => r()));
 
 		if (scrollContainer) {
+			// Single correction only — multi-frame retune causes stop-scroll twitch
 			preserveScrollAfterPrepend(
 				scrollContainer,
 				prevHeight,
@@ -1082,17 +1104,6 @@ async function fetchMore() {
 				anchorId,
 				anchorTopBefore,
 			);
-			// Second frame: only re-tune element Y (do not re-apply height delta
-			// from the original snapshot — that can fight the first correction).
-			requestAnimationFrame(() => {
-				if (!scrollContainer.isConnected || anchorTopBefore == null) return;
-				const el = window.document.getElementById(`chat-msg-${anchorId}`);
-				if (!el) return;
-				const drift = el.getBoundingClientRect().top - anchorTopBefore;
-				if (Math.abs(drift) > 0.5) {
-					scrollContainer.scrollTop += drift;
-				}
-			});
 		}
 	} catch {
 		// keep canFetchMore; user can retry via sentinel / button
@@ -1156,14 +1167,22 @@ function onMessage(message: Misskey.entities.ChatMessageLite) {
 			});
 		}
 	} else if (nearLive && scrollContainer && !historyLoading.value) {
-		// Stick to bottom (live edge) after newest message paints
-		void nextTick().then(() => {
-			requestAnimationFrame(() => {
-				if (!historyLoading.value && !isReadingHistory(scrollContainer)) {
-					scrollToLiveEdge('instant');
-				}
+		// Stick to bottom only if user is not mid/just-finished scrolling (avoids twitch)
+		if (Date.now() < userScrollUntil) {
+			// still reading / finger just lifted near edge — don't yank
+		} else {
+			void nextTick().then(() => {
+				requestAnimationFrame(() => {
+					if (
+						!historyLoading.value &&
+						Date.now() >= userScrollUntil &&
+						!isReadingHistory(scrollContainer)
+					) {
+						scrollToLiveEdge('instant');
+					}
+				});
 			});
-		});
+		}
 	}
 
 	// Live-update @mentions of me
@@ -1431,18 +1450,19 @@ definePage(computed(() => {
 <style lang="scss" module>
 .timeline {
 	/*
-	 * Fill the viewport so short chats sit at the bottom (Telegram-like),
-	 * without using page-level column-reverse (which breaks scroll math).
+	 * Do NOT use justify-content:flex-end here.
+	 * It reflows when history loads / media settles and causes stop-scroll twitch
+	 * and upward jump. Stick-to-live is handled by scrollTop only.
 	 */
-	min-height: calc(100cqh - (var(--MI-stickyTop, 0px) + var(--MI-stickyBottom, 0px)) - 24px);
 	display: flex;
 	flex-direction: column;
-	justify-content: flex-end;
 	padding-bottom: 4px;
+	/* Spacer so short chats still open near the bottom without flex-end thrash */
+	min-height: 0;
 }
 
 .msgList {
-	/* Default: no browser anchoring on the whole list (we manage history loads) */
+	/* We manage history loads; browser anchoring fights media + prepend */
 	overflow-anchor: none;
 	width: 100%;
 }
@@ -1451,9 +1471,9 @@ definePage(computed(() => {
 	overflow-anchor: none;
 }
 
-/* Allow browser to keep the newest bubble stable when its media loads while at live edge */
 .msgRowLive {
-	overflow-anchor: auto;
+	/* Keep off — media load + anchor causes twitch when finger stops */
+	overflow-anchor: none;
 }
 
 .loadMoreSentinel {
