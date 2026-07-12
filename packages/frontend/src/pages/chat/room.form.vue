@@ -28,30 +28,25 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</div>
 		<button class="_button" :class="$style.replyBarClose" @click="$emit('clearReply')"><i class="ti ti-x"></i></button>
 	</div>
+	<!-- 1:1: E2EE is always on (system-managed). No user toggle. -->
 	<div v-if="user && canCompose" :class="$style.e2eeRow">
-		<button
-			type="button"
-			class="_button"
-			:class="[$style.e2eeToggle, e2eeEnabled ? $style.e2eeOn : null]"
-			:title="e2eeEnabled ? tChat('e2eeOn') : tChat('e2eeOff')"
-			@click="toggleE2ee"
-		>
-			<i :class="e2eeEnabled ? 'ti ti-lock' : 'ti ti-lock-open'"></i>
-			<span>{{ e2eeEnabled ? tChat('e2eeOn') : tChat('e2eeOff') }}</span>
-		</button>
-		<span v-if="e2eeEnabled && peerFingerprint" :class="$style.e2eeFp" :title="tChat('e2eeFingerprint')">
+		<span :class="[$style.e2eeBadge, peerHasKey ? $style.e2eeOn : $style.e2eePending]">
+			<i :class="peerHasKey ? 'ti ti-lock' : 'ti ti-lock-open'"></i>
+			<span>{{ peerHasKey ? tChat('e2eeAlwaysOn') : tChat('e2eeWaitingPeer') }}</span>
+		</span>
+		<span v-if="peerHasKey && peerFingerprint" :class="$style.e2eeFp" :title="tChat('e2eeFingerprint')">
 			{{ peerFingerprint }}
 		</span>
-		<span v-if="e2eeEnabled && !peerHasKey" :class="$style.e2eeWarn">{{ tChat('e2eePeerNoKey') }}</span>
+		<span v-if="!peerHasKey" :class="$style.e2eeWarn">{{ tChat('e2eePeerNoKey') }}</span>
 	</div>
 	<textarea
 		ref="textareaEl"
 		v-model="text"
 		:class="$style.textarea"
 		class="_acrylic"
-		:placeholder="canCompose ? (e2eeEnabled ? tChat('e2eePlaceholder') : i18n.ts.inputMessageHere) : mutedAllBody"
-		:readonly="textareaReadOnly || !canCompose || sending"
-		:disabled="!canCompose || sending"
+		:placeholder="canCompose ? (user ? tChat('e2eePlaceholder') : i18n.ts.inputMessageHere) : mutedAllBody"
+		:readonly="textareaReadOnly || !canCompose || sending || e2eeBlocked"
+		:disabled="!canCompose || sending || e2eeBlocked"
 		@keydown="onKeydown"
 		@paste="onPaste"
 	></textarea>
@@ -146,22 +141,52 @@ const file = ref<Misskey.entities.DriveFile | null>(null);
 const sending = ref(false);
 const textareaReadOnly = ref(false);
 const showStickers = ref(false);
-/** 1:1 E2EE on by default when peer has a key */
-const e2eeEnabled = ref(false);
+/**
+ * 1:1 E2EE is always required (no user option).
+ * Keys are generated/published automatically; private key never leaves the client.
+ */
 const peerHasKey = ref(false);
 const peerFingerprint = ref('');
+const e2eeReady = ref(false);
 let autocompleteInstance: Autocomplete | null = null;
+let peerKeyPollTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Block text input for 1:1 until both sides have published E2EE keys */
+const e2eeBlocked = computed(() => !!props.user && !peerHasKey.value);
 
 async function refreshPeerKeyState() {
 	if (!props.user) {
 		peerHasKey.value = false;
 		peerFingerprint.value = '';
+		e2eeReady.value = true;
 		return;
 	}
+	// Always ensure our key is published (system-managed)
+	await publishE2eePublicKey(chatWs);
 	const pk = await fetchPeerPublicKey(props.user.id, { force: true, ws: chatWs });
 	peerHasKey.value = !!pk;
 	peerFingerprint.value = pk ? (await peerKeyFingerprintLabel(props.user.id) ?? '') : '';
-	if (e2eeEnabled.value && !pk) e2eeEnabled.value = false;
+	e2eeReady.value = true;
+}
+
+function startPeerKeyPoll() {
+	stopPeerKeyPoll();
+	if (!props.user || peerHasKey.value) return;
+	// Peer may open chat and publish shortly — poll a few times
+	let n = 0;
+	peerKeyPollTimer = setInterval(() => {
+		n++;
+		void refreshPeerKeyState().then(() => {
+			if (peerHasKey.value || n >= 20) stopPeerKeyPoll();
+		});
+	}, 3000);
+}
+
+function stopPeerKeyPoll() {
+	if (peerKeyPollTimer) {
+		clearInterval(peerKeyPollTimer);
+		peerKeyPollTimer = null;
+	}
 }
 
 /** false when room is muted-all and current user is not owner/admin/instance mod */
@@ -181,7 +206,14 @@ const mutedAllTitle = computed(() => chatT('mutedAll', chatFb.mutedAll));
 const mutedAllBody = computed(() => chatT('mutedAllComposerDisabled', chatFb.mutedAllComposerDisabled));
 const stickersLabel = computed(() => chatT('stickers', chatFb.stickers));
 
-const canSend = computed(() => canCompose.value && !sending.value && ((text.value != null && text.value !== '') || file.value != null));
+const canSend = computed(() => {
+	if (!canCompose.value || sending.value) return false;
+	const hasContent = (text.value != null && text.value !== '') || file.value != null;
+	if (!hasContent) return false;
+	// 1:1 text always needs E2EE readiness; file-only may send without text encrypt
+	if (props.user && text.value && !peerHasKey.value) return false;
+	return true;
+});
 const sendBusyLabel = computed(() => chatT('sending', chatFb.sending));
 const sendBusyTitle = computed(() => chatT('sendingHint', chatFb.sendingHint));
 
@@ -363,8 +395,15 @@ async function sendPayload(payload: { text?: string; fileId?: string }) {
 	let textOut = payload.text;
 
 	try {
-		// 1:1 E2EE: encrypt client-side; server only stores ciphertext
-		if (props.user && e2eeEnabled.value && payload.text) {
+		// 1:1: always encrypt text (no user option). Server stores ciphertext only.
+		if (props.user && payload.text) {
+			if (!peerHasKey.value) {
+				await refreshPeerKeyState();
+			}
+			if (!peerHasKey.value) {
+				os.alert({ type: 'warning', text: tChat('e2eePeerNoKey') });
+				return;
+			}
 			const ct = await encryptChatText(props.user.id, payload.text, chatWs);
 			if (!ct) {
 				os.alert({ type: 'error', text: tChat('e2eeEncryptFailed') });
@@ -433,20 +472,7 @@ async function sendPayload(payload: { text?: string; fileId?: string }) {
 	}
 }
 
-async function toggleE2ee() {
-	if (!props.user) return;
-	if (!e2eeEnabled.value) {
-		await publishE2eePublicKey(chatWs);
-		await refreshPeerKeyState();
-		if (!peerHasKey.value) {
-			os.alert({ type: 'warning', text: tChat('e2eePeerNoKey') });
-			return;
-		}
-		e2eeEnabled.value = true;
-	} else {
-		e2eeEnabled.value = false;
-	}
-}
+
 
 function send() {
 	if (!canCompose.value || sending.value || !canSend.value) return;
@@ -541,24 +567,29 @@ onMounted(async () => {
 		file.value = draft.data.file;
 	}
 
-	// 1:1: publish our E2EE key (WS preferred) + enable if peer also has one
+	// 1:1: system always publishes our key and waits for peer (no toggle)
 	if (props.user) {
-		await publishE2eePublicKey(chatWs);
 		await refreshPeerKeyState();
-		e2eeEnabled.value = peerHasKey.value;
+		if (!peerHasKey.value) startPeerKeyPoll();
 	}
 });
 
 onBeforeUnmount(() => {
+	stopPeerKeyPoll();
 	if (autocompleteInstance) {
 		autocompleteInstance.detach();
 		autocompleteInstance = null;
 	}
 });
 
-// Peer rotated key while this chat is open
+// Peer changed / rotated while this chat is open
 watch(() => props.user?.id, () => {
-	if (props.user) void refreshPeerKeyState();
+	stopPeerKeyPoll();
+	if (props.user) {
+		void refreshPeerKeyState().then(() => {
+			if (!peerHasKey.value) startPeerKeyPoll();
+		});
+	}
 });
 </script>
 
@@ -643,7 +674,7 @@ watch(() => props.user?.id, () => {
 	flex-wrap: wrap;
 }
 
-.e2eeToggle {
+.e2eeBadge {
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
@@ -651,14 +682,19 @@ watch(() => props.user?.id, () => {
 	border-radius: 999px;
 	font-size: 11px;
 	font-weight: 600;
-	opacity: 0.85;
-	background: color-mix(in srgb, var(--MI_THEME-fg) 8%, transparent);
+	opacity: 0.9;
+	pointer-events: none;
+	user-select: none;
 }
 
 .e2eeOn {
 	color: var(--MI_THEME-accent);
 	background: color-mix(in srgb, var(--MI_THEME-accent) 14%, transparent);
-	opacity: 1;
+}
+
+.e2eePending {
+	color: var(--MI_THEME-warn);
+	background: color-mix(in srgb, var(--MI_THEME-warn) 12%, transparent);
 }
 
 .e2eeWarn {
