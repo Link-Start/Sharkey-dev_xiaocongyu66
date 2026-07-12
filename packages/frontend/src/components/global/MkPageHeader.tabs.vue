@@ -199,6 +199,8 @@ onUnmounted(() => {
 
 .tabsInner {
 	display: inline-block;
+	position: relative;
+	z-index: 1;
 	height: var(--height);
 	white-space: nowrap;
 }
@@ -206,6 +208,7 @@ onUnmounted(() => {
 .tab {
 	display: inline-block;
 	position: relative;
+	z-index: 1;
 	padding: 0 10px;
 	height: 100%;
 	font-weight: normal;
@@ -228,6 +231,18 @@ onUnmounted(() => {
 .tabInner {
 	display: flex;
 	align-items: center;
+	justify-content: center;
+	height: 100%;
+	position: relative;
+	z-index: 1;
+}
+
+.tabIcon {
+	/* Keep icon above the underline indicator */
+	position: relative;
+	z-index: 1;
+	line-height: 1;
+	font-size: 1.15em;
 }
 
 .tabIcon + .tabTitle {
@@ -236,20 +251,34 @@ onUnmounted(() => {
 
 .tabTitle {
 	overflow: hidden;
+	position: relative;
+	z-index: 1;
 
 	&.animate {
 		transition: width .15s linear, padding-left .15s linear;
 	}
 }
 
+/*
+ * Active indicator must stay a thin underline only.
+ * Never inherit min-height from page-level [class*='tab'] overrides
+ * (that matched tabHighlight and painted a full green slab over icons).
+ */
 .tabHighlight {
 	position: absolute;
 	bottom: 0;
-	height: 3px;
+	left: 0;
+	z-index: 0;
+	height: 3px !important;
+	min-height: 0 !important;
+	max-height: 3px !important;
 	background: var(--MI_THEME-accent);
 	border-radius: var(--MI-radius-ellipse);
 	transition: none;
 	pointer-events: none;
+	/* Avoid any accidental fill of the tab row */
+	box-sizing: border-box;
+	overflow: hidden;
 
 	&.animate {
 		transition: width 0.15s ease, left 0.15s ease;

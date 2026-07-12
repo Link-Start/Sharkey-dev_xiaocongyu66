@@ -1554,13 +1554,19 @@ definePage(computed(() => {
 	gap: 6px !important;
 }
 
-/* Compact sticky header: shorter "chin" under room name (esp. mobile) */
+/*
+ * Compact sticky header ("chin" under room name).
+ * Never target [class*='tab'] here — CSS-module names like tabHighlight
+ * also contain "tab", and min-height on the underline becomes a green slab
+ * that covers the selected icon.
+ */
 .chatPage {
 	:global([class*='lower']) {
-		--height: 28px !important;
+		/* Room for icon + 3px underline */
+		--height: 36px !important;
 	}
 	:global([class*='upper']) {
-		--height: 38px !important;
+		--height: 40px !important;
 	}
 	:global([class*='titleContainer']) {
 		margin-left: 6px !important;
@@ -1568,19 +1574,21 @@ definePage(computed(() => {
 	:global([class*='titleAvatarContainer']) {
 		padding: 2px !important;
 	}
-	/* Tabs row: smaller icons / less vertical padding */
-	:global([class*='tab']) {
-		min-height: 28px !important;
+	/* Only the underline bar — not .tab / .tabs / .tabIcon */
+	:global([class*='tabHighlight']) {
+		height: 3px !important;
+		min-height: 0 !important;
+		max-height: 3px !important;
 	}
 }
 
 @media (max-width: 500px) {
 	.chatPage {
 		:global([class*='lower']) {
-			--height: 26px !important;
+			--height: 34px !important;
 		}
 		:global([class*='upper']) {
-			--height: 36px !important;
+			--height: 38px !important;
 		}
 	}
 	.chatSpacer {
