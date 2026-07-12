@@ -27,13 +27,19 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<template v-else>
 				<!-- NagramX/Telegram pinned-message style announcement (sticky under header) -->
 				<ChatAnnouncementBar
-					v-if="room && (room as any).announcement && isMember"
+					v-if="room && (room as any).announcement && canViewTimeline"
 					:text="(room as any).announcement"
 					:title="i18n.ts.announcement"
 					:editLabel="i18n.ts.edit"
 					:canEdit="canEditAnnouncement"
 					@edit="openAnnouncementEdit"
 				/>
+				<div v-if="room && isStaffViewer && !isMember && canViewTimeline" class="_panel" style="padding: 10px 12px;">
+					<MkInfo>
+						<div style="font-weight: bold;">{{ tChat('staffReadonlyView') }}</div>
+						<div style="margin-top: 4px; opacity: 0.9;">{{ tChat('staffReadonlyViewHint') }}</div>
+					</MkInfo>
+				</div>
 				<div v-if="room && (room as any).isMutedAll && isMember" class="_panel" style="padding: 10px 12px;">
 					<MkInfo warn>
 						<div style="font-weight: bold;">{{ tChat('mutedAll') }}</div>
@@ -162,15 +168,15 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</div>
 	</div>
 
-	<div v-else-if="tab === 'search' && isMember" class="_spacer" style="--MI_SPACER-w: 700px;">
+	<div v-else-if="tab === 'search' && canViewTimeline" class="_spacer" style="--MI_SPACER-w: 700px;">
 		<XSearch :userId="userId" :roomId="roomId" @jump="onSearchJump"/>
 	</div>
 
-	<div v-else-if="tab === 'members' && isMember" class="_spacer" style="--MI_SPACER-w: 700px;">
+	<div v-else-if="tab === 'members' && canViewTimeline" class="_spacer" style="--MI_SPACER-w: 700px;">
 		<XMembers v-if="room != null" :room="room" @inviteUser="inviteUser"/>
 	</div>
 
-	<div v-else-if="tab === 'info' && isMember" class="_spacer" style="--MI_SPACER-w: 700px;">
+	<div v-else-if="tab === 'info' && canViewTimeline" class="_spacer" style="--MI_SPACER-w: 700px;">
 		<XInfo v-if="room != null" :room="room"/>
 	</div>
 
@@ -204,7 +210,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <!-- NagramX/Telegram: floating @ mentions button (bottom-right), not a top bar -->
 <button
-	v-if="tab === 'chat' && mentions.length > 0 && isMember && !mentionsDismissed"
+	v-if="tab === 'chat' && mentions.length > 0 && canViewTimeline && !mentionsDismissed"
 	type="button"
 	class="_button"
 	:class="$style.mentionFab"
@@ -234,7 +240,7 @@ import * as os from '@/os.js';
 import { useStream } from '@/stream.js';
 import * as sound from '@/utility/sound.js';
 import { i18n } from '@/i18n.js';
-import { $i } from '@/i.js';
+import { $i, iAmModerator } from '@/i.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import { definePage } from '@/page.js';
 import MkButton from '@/components/MkButton.vue';
@@ -279,7 +285,13 @@ const user = ref<Misskey.entities.UserDetailed | null>(null);
 const room = ref<Misskey.entities.ChatRoom | null>(null);
 const replyTo = ref<NormalizedChatMessage | null>(null);
 const highlightId = ref<string | null>(null);
+/**
+ * After search/mention jump: keep this message in the loaded window and
+ * do not stick-to-live when new WS messages arrive (avoids "being pushed away").
+ */
+const pinnedViewMessageId = ref<string | null>(null);
 let highlightTimer: ReturnType<typeof setTimeout> | null = null;
+let scrollListenCleanup: (() => void) | null = null;
 const needJoin = ref(false);
 const joining = ref(false);
 const joinCode = ref('');
@@ -288,6 +300,10 @@ const loadError = ref('');
 const roomPreviewName = ref('');
 const isMember = ref(false);
 const joinPolicy = ref<'public' | 'link' | 'invite' | 'closed'>('invite');
+/** Staff may open any room timeline without joining (abuse-report deep links). */
+const isStaffViewer = computed(() => iAmModerator);
+/** Can read timeline: member or staff */
+const canViewTimeline = computed(() => isMember.value || isStaffViewer.value);
 
 /** Messages that @mention the current user (Telegram-style jump list) */
 const mentions = ref<Array<{ id: string; fromUserId: string; text: string | null }>>([]);
@@ -386,6 +402,7 @@ async function goMention(delta: number) {
 
 	mentionJumping.value = true;
 	try {
+		pinnedViewMessageId.value = target.id;
 		await ensureMessageLoaded(target.id);
 		await nextTick();
 		scrollToMessage(target.id);
@@ -407,6 +424,7 @@ async function onMentionFabClick() {
 
 	mentionJumping.value = true;
 	try {
+		pinnedViewMessageId.value = target.id;
 		await ensureMessageLoaded(target.id);
 		await nextTick();
 		scrollToMessage(target.id);
@@ -478,17 +496,28 @@ function scrollToMessage(id: string) {
 		});
 		return;
 	}
+	// Pin first so concurrent WS messages don't stick-to-live during scrollIntoView
+	markPinnedView(id);
 	el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-	highlightId.value = id;
-	if (highlightTimer) clearTimeout(highlightTimer);
-	highlightTimer = setTimeout(() => {
-		if (highlightId.value === id) highlightId.value = null;
-	}, 1800);
+	// Re-pin after smooth scroll settles (layout may shift)
+	window.setTimeout(() => {
+		const again = window.document.getElementById(`chat-msg-${id}`);
+		if (again && pinnedViewMessageId.value === id) {
+			const rect = again.getBoundingClientRect();
+			const mid = window.innerHeight / 2;
+			// If still far from center (interrupted by new messages), nudge once
+			if (rect.top < mid - 120 || rect.bottom > mid + 120) {
+				again.scrollIntoView({ behavior: 'instant', block: 'center' });
+			}
+		}
+	}, 450);
 }
 
 /** From search tab: switch to chat and scroll to the message (load history if needed) */
 async function onSearchJump(messageId: string) {
 	tab.value = 'chat';
+	// Pin immediately so any WS event during load won't yank to live edge
+	pinnedViewMessageId.value = messageId;
 	await nextTick();
 	// Wait a frame for chat DOM to mount
 	await new Promise<void>(r => requestAnimationFrame(() => r()));
@@ -497,7 +526,7 @@ async function onSearchJump(messageId: string) {
 	if (ok) {
 		scrollToMessage(messageId);
 	} else {
-		// Message may be outside loaded pages; try one more full fetch pass then show not found
+		pinnedViewMessageId.value = null;
 		os.alert({
 			type: 'info',
 			text: i18n.ts.notFound,
@@ -514,7 +543,7 @@ const streamState = ref(stream.state);
 function onStreamState() {
 	streamState.value = stream.state;
 	// Re-subscribe chat channel after reconnect so WS stays live
-	if (stream.state === 'connected' && isMember.value) {
+	if (stream.state === 'connected' && canViewTimeline.value) {
 		if (props.roomId && room.value) {
 			void enterRoomChannel();
 		} else if (props.userId && user.value) {
@@ -575,9 +604,50 @@ function doLogin() {
 const SCROLL_HEAD_THRESHOLD = 24;
 
 function isNearLiveEdge(container: HTMLElement | null): boolean {
-	if (!container) return true;
+	// null → not "at live" (avoid false stick-to-bottom after search jump)
+	if (!container) return false;
 	// column-reverse: scrollTop is typically ≤ 0; near 0 = viewing newest
 	return Math.abs(container.scrollTop) < SCROLL_HEAD_THRESHOLD;
+}
+
+/** User is reading history (search jump pin, or scrolled away from newest) */
+function isReadingHistory(container: HTMLElement | null = null): boolean {
+	if (pinnedViewMessageId.value) return true;
+	const sc = container ?? (timelineEl.value ? getScrollContainer(timelineEl.value) : null);
+	if (!sc) return false;
+	return !isNearLiveEdge(sc);
+}
+
+function markPinnedView(id: string) {
+	pinnedViewMessageId.value = id;
+	// Keep soft highlight a bit longer when arriving from search
+	highlightId.value = id;
+	if (highlightTimer) clearTimeout(highlightTimer);
+	highlightTimer = setTimeout(() => {
+		if (highlightId.value === id) highlightId.value = null;
+	}, 4000);
+	bindScrollLiveClear();
+}
+
+function clearPinnedViewIfAtLive() {
+	const sc = timelineEl.value ? getScrollContainer(timelineEl.value) : null;
+	if (sc && isNearLiveEdge(sc)) {
+		pinnedViewMessageId.value = null;
+	}
+}
+
+function bindScrollLiveClear() {
+	if (scrollListenCleanup) return;
+	const sc = timelineEl.value ? getScrollContainer(timelineEl.value) : null;
+	if (!sc) return;
+	const onScroll = () => {
+		clearPinnedViewIfAtLive();
+	};
+	sc.addEventListener('scroll', onScroll, { passive: true });
+	scrollListenCleanup = () => {
+		sc.removeEventListener('scroll', onScroll);
+		scrollListenCleanup = null;
+	};
 }
 
 /**
@@ -641,7 +711,7 @@ function setupLoadMoreIo() {
 			if (Date.now() < loadMoreCooldownUntil) continue;
 			// Only auto-load when user has actually scrolled away from live edge
 			const sc = root ?? getScrollContainer(sentinel);
-			if (sc && isNearLiveEdge(sc)) continue;
+			if (sc && isNearLiveEdge(sc) && !pinnedViewMessageId.value) continue;
 			void fetchMore();
 		}
 	}, {
@@ -677,7 +747,8 @@ function normalizeMessage(message: Misskey.entities.ChatMessageLite | Misskey.en
 }
 
 async function enterRoomChannel() {
-	if (!room.value || !isMember.value) return;
+	// Members get live WS; staff-only viewers still open channel when backend allows
+	if (!room.value || !canViewTimeline.value) return;
 	connection.value?.dispose();
 	connection.value = useStream().useChannel('chatRoom', {
 		roomId: room.value.id,
@@ -689,6 +760,30 @@ async function enterRoomChannel() {
 	// WS admin / clear broadcast
 	(connection.value as any).on('cleared', onRoomCleared);
 	(connection.value as any).on('msgError', onMsgError);
+}
+
+/** Deep-link ?msg= from abuse report / shared message URL */
+async function jumpToQueryMessage() {
+	const q = new URLSearchParams(window.location.search);
+	const msgId = q.get('msg') || q.get('messageId') || '';
+	if (!msgId) return;
+	// Wait for timeline DOM
+	await nextTick();
+	await new Promise<void>(r => requestAnimationFrame(() => r()));
+	pinnedViewMessageId.value = msgId;
+	const ok = await ensureMessageLoaded(msgId);
+	if (ok) {
+		scrollToMessage(msgId);
+	} else {
+		pinnedViewMessageId.value = null;
+	}
+	// Drop msg from URL so refresh doesn't re-jump awkwardly; keep room path
+	try {
+		const url = new URL(window.location.href);
+		url.searchParams.delete('msg');
+		url.searchParams.delete('messageId');
+		window.history.replaceState(window.history.state, '', url.pathname + (url.search || '') + url.hash);
+	} catch { /* ignore */ }
 }
 
 async function loadRoomTimeline() {
@@ -741,6 +836,7 @@ async function initialize() {
 	messages.value = [];
 	canFetchMore.value = false;
 	historyLoading.value = false;
+	pinnedViewMessageId.value = null;
 	mentions.value = [];
 	mentionCursor.value = 0;
 	mentionsDismissed.value = false;
@@ -783,7 +879,7 @@ async function initialize() {
 			const member = r.isMember === true || r.myRole != null || r.ownerId === $i.id;
 			isMember.value = member;
 
-			if (!member) {
+			if (!member && !isStaffViewer.value) {
 				needJoin.value = true;
 				// auto-join public rooms when opened via link
 				if (r.joinPolicy === 'public') {
@@ -795,6 +891,7 @@ async function initialize() {
 				return;
 			}
 
+			// Staff non-member: still load timeline (backend allows moderators)
 			await loadRoomTimeline();
 		}
 	} catch (e: any) {
@@ -802,7 +899,7 @@ async function initialize() {
 		const msg = e?.message || e?.error?.message || String(e);
 		if (code === 'NO_SUCH_ROOM' || /no such room/i.test(msg)) {
 			// might be non-member timeline denial
-			if (room.value && !isMember.value) {
+			if (room.value && !isMember.value && !isStaffViewer.value) {
 				needJoin.value = true;
 			} else {
 				loadError.value = tChat('roomOpenFailed');
@@ -816,17 +913,14 @@ async function initialize() {
 
 	window.document.addEventListener('visibilitychange', onVisibilitychange);
 	initializing.value = false;
+
+	// After first paint: deep-link jump (?msg=) without fighting initial stick-to-live
+	if (!loadError.value && !needJoin.value && canViewTimeline.value) {
+		void jumpToQueryMessage();
+	}
 }
 
 let isActivated = true;
-
-onActivated(() => {
-	isActivated = true;
-});
-
-onDeactivated(() => {
-	isActivated = false;
-});
 
 async function fetchMore() {
 	if (moreFetching.value || !canFetchMore.value) return;
@@ -911,21 +1005,86 @@ function onMessage(message: Misskey.entities.ChatMessageLite) {
 	sound.playMisskeySfx('chatMessage');
 
 	const scrollContainer = timelineEl.value ? getScrollContainer(timelineEl.value) : null;
-	const nearLive = isNearLiveEdge(scrollContainer);
+	const readingHistory = isReadingHistory(scrollContainer);
+	const nearLive = !readingHistory && isNearLiveEdge(scrollContainer);
+
+	// Preserve viewport while reading history / after search jump
+	const pinId = pinnedViewMessageId.value;
+	const anchorId = pinId
+		?? (messages.value[0]?.id ?? null); // newest currently loaded as weak anchor
+	const anchorTopBefore = (scrollContainer && anchorId && readingHistory)
+		? window.document.getElementById(`chat-msg-${anchorId}`)?.getBoundingClientRect().top ?? null
+		: null;
+	const prevHeight = scrollContainer?.scrollHeight ?? 0;
+	const prevTop = scrollContainer?.scrollTop ?? 0;
 
 	messages.value.unshift(normalizeMessage(message));
 
-	// Cap only at live edge — trimming while reading history jumps the list
-	if (nearLive && messages.value.length > MAX_MESSAGES) {
+	// Cap only at live edge — never trim while pinned/reading history
+	// (would drop the jumped-to message and "squeeze" the user away)
+	if (nearLive && !pinnedViewMessageId.value && messages.value.length > MAX_MESSAGES) {
 		const overflow = messages.value.length - MAX_MESSAGES;
 		messages.value.splice(messages.value.length - overflow, overflow);
 		canFetchMore.value = true;
+	} else if (pinnedViewMessageId.value && messages.value.length > MAX_MESSAGES * 2) {
+		// Soft upper bound even when pinned: drop oldest only if pin is not among them
+		const pin = pinnedViewMessageId.value;
+		const pinIdx = messages.value.findIndex(m => m.id === pin);
+		if (pinIdx >= 0 && pinIdx < messages.value.length - 40) {
+			// drop from the oldest end, keep pin + context
+			const keepFrom = Math.max(pinIdx, messages.value.length - MAX_MESSAGES);
+			if (keepFrom > 0 && keepFrom < messages.value.length) {
+				// actually oldest is at the end of array (newest-first)
+				const overflow = messages.value.length - MAX_MESSAGES;
+				if (overflow > 0 && pinIdx < messages.value.length - overflow) {
+					messages.value.splice(messages.value.length - overflow, overflow);
+					canFetchMore.value = true;
+				}
+			}
+		}
 	}
 
-	// Explicit stick when already at newest (no MutationObserver)
-	if (nearLive && scrollContainer && !historyLoading.value) {
+	if (readingHistory && scrollContainer) {
+		// Do NOT stick to live — keep reading position (search jump / scroll-up)
+		void nextTick().then(() => {
+			requestAnimationFrame(() => {
+				if (anchorTopBefore != null && anchorId) {
+					restoreScrollAnchor(scrollContainer, anchorId, anchorTopBefore);
+				} else if (prevHeight > 0) {
+					const delta = scrollContainer.scrollHeight - prevHeight;
+					if (delta !== 0) {
+						const tryA = prevTop - delta;
+						scrollContainer.scrollTop = tryA;
+						if (Math.abs(scrollContainer.scrollTop - tryA) > 1) {
+							scrollContainer.scrollTop = prevTop + delta;
+						}
+					}
+				}
+				// If pin left the loaded set somehow, try to bring it back
+				if (pinId && !messages.value.some(m => m.id === pinId)) {
+					void ensureMessageLoaded(pinId).then(ok => {
+						if (ok) scrollToMessage(pinId);
+					});
+				} else if (pinId) {
+					const pinEl = window.document.getElementById(`chat-msg-${pinId}`);
+					if (pinEl) {
+						const r = pinEl.getBoundingClientRect();
+						// Completely off-screen after layout thrash → re-center once
+						if (r.bottom < 0 || r.top > window.innerHeight) {
+							pinEl.scrollIntoView({ behavior: 'instant', block: 'center' });
+						}
+					}
+				}
+			});
+		});
+		// New message indicator while reading history
+		if (message.fromUserId !== $i.id) {
+			notifyNewMessage();
+		}
+	} else if (nearLive && scrollContainer && !historyLoading.value) {
+		// Explicit stick when already at newest
 		requestAnimationFrame(() => {
-			if (!historyLoading.value) {
+			if (!historyLoading.value && !isReadingHistory(scrollContainer)) {
 				scrollContainer.scrollTo({ top: 0, behavior: 'instant' });
 			}
 		});
@@ -995,6 +1154,10 @@ function onUnreact(ctx: Parameters<Misskey.Channels['chatUser']['events']['unrea
 
 function onIndicatorClick() {
 	showIndicator.value = false;
+	// Jump to live edge and release history pin
+	pinnedViewMessageId.value = null;
+	const sc = timelineEl.value ? getScrollContainer(timelineEl.value) : null;
+	sc?.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function notifyNewMessage() {
@@ -1006,6 +1169,27 @@ function onVisibilitychange() {
 	// TODO
 }
 
+function releaseChatResources(opts?: { clearMessages?: boolean }) {
+	teardownLoadMoreIo();
+	scrollListenCleanup?.();
+	scrollListenCleanup = null;
+	if (highlightTimer) {
+		clearTimeout(highlightTimer);
+		highlightTimer = null;
+	}
+	connection.value?.dispose();
+	connection.value = null;
+	// Drop message list to free Vue VNodes + media decoders when leaving page
+	if (opts?.clearMessages !== false) {
+		messages.value = [];
+		mentions.value = [];
+		replyTo.value = null;
+		pinnedViewMessageId.value = null;
+		highlightId.value = null;
+		showIndicator.value = false;
+	}
+}
+
 onMounted(() => {
 	stream.on('_connected_', onStreamState);
 	stream.on('_disconnected_', onStreamState);
@@ -1013,11 +1197,46 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-	teardownLoadMoreIo();
 	stream.off('_connected_', onStreamState);
 	stream.off('_disconnected_', onStreamState);
-	connection.value?.dispose();
 	window.document.removeEventListener('visibilitychange', onVisibilitychange);
+	releaseChatResources({ clearMessages: true });
+});
+
+// Keep-alive: free heavy media/WS when room is backgrounded in stacking router
+onDeactivated(() => {
+	isActivated = false;
+	// Pause live channel while backgrounded (re-enter on activate)
+	connection.value?.dispose();
+	connection.value = null;
+	teardownLoadMoreIo();
+	// Soft-trim: drop oldest beyond a small window to free DOM/media
+	if (messages.value.length > 80) {
+		const pin = pinnedViewMessageId.value;
+		const pinIdx = pin ? messages.value.findIndex(m => m.id === pin) : -1;
+		if (pinIdx < 0 || pinIdx < 60) {
+			messages.value = messages.value.slice(0, 80);
+			canFetchMore.value = true;
+		}
+	}
+});
+
+onActivated(() => {
+	isActivated = true;
+	if (canViewTimeline.value && room.value) {
+		void enterRoomChannel();
+	} else if (canViewTimeline.value && user.value) {
+		// 1:1 re-subscribe
+		connection.value?.dispose();
+		connection.value = useStream().useChannel('chatUser', {
+			otherId: user.value.id,
+		});
+		connection.value.on('message', onMessage);
+		connection.value.on('deleted', onDeleted);
+		connection.value.on('react', onReact);
+		connection.value.on('unreact', onUnreact);
+	}
+	void nextTick(() => setupLoadMoreIo());
 });
 
 async function inviteUser() {
@@ -1036,7 +1255,7 @@ const headerTabs = computed(() => {
 	// On narrow screens icon-only tabs shrink the second header row ("chin")
 	const narrow = typeof window !== 'undefined' && window.matchMedia('(max-width: 500px)').matches;
 
-	if (room.value && isMember.value) {
+	if (room.value && canViewTimeline.value) {
 		const tabs: Array<{ key: string; title: string; icon: string; iconOnly?: boolean }> = [{
 			key: 'chat',
 			title: i18n.ts.chat,
@@ -1053,7 +1272,7 @@ const headerTabs = computed(() => {
 			icon: 'ti ti-info-circle',
 			iconOnly: narrow,
 		}];
-		if (canModerate.value) {
+		if (canModerate.value && isMember.value) {
 			tabs.push({
 				key: 'manage',
 				title: tChat('manage'),

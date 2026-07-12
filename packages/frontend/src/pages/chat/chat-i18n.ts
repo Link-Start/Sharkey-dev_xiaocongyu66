@@ -546,4 +546,18 @@ export const chatFb = {
 		ja: 'メッセージへ移動中…',
 		ko: '메시지로 이동 중…',
 	},
+	staffReadonlyView: {
+		en: 'Staff view (not a member)',
+		zh: '管理员只读查看（非群成员）',
+		'zh-TW': '管理員唯讀檢視（非群成員）',
+		ja: 'スタッフ閲覧（非メンバー）',
+		ko: '스태프 보기 (비회원)',
+	},
+	staffReadonlyViewHint: {
+		en: 'You can read this room for moderation. Sending requires membership.',
+		zh: '可查看群聊消息以便处理举报；发送消息仍需加入该群。',
+		'zh-TW': '可檢視群聊訊息以便處理檢舉；傳送訊息仍需加入此群。',
+		ja: 'モデレーションのためルームを閲覧できます。送信には参加が必要です。',
+		ko: '신고 처리를 위해 이 방을 읽을 수 있습니다. 전송하려면 가입이 필요합니다.',
+	},
 } as const satisfies Record<string, FallbackTable>;

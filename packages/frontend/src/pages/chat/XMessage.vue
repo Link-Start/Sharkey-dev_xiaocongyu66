@@ -338,7 +338,13 @@ function showMenu(ev: MouseEvent, contextmenu = false) {
 			text: i18n.ts.reportAbuse,
 			icon: 'ti ti-exclamation-circle',
 			action: () => {
-				const localUrl = `${url}/chat/messages/${props.message.id}`;
+				// Prefer room deep-link so admin opens group context; also keep
+				// /chat/messages/:id which redirects into room/user with ?msg=
+				const roomId = (props.message as any).toRoomId as string | null | undefined;
+				const msgPath = `${url}/chat/messages/${props.message.id}`;
+				const localUrl = roomId
+					? `${url}/chat/room/${roomId}?msg=${encodeURIComponent(props.message.id)}\n${msgPath}`
+					: msgPath;
 				const { dispose } = os.popup(defineAsyncComponent(() => import('@/components/MkAbuseReportWindow.vue')), {
 					user: props.message.fromUser!,
 					initialComment: `${localUrl}\n-----\n`,

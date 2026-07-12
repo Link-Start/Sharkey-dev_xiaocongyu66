@@ -135,7 +135,19 @@ function openImage() {
 	window.open(props.file.url, '_blank', 'noopener');
 }
 
+function onDocVisibility() {
+	// Background tab: free decoder even if still "near" in layout
+	if (window.document.hidden) {
+		if (playing.value && videoEl.value) {
+			try { videoEl.value.pause(); } catch { /* ignore */ }
+			playing.value = false;
+		}
+		unloadVideo();
+	}
+}
+
 onMounted(() => {
+	window.document.addEventListener('visibilitychange', onDocVisibility);
 	if (!rootEl.value || typeof IntersectionObserver === 'undefined') {
 		nearViewport.value = true;
 		return;
@@ -159,6 +171,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+	window.document.removeEventListener('visibilitychange', onDocVisibility);
 	io?.disconnect();
 	io = null;
 	playing.value = false;
@@ -169,6 +182,7 @@ onBeforeUnmount(() => {
 			videoEl.value.load();
 		} catch { /* ignore */ }
 	}
+	activated.value = false;
 });
 </script>
 

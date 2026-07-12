@@ -62,6 +62,26 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<template #icon><i class="ti ti-message-2"></i></template>
 			<template #label>{{ i18n.ts.details }}</template>
 			<div class="_gaps_s">
+				<!-- Chat / group message deep link from report comment -->
+				<div v-if="chatTarget" class="_panel" style="padding: 12px;">
+					<div style="font-weight: bold; margin-bottom: 6px;">
+						<i class="ti ti-messages"></i>
+						{{ chatTarget.kind === 'room' ? '群聊消息举报' : '私聊消息举报' }}
+					</div>
+					<div style="opacity: 0.85; font-size: 0.9em; margin-bottom: 10px; word-break: break-all;">
+						{{ chatTarget.url }}
+					</div>
+					<div class="_buttons">
+						<MkButton primary @click="openChatTarget">
+							<i class="ti ti-arrow-right"></i>
+							{{ chatTarget.kind === 'room' ? '打开群聊消息' : '打开聊天消息' }}
+						</MkButton>
+						<MkButton @click="copyChatUrl">
+							<i class="ti ti-copy"></i>
+							{{ i18n.ts.copyLink }}
+						</MkButton>
+					</div>
+				</div>
 				<Mfm :text="report.comment" :parsedNodes="parsedComment" :isBlock="true" :linkNavigationBehavior="'window'" :author="report.reporter" :nyaize="false" :isAnim="false"/>
 				<div class="_gaps_s" @click.stop>
 					<SkUrlPreviewGroup :sourceNodes="parsedComment" :compact="false" :detail="false" :showAsQuote="true"/>
@@ -140,6 +160,62 @@ reporterRouter.init();
 
 const parsedComment = computed(() => mfm.parse(props.report.comment));
 
+/**
+ * Parse chat deep links embedded in report comments by XMessage:
+ *   {origin}/chat/messages/{messageId}
+ *   {origin}/chat/room/{roomId}?msg={messageId}
+ *   {origin}/chat/user/{userId}?msg={messageId}
+ */
+const chatTarget = computed(() => {
+	const comment = props.report.comment ?? '';
+	// Prefer explicit message id path (always used by chat report menu)
+	const msgPath = comment.match(/(?:https?:\/\/[^\s]+)?\/chat\/messages\/([a-zA-Z0-9]+)/);
+	if (msgPath) {
+		const messageId = msgPath[1];
+		const full = comment.match(/https?:\/\/[^\s]*\/chat\/messages\/[a-zA-Z0-9]+/);
+		return {
+			kind: 'message' as const,
+			messageId,
+			// Landing page redirects into room/user with ?msg=
+			path: `/chat/messages/${messageId}`,
+			url: full?.[0] ?? `/chat/messages/${messageId}`,
+		};
+	}
+	const roomMsg = comment.match(/(?:https?:\/\/[^\s]+)?\/chat\/room\/([a-zA-Z0-9]+)(?:\?[^\s#]*\bmsg=([a-zA-Z0-9]+))?/);
+	if (roomMsg) {
+		const roomId = roomMsg[1];
+		const messageId = roomMsg[2] ?? null;
+		const path = messageId
+			? `/chat/room/${roomId}?msg=${encodeURIComponent(messageId)}`
+			: `/chat/room/${roomId}`;
+		const full = comment.match(/https?:\/\/[^\s]*\/chat\/room\/[a-zA-Z0-9]+[^\s]*/);
+		return {
+			kind: 'room' as const,
+			roomId,
+			messageId,
+			path,
+			url: full?.[0] ?? path,
+		};
+	}
+	const userMsg = comment.match(/(?:https?:\/\/[^\s]+)?\/chat\/user\/([a-zA-Z0-9]+)(?:\?[^\s#]*\bmsg=([a-zA-Z0-9]+))?/);
+	if (userMsg) {
+		const userId = userMsg[1];
+		const messageId = userMsg[2] ?? null;
+		const path = messageId
+			? `/chat/user/${userId}?msg=${encodeURIComponent(messageId)}`
+			: `/chat/user/${userId}`;
+		const full = comment.match(/https?:\/\/[^\s]*\/chat\/user\/[a-zA-Z0-9]+[^\s]*/);
+		return {
+			kind: 'user' as const,
+			userId,
+			messageId,
+			path,
+			url: full?.[0] ?? path,
+		};
+	}
+	return null;
+});
+
 const targetInstanceIcon = computed(() => props.report.targetInstance?.faviconUrl
 	? getProxiedImageUrlNullable(props.report.targetInstance.faviconUrl, 'preview')
 	: props.report.targetInstance?.iconUrl
@@ -173,8 +249,19 @@ function forward() {
 	});
 }
 
+function openChatTarget() {
+	if (!chatTarget.value) return;
+	// New window so admin keeps the report list open
+	os.pageWindow(chatTarget.value.path);
+}
+
+function copyChatUrl() {
+	if (!chatTarget.value) return;
+	copyToClipboard(chatTarget.value.url);
+}
+
 function showMenu(ev: MouseEvent) {
-	os.popupMenu([{
+	const items: any[] = [{
 		icon: 'ti ti-hash',
 		text: 'Copy ID',
 		action: () => {
@@ -186,7 +273,15 @@ function showMenu(ev: MouseEvent) {
 		action: () => {
 			copyToClipboard(JSON.stringify(props.report, null, '\t'));
 		},
-	}], ev.currentTarget ?? ev.target);
+	}];
+	if (chatTarget.value) {
+		items.unshift({
+			icon: 'ti ti-messages',
+			text: chatTarget.value.kind === 'room' ? '打开群聊消息' : '打开聊天消息',
+			action: () => openChatTarget(),
+		});
+	}
+	os.popupMenu(items, ev.currentTarget ?? ev.target);
 }
 </script>
 
