@@ -88,3 +88,40 @@ export function createUserScrollGuard() {
 		},
 	};
 }
+
+/**
+ * Page-level scroll (PageWithHeader _pageScrollable) save/restore.
+ * Used when chat pane is hidden via v-show and scrollHeight collapses.
+ */
+export function createPageScrollMemory(getContainer: () => HTMLElement | null) {
+	let savedTop: number | null = null;
+
+	return {
+		save() {
+			const sc = getContainer();
+			if (sc) savedTop = sc.scrollTop;
+		},
+		/**
+		 * Restore after DOM shows the tall timeline again.
+		 * Applies in nextTick + rAF (caller supplies nextTick).
+		 */
+		restore(schedule: (fn: () => void) => void) {
+			const top = savedTop;
+			if (top == null) return;
+			const apply = () => {
+				const sc = getContainer();
+				if (!sc) return;
+				sc.scrollTop = top;
+				// Layout (footer / sticky header) may settle one frame later
+				requestAnimationFrame(() => {
+					const sc2 = getContainer();
+					if (sc2) sc2.scrollTop = top;
+				});
+			};
+			schedule(apply);
+		},
+		get saved() {
+			return savedTop;
+		},
+	};
+}

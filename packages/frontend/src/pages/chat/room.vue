@@ -245,7 +245,9 @@ import {
 	scrollElementToLiveEdge,
 	preserveScrollAfterPrepend,
 	createUserScrollGuard,
+	createPageScrollMemory,
 } from './chat-scroll.js';
+import { loadRoomMeta as loadRoomMetaApi, loadUserMeta as loadUserMetaApi, patchAvatarUrls } from './chat-meta.js';
 import {
 	useChatMessages,
 	MAX_MESSAGES,
@@ -1011,17 +1013,7 @@ function bindChatChannelEvents() {
 	conn.on?.('userAvatarUpdated', (body: { user?: any; updatedAt?: string }) => {
 		const u = body?.user;
 		if (!u?.id) return;
-		const bust = body?.updatedAt ? `?t=${encodeURIComponent(body.updatedAt)}` : '';
-		const applyBust = (url: string | null | undefined) => {
-			if (!url) return url;
-			// Drop previous cache buster then append
-			const base = String(url).split('?')[0];
-			return bust ? `${base}${bust}` : base;
-		};
-		const patched = {
-			...u,
-			avatarUrl: applyBust(u.avatarUrl) ?? u.avatarUrl,
-		};
+		const patched = patchAvatarUrls(u, body?.updatedAt);
 		for (const m of messages.value) {
 			if (m.fromUserId === u.id && m.fromUser) {
 				m.fromUser = { ...m.fromUser, ...patched };
@@ -1106,45 +1098,12 @@ async function enterRoomChannel() {
 
 /** Load room meta over WS (roomShow); REST fallback. */
 async function loadRoomMeta(roomId: string): Promise<any> {
-	if (chatWs.ready()) {
-		try {
-			const res = await chatWs.request<{ room?: any }>(
-				'roomShow',
-				{},
-				'room',
-				'roomError',
-				'chat/rooms/show',
-				{ roomId },
-				6000,
-			);
-			// WS shape: { reqId, room }  | REST shape: room object
-			return (res as any)?.room ?? res;
-		} catch {
-			// fall through
-		}
-	}
-	return await misskeyApi('chat/rooms/show', { roomId }) as any;
+	return loadRoomMetaApi(chatWs, roomId);
 }
 
 /** Load peer profile over WS (userShow); REST fallback. */
 async function loadUserMeta(userId: string): Promise<Misskey.entities.UserDetailed> {
-	if (chatWs.ready()) {
-		try {
-			const res = await chatWs.request<{ user?: any }>(
-				'userShow',
-				{ userId },
-				'user',
-				'userError',
-				'users/show',
-				{ userId },
-				6000,
-			);
-			return ((res as any)?.user ?? res) as Misskey.entities.UserDetailed;
-		} catch {
-			// fall through
-		}
-	}
-	return await misskeyApi('users/show', { userId });
+	return loadUserMetaApi(chatWs, userId);
 }
 
 /** Initial timeline page — WS history first, short REST fallback. */
@@ -1654,35 +1613,12 @@ const tab = ref('chat');
  * scrollHeight collapses and the browser clamps scrollTop to 0. Coming back
  * without restore lands at the top of the thread. Save/restore across tab changes.
  */
-let savedChatPageScrollTop: number | null = null;
-
-function saveChatPageScroll() {
-	const sc = getChatScrollContainer();
-	if (sc) savedChatPageScrollTop = sc.scrollTop;
-}
-
-function restoreChatPageScroll() {
-	const top = savedChatPageScrollTop;
-	if (top == null) return;
-	const apply = () => {
-		const sc = getChatScrollContainer();
-		if (!sc) return;
-		sc.scrollTop = top;
-		// Layout (footer / sticky header) may settle one frame later
-		requestAnimationFrame(() => {
-			const sc2 = getChatScrollContainer();
-			if (sc2) sc2.scrollTop = top;
-		});
-	};
-	void nextTick().then(() => {
-		requestAnimationFrame(apply);
-	});
-}
+const pageScrollMemory = createPageScrollMemory(() => getChatScrollContainer());
 
 // Leaving chat: save while timeline is still laid out (pre-flush, before v-show hides it)
 watch(tab, (next, prev) => {
 	if (prev === 'chat' && next !== 'chat') {
-		saveChatPageScroll();
+		pageScrollMemory.save();
 	}
 }, { flush: 'pre' });
 
@@ -1692,7 +1628,11 @@ watch(tab, (next, prev) => {
 		void nextTick(() => {
 			// Search/mention jump owns scroll via pinnedViewMessageId
 			if (pinnedViewMessageId.value) return;
-			restoreChatPageScroll();
+			pageScrollMemory.restore((apply) => {
+				void nextTick().then(() => {
+					requestAnimationFrame(apply);
+				});
+			});
 		});
 	}
 });
