@@ -10,6 +10,7 @@ import type { WebhooksRepository } from '@/models/_.js';
 import { webhookEventTypes } from '@/models/Webhook.js';
 import { DI } from '@/di-symbols.js';
 import { RoleService } from '@/core/RoleService.js';
+import { UtilityService } from '@/core/UtilityService.js';
 import { InternalEventService } from '@/global/InternalEventService.js';
 import { ApiError } from '@/server/api/error.js';
 
@@ -26,6 +27,11 @@ export const meta = {
 			message: 'You cannot create webhook any more.',
 			code: 'TOO_MANY_WEBHOOKS',
 			id: '87a9bb19-111e-4e37-81d3-a3e7426453b0',
+		},
+		invalidUrl: {
+			message: 'Invalid webhook URL (https required; no credentials in URL).',
+			code: 'INVALID_WEBHOOK_URL',
+			id: 'c0ffee00-webh-4a11-b001-000000000001',
 		},
 	},
 
@@ -86,6 +92,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 		private idService: IdService,
 		private roleService: RoleService,
+		private utilityService: UtilityService,
 		private readonly internalEventService: InternalEventService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
@@ -94,6 +101,18 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			});
 			if (currentWebhooksCount >= (await this.roleService.getUserPolicies(me.id)).webhookLimit) {
 				throw new ApiError(meta.errors.tooManyWebhooks);
+			}
+
+			// SK-2026-016: https only (http allowed in non-prod via checkHttps), no userinfo
+			if (!this.utilityService.isValidUrl(ps.url, { allowHttp: false, allowFragment: false })) {
+				throw new ApiError(meta.errors.invalidUrl);
+			}
+			try {
+				const u = new URL(ps.url);
+				if (u.username || u.password) throw new Error('creds');
+				if (!this.utilityService.checkHttps(u, false)) throw new Error('scheme');
+			} catch {
+				throw new ApiError(meta.errors.invalidUrl);
 			}
 
 			const webhook = await this.webhooksRepository.insertOne({

@@ -120,7 +120,7 @@ Return `400` / `unsupported_grant_type`, or implement real client credentials wi
 |--|--|
 | **Severity** | **M** |
 | **CWE** | CWE-79 (CSS injection) / CWE-20 |
-| **Status** | **Fixed in tree** (API) — `color` restricted to `#RGB` / `#RRGGBB`; invalid values fall back to `#86b300`. Frontend still trusts stored values. |
+| **Status** | **Fixed in tree** — API hex-only; frontend `safeCssHexColor` on note/post channel bars + instance ticker themeColor. |
 | **Components** | Backend: `channels/create.ts`, `channels/update.ts`. Frontend: `MkNote.vue`, `SkNote.vue`, `MkNoteSub.vue`, `MkPostForm.vue` — `:style="{ background: note.channel.color }"` |
 
 **Description**  
@@ -143,7 +143,8 @@ Server + client: allow only `#RGB` / `#RRGGBB`. Reject otherwise; default `#86b3
 |--|--|
 | **Severity** | **M** (federation) / **L** (local admin) |
 | **CWE** | CWE-79 |
-| **Components** | `MkInstanceTicker.vue` — ``background: linear-gradient(90deg, ${themeColor}, ${themeColor}00)``; remote `instance.themeColor` |
+| **Status** | **Fixed in tree** — `safeCssHexColor` on Mk/Sk InstanceTicker |
+| **Components** | `MkInstanceTicker.vue` / `SkInstanceTicker.vue` |
 
 **Description**  
 Remote instances’ theme colors are interpolated into CSS without strict hex validation.
@@ -159,6 +160,7 @@ Same hex whitelist; strip non-matching remote values.
 |--|--|
 | **Severity** | **M** (requires admin content) |
 | **CWE** | CWE-79 |
+| **Status** | **Fixed in tree** — global `style` attribute removed from allowlist |
 | **Components** | `packages/frontend/src/utility/sanitize-html.ts`; consumers: about page, visitor dashboard, signup rules |
 
 **Description**  
@@ -273,6 +275,7 @@ Honest UX (“escrow / operator can read”); require dedicated `chatEscrowSecre
 |--|--|
 | **Severity** | **M** (pattern) / **L** (current exploitability) |
 | **CWE** | CWE-89 |
+| **Status** | **Partially fixed** — poll vote `noteId` parameterized; chat reaction array_append/remove parameterized. HashtagService / ReactionService patterns may remain. |
 | **Components** | |
 
 **Poll**  
@@ -355,7 +358,8 @@ Same as SSRF hardening; consider signed proxy URLs; stricter host allowlist for 
 |--|--|
 | **Severity** | **M** |
 | **CWE** | CWE-918 |
-| **Components** | `endpoints/fetch-rss.ts` — `requireCredential: false`, 20/10s |
+| **Status** | **Fixed in tree** — requires credential; URL validated via `isValidUrl` |
+| **Components** | `endpoints/fetch-rss.ts` |
 
 **Description**  
 Server fetches attacker-supplied URL and parses feed. Amplifies SSRF when private-IP checks off; even in production, probes public IPs / port scan via timing/errors.
@@ -371,7 +375,8 @@ Auth or instance setting; block non-http(s); optional domain allowlist; lower li
 |--|--|
 | **Severity** | **M** |
 | **CWE** | CWE-918 |
-| **Components** | `i/webhooks/create.ts` — `url` free string; `UserWebhookDeliverProcessorService` → `httpRequestService.send` |
+| **Status** | **Partially fixed** — create/update require valid https URL without userinfo; private-IP still blocked at socket layer. |
+| **Components** | `i/webhooks/create.ts`, `i/webhooks/update.ts` |
 
 **Description**  
 Logged-in users register webhook URLs; instance POSTs events there. Classic “SSRF with user auth” (metadata, internal HTTP if guards fail).
@@ -868,6 +873,7 @@ Internet
 | 0.2 | 2026-07-14 | + push unregister, Telegram token URLs, translator privacy, export emoji, more |
 | 0.3 | 2026-07-14 | Chat stream gate + escrow setupPassword cut |
 | 0.4 | 2026-07-14 | Batch fix: SSRF always-on, OAuth stub, channel color, invite CSPRNG, room invite blocks, sw unregister, sponsors forceUpdate, federation update-remote-user auth, storage path, docs |
+| 0.5 | 2026-07-14 | P1: fetch-rss auth, webhook URL https, poll/chat SQL params, sanitize-html no style, frontend safe colors |
 
 ---
 

@@ -25,7 +25,7 @@ Displays a note in the Sharkey style. Used to show the "main" note in a given co
 	</div>
 	<div v-if="pinned" :class="$style.tip"><i class="ti ti-pin"></i> {{ i18n.ts.pinnedNote }}</div>
 	<div v-if="isRenote" :class="$style.renote">
-		<div v-if="note.channel" :class="$style.colorBar" :style="{ background: note.channel.color }"></div>
+		<div v-if="note.channel" :class="$style.colorBar" :style="{ background: safeCssHexColor(note.channel.color) }"></div>
 		<MkAvatar :class="$style.renoteAvatar" :user="note.user" link preview/>
 		<i class="ti ti-repeat" style="margin-right: 4px;"></i>
 		<I18n :src="i18n.ts.renotedBy" tag="span" :class="$style.renoteText">
@@ -56,7 +56,7 @@ Displays a note in the Sharkey style. Used to show the "main" note in a given co
 	</div>
 	<article v-else :class="$style.article" @contextmenu.stop="onContextmenu">
 		<div style="display: flex; padding-bottom: 10px;">
-			<div v-if="appearNote.channel" :class="$style.colorBar" :style="{ background: appearNote.channel.color }"></div>
+			<div v-if="appearNote.channel" :class="$style.colorBar" :style="{ background: safeCssHexColor(appearNote.channel.color) }"></div>
 			<MkAvatar :class="[$style.avatar, { [$style.avatarReplyTo]: appearNote.reply }]" :user="appearNote.user" :link="!mock" :preview="!mock"/>
 			<div :class="$style.main">
 				<SkNoteHeader :note="appearNote" :mini="true"/>
@@ -183,6 +183,7 @@ import { shouldCollapsed } from '@@/js/collapsed.js';
 import * as config from '@@/js/config.js';
 import type { Ref } from 'vue';
 import type { MenuItem } from '@/types/menu.js';
+import { safeCssHexColor } from '@/utility/color.js';
 import type { OpenOnRemoteOptions } from '@/utility/please-login.js';
 import type { Keymap } from '@/utility/hotkey.js';
 import type { Visibility } from '@/utility/boost-quote.js';

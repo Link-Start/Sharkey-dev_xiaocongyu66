@@ -82,7 +82,14 @@ export class PollService {
 
 		// Increment votes count
 		const index = choice + 1; // In SQL, array index is 1 based
-		await this.pollsRepository.query(`UPDATE poll SET votes[${index}] = votes[${index}] + 1 WHERE "noteId" = '${poll.noteId}'`);
+		// SK-2026-011: noteId parameterized; index is integer-validated only (array subscript)
+			if (!Number.isInteger(index) || index < 1 || index > 128) {
+				throw new Error('invalid poll choice index');
+			}
+			await this.pollsRepository.query(
+				`UPDATE poll SET votes[${index}] = votes[${index}] + 1 WHERE "noteId" = $1`,
+				[poll.noteId],
+			);
 
 		this.globalEventService.publishNoteStream(note.id, 'pollVoted', {
 			id: note.id,

@@ -11,7 +11,7 @@ For example, when viewing a reply on the timeline, SkNoteSub will be used to dis
 <SkMutedNote v-show="!isDeleted" ref="rootComp" :note="appearNote" :mutedClass="$style.muted" :expandedClass="[$style.root, { [$style.children]: depth > 1, [$style.isReply]: props.isReply, [$style.detailed]: props.detailed }]" @expandMute="n => emit('expandMute', n)">
 	<div v-if="!hideLine" :class="$style.line"></div>
 	<div :class="$style.main">
-		<div v-if="note.channel" :class="$style.colorBar" :style="{ background: note.channel.color }"></div>
+		<div v-if="note.channel" :class="$style.colorBar" :style="{ background: safeCssHexColor(note.channel.color) }"></div>
 		<!-- new avatar container with line (post section) -->
 		<div :class="$style.avatarContainer">
 			<MkAvatar :class="$style.avatar" :user="note.user" link preview/>
@@ -98,6 +98,7 @@ import * as Misskey from 'misskey-js';
 import * as config from '@@/js/config.js';
 import type { Ref } from 'vue';
 import type { Visibility } from '@/utility/boost-quote.js';
+import { safeCssHexColor } from '@/utility/color.js';
 import type { OpenOnRemoteOptions } from '@/utility/please-login.js';
 import SkNoteHeader from '@/components/SkNoteHeader.vue';
 import MkReactionsViewer from '@/components/MkReactionsViewer.vue';

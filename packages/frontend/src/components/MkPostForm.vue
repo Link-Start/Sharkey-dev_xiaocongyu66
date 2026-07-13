@@ -71,7 +71,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<div v-if="maxCwTextLength - cwTextLength < 20" :class="['_acrylic', $style.cwTextCount, { [$style.cwTextOver]: cwTextLength > maxCwTextLength }]">{{ maxCwTextLength - cwTextLength }}</div>
 	</div>
 	<div :class="[$style.textOuter, { [$style.withCw]: useCw }]">
-		<div v-if="channel" :class="$style.colorBar" :style="{ background: channel.color }"></div>
+		<div v-if="channel" :class="$style.colorBar" :style="{ background: safeCssHexColor(channel.color) }"></div>
 		<textarea ref="textareaEl" v-model="text" :class="[$style.text]" :disabled="posting || posted" :readonly="textAreaReadOnly" :placeholder="placeholder" data-cy-post-form-text dir="auto" @keydown="onKeydown" @keyup="onKeyup" @paste="onPaste" @compositionupdate="onCompositionUpdate" @compositionend="onCompositionEnd"/>
 		<div v-if="maxTextLength - textLength < 100" :class="['_acrylic', $style.textCount, { [$style.textOver]: textLength > maxTextLength }]">{{ maxTextLength - textLength }}</div>
 	</div>
@@ -116,6 +116,7 @@ import { appendContentWarning } from '@@/js/append-content-warning.js';
 import { formatTimeString } from '@@/js/format-time-string.js';
 import type { ShallowRef } from 'vue';
 import type { MenuItem } from '@/types/menu.js';
+import { safeCssHexColor } from '@/utility/color.js';
 import type { PostFormProps } from '@/types/post-form.js';
 import type { PollEditorModelValue } from '@/components/MkPollEditor.vue';
 import MkNotePreview from '@/components/MkNotePreview.vue';

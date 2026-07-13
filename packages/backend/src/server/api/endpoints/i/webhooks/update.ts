@@ -9,6 +9,7 @@ import type { WebhooksRepository } from '@/models/_.js';
 import { InternalEventService } from '@/global/InternalEventService.js';
 import { webhookEventTypes } from '@/models/Webhook.js';
 import { DI } from '@/di-symbols.js';
+import { UtilityService } from '@/core/UtilityService.js';
 import { ApiError } from '../../../error.js';
 
 export const meta = {
@@ -23,6 +24,11 @@ export const meta = {
 			message: 'No such webhook.',
 			code: 'NO_SUCH_WEBHOOK',
 			id: 'fb0fea69-da18-45b1-828d-bd4fd1612518',
+		},
+		invalidUrl: {
+			message: 'Invalid webhook URL (https required; no credentials in URL).',
+			code: 'INVALID_WEBHOOK_URL',
+			id: 'c0ffee00-webh-4a11-b001-000000000002',
 		},
 	},
 
@@ -56,6 +62,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		@Inject(DI.webhooksRepository)
 		private webhooksRepository: WebhooksRepository,
 
+		private utilityService: UtilityService,
 		private readonly internalEventService: InternalEventService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
@@ -66,6 +73,19 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			if (webhook == null) {
 				throw new ApiError(meta.errors.noSuchWebhook);
+			}
+
+			if (ps.url !== undefined) {
+				if (!this.utilityService.isValidUrl(ps.url, { allowHttp: false, allowFragment: false })) {
+					throw new ApiError(meta.errors.invalidUrl);
+				}
+				try {
+					const u = new URL(ps.url);
+					if (u.username || u.password) throw new Error('creds');
+					if (!this.utilityService.checkHttps(u, false)) throw new Error('scheme');
+				} catch {
+					throw new ApiError(meta.errors.invalidUrl);
+				}
 			}
 
 			await this.webhooksRepository.update(webhook.id, {

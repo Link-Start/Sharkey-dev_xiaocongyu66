@@ -162,9 +162,15 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				choice: ps.choice,
 			});
 
-			// Increment votes count
+			// Increment votes count (SK-2026-011: parameterize noteId; index is bounds-checked int)
 			const index = ps.choice + 1; // In SQL, array index is 1 based
-			await this.pollsRepository.query(`UPDATE poll SET votes[${index}] = votes[${index}] + 1 WHERE "noteId" = '${poll.noteId}'`);
+			if (!Number.isInteger(index) || index < 1 || index > 128) {
+				throw new ApiError(meta.errors.invalidChoice);
+			}
+			await this.pollsRepository.query(
+				`UPDATE poll SET votes[${index}] = votes[${index}] + 1 WHERE "noteId" = $1`,
+				[poll.noteId],
+			);
 
 			this.globalEventService.publishNoteStream(note.id, 'pollVoted', {
 				id: note.id,

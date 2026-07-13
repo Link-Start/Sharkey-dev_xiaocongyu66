@@ -15,6 +15,7 @@ import { computed } from 'vue';
 import { instanceName as localInstanceName } from '@@/js/config.js';
 import type { CSSProperties } from 'vue';
 import { instance as localInstance } from '@/instance.js';
+import { safeCssHexColor } from '@/utility/color.js';
 import { getProxiedImageUrlNullable } from '@/utility/media-proxy.js';
 
 const props = defineProps<{
@@ -44,7 +45,7 @@ const faviconUrl = computed(() => {
 });
 
 const themeColorStyle = computed<CSSProperties>(() => {
-	const themeColor = (props.host == null ? localInstance.themeColor : props.instance?.themeColor) ?? '#777777';
+	const themeColor = safeCssHexColor((props.host == null ? localInstance.themeColor : props.instance?.themeColor) ?? null, '#777777');
 	return {
 		background: `linear-gradient(90deg, ${themeColor}, ${themeColor}00)`,
 	};

@@ -22,7 +22,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	<MkNoteSub v-if="appearNote.reply" v-show="!renoteCollapsed && !inReplyToCollapsed" :note="appearNote.reply" :class="$style.replyTo" @expandMute="n => emit('expandMute', n)"/>
 	<div v-if="pinned" :class="$style.tip"><i class="ti ti-pin"></i> {{ i18n.ts.pinnedNote }}</div>
 	<div v-if="isRenote" :class="$style.renote">
-		<div v-if="note.channel" :class="$style.colorBar" :style="{ background: note.channel.color }"></div>
+		<div v-if="note.channel" :class="$style.colorBar" :style="{ background: safeCssHexColor(note.channel.color) }"></div>
 		<MkAvatar :class="$style.renoteAvatar" :user="note.user" link preview/>
 		<i class="ti ti-repeat" style="margin-right: 4px;"></i>
 		<I18n :src="i18n.ts.renotedBy" tag="span" :class="$style.renoteText">
@@ -52,7 +52,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<Mfm :text="getNoteSummary(appearNote)" :isBlock="true" :plain="true" :nowrap="true" :author="appearNote.user" :nyaize="'respect'" :class="$style.collapsedRenoteTargetText" @click="renoteCollapsed = false; inReplyToCollapsed = false"/>
 	</div>
 	<article v-else :class="$style.article" @contextmenu.stop="onContextmenu">
-		<div v-if="appearNote.channel" :class="$style.colorBar" :style="{ background: appearNote.channel.color }"></div>
+		<div v-if="appearNote.channel" :class="$style.colorBar" :style="{ background: safeCssHexColor(appearNote.channel.color) }"></div>
 		<MkAvatar :class="[$style.avatar, prefer.s.useStickyIcons ? $style.useSticky : null]" :user="appearNote.user" :link="!mock" :preview="!mock"/>
 		<div :class="[$style.main, { [$style.clickToOpen]: prefer.s.clickToOpen }]" @click.stop="prefer.s.clickToOpen ? noteclick(appearNote.id) : undefined">
 			<MkNoteHeader :note="appearNote" :mini="true" @click.stop/>
@@ -181,6 +181,7 @@ import { shouldCollapsed } from '@@/js/collapsed.js';
 import * as config from '@@/js/config.js';
 import type { Ref } from 'vue';
 import type { MenuItem } from '@/types/menu.js';
+import { safeCssHexColor } from '@/utility/color.js';
 import type { OpenOnRemoteOptions } from '@/utility/please-login.js';
 import type { Keymap } from '@/utility/hotkey.js';
 import type { Visibility } from '@/utility/boost-quote.js';

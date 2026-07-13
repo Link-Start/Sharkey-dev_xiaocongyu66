@@ -6,7 +6,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <template>
 <SkMutedNote v-show="!isDeleted" ref="rootComp" :note="appearNote" :mutedClass="$style.muted" :expandedClass="[$style.root, { [$style.children]: depth > 1 }]" @expandMute="n => emit('expandMute', n)">
 	<div :class="$style.main">
-		<div v-if="note.channel" :class="$style.colorBar" :style="{ background: note.channel.color }"></div>
+		<div v-if="note.channel" :class="$style.colorBar" :style="{ background: safeCssHexColor(note.channel.color) }"></div>
 		<MkAvatar :class="$style.avatar" :user="note.user" link preview/>
 		<div :class="$style.body">
 			<MkNoteHeader :class="$style.header" :note="note" :mini="true"/>
@@ -86,6 +86,7 @@ import * as Misskey from 'misskey-js';
 import * as config from '@@/js/config.js';
 import type { Ref } from 'vue';
 import type { Visibility } from '@/utility/boost-quote.js';
+import { safeCssHexColor } from '@/utility/color.js';
 import type { OpenOnRemoteOptions } from '@/utility/please-login.js';
 import MkNoteHeader from '@/components/MkNoteHeader.vue';
 import MkReactionsViewer from '@/components/MkReactionsViewer.vue';

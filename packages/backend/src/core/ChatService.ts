@@ -1421,12 +1421,12 @@ export class ChatService {
 			}
 		}
 
-		await this.chatMessagesRepository.createQueryBuilder().update()
-			.set({
-				reactions: () => `array_append("reactions", '${userId}/${reaction}')`,
-			})
-			.where('id = :id', { id: message.id })
-			.execute();
+		// SK-2026-011: parameterized reaction token
+		const reactionToken = `${userId}/${reaction}`;
+		await this.chatMessagesRepository.query(
+			`UPDATE "chat_message" SET "reactions" = array_append("reactions", $1) WHERE "id" = $2`,
+			[reactionToken, message.id],
+		);
 
 		if (room) {
 			this.globalEventService.publishChatRoomStream(room.id, 'react', {
@@ -1465,12 +1465,11 @@ export class ChatService {
 
 		const room = message.toRoomId ? await this.chatRoomsRepository.findOneByOrFail({ id: message.toRoomId }) : null;
 
-		await this.chatMessagesRepository.createQueryBuilder().update()
-			.set({
-				reactions: () => `array_remove("reactions", '${userId}/${reaction}')`,
-			})
-			.where('id = :id', { id: message.id })
-			.execute();
+		const reactionToken = `${userId}/${reaction}`;
+		await this.chatMessagesRepository.query(
+			`UPDATE "chat_message" SET "reactions" = array_remove("reactions", $1) WHERE "id" = $2`,
+			[reactionToken, message.id],
+		);
 
 		// TODO: 実際に削除が行われたときのみイベントを発行する
 

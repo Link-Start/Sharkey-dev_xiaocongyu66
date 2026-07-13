@@ -7,13 +7,16 @@ import { Injectable } from '@nestjs/common';
 import { parseFeed } from 'htmlparser2';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import { HttpRequestService } from '@/core/HttpRequestService.js';
+import { UtilityService } from '@/core/UtilityService.js';
 import { ApiError } from '../error.js';
 import type { FeedItem } from 'domutils';
 
 export const meta = {
 	tags: ['meta'],
 
-	requireCredential: false,
+	// SK-2026-015: unauthenticated outbound fetch is an SSRF/amplification surface
+	requireCredential: true,
+	kind: 'read:account',
 	allowGet: true,
 	cacheSec: 60 * 3,
 
@@ -22,6 +25,11 @@ export const meta = {
 			id: '88f4356f-719d-4715-b4fc-703a10a812d2',
 			code: 'FETCH_FAILED',
 			message: 'Failed to fetch RSS feed',
+		},
+		invalidUrl: {
+			id: 'a1b2c3d4-e5f6-4789-a012-3456789abcde',
+			code: 'INVALID_URL',
+			message: 'Invalid or disallowed RSS URL.',
 		},
 	},
 
@@ -123,7 +131,7 @@ export const meta = {
 export const paramDef = {
 	type: 'object',
 	properties: {
-		url: { type: 'string' },
+		url: { type: 'string', minLength: 1, maxLength: 2048 },
 	},
 	required: ['url'],
 } as const;
@@ -132,8 +140,23 @@ export const paramDef = {
 export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-disable-line import/no-default-export
 	constructor(
 		private httpRequestService: HttpRequestService,
+		private utilityService: UtilityService,
 	) {
 		super(meta, paramDef, async (ps) => {
+			// Only http(s); block credentials/userinfo and fragments for SSRF hygiene
+			if (!this.utilityService.isValidUrl(ps.url, { allowHttp: true, allowFragment: false })) {
+				throw new ApiError(meta.errors.invalidUrl);
+			}
+			let parsed: URL;
+			try {
+				parsed = new URL(ps.url);
+			} catch {
+				throw new ApiError(meta.errors.invalidUrl);
+			}
+			if (parsed.username || parsed.password) {
+				throw new ApiError(meta.errors.invalidUrl);
+			}
+
 			const res = await this.httpRequestService.send(ps.url, {
 				method: 'GET',
 				headers: {
