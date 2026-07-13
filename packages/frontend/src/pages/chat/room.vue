@@ -117,21 +117,16 @@ SPDX-License-Identifier: AGPL-3.0-only
 				</div>
 
 				<div v-else ref="timelineEl" class="_gaps" :class="$style.timeline">
-					<!-- History status: async background prefetch (not scroll-chained dynamic load) -->
-					<div v-if="canFetchMore || historyPrefetching || moreFetching" :class="$style.loadMoreSentinel">
+					<!-- Auto history: scroll near top starts prefetch; no "load more" button -->
+					<div
+						v-if="canFetchMore || historyPrefetching || moreFetching"
+						ref="historySentinelEl"
+						:class="$style.loadMoreSentinel"
+						aria-hidden="true"
+					>
 						<div v-if="historyPrefetching || moreFetching" :class="$style.loadingOlder">
 							<MkLoading :inline="true" :colored="false"/>
-							<span v-if="historyPrefetchLabel" :class="$style.prefetchLabel">{{ historyPrefetchLabel }}</span>
 						</div>
-						<button
-							v-else
-							type="button"
-							class="_textButton"
-							:class="$style.loadMoreManual"
-							@click="fetchMore"
-						>
-							{{ i18n.ts.loadMore }}
-						</button>
 					</div>
 
 					<!-- Chronological list + viewport lazy mount. No TransitionGroup. -->
@@ -802,43 +797,64 @@ function clearPinnedViewIfAtLive() {
 	}
 }
 
+const historySentinelEl = useTemplateRef<HTMLElement>('historySentinelEl');
+let historyIo: IntersectionObserver | null = null;
+
+function maybeLoadOlderHistory(sc: HTMLElement | null) {
+	if (!sc || !canFetchMore.value) return;
+	if (historyPrefetching.value || moreFetching.value) return;
+	// Near top of chat → auto load older (no manual button)
+	if (isNearHistoryTop(sc) || sc.scrollTop < 200) {
+		if (!userScrollGuard.blocked || sc.scrollTop < 24) {
+			void fetchMore();
+		}
+	}
+}
+
+function bindHistorySentinelIo() {
+	historyIo?.disconnect();
+	historyIo = null;
+	const el = historySentinelEl.value;
+	const sc = getChatScrollContainer();
+	if (!el || !sc || typeof IntersectionObserver === 'undefined') return;
+	historyIo = new IntersectionObserver((entries) => {
+		for (const e of entries) {
+			if (e.isIntersecting) {
+				maybeLoadOlderHistory(sc);
+			}
+		}
+	}, {
+		root: sc,
+		rootMargin: '120px 0px 0px 0px',
+		threshold: 0,
+	});
+	historyIo.observe(el);
+}
+
 function bindScrollLiveClear() {
 	if (scrollListenCleanup) return;
 	const sc = getChatScrollContainer();
 	if (!sc) return;
 	userScrollGuard.setLastScrollTop(sc.scrollTop);
-	let prefetchKickTimer: ReturnType<typeof setTimeout> | null = null;
+	let settleTimer: ReturnType<typeof setTimeout> | null = null;
 	const onScroll = () => {
 		userScrollGuard.markUserScrolling(sc);
-		// Don't clear pin / kick prefetch mid-fling — wait until scroll settles
-		if (userScrollGuard.blocked) {
-			if (prefetchKickTimer) clearTimeout(prefetchKickTimer);
-			prefetchKickTimer = setTimeout(() => {
-				prefetchKickTimer = null;
-				if (!userScrollGuard.blocked) onScrollSettled(sc);
-			}, 180);
-			return;
-		}
-		onScrollSettled(sc);
-	};
-	const onScrollSettled = (el: HTMLElement) => {
-		userScrollGuard.idleTick();
-		clearPinnedViewIfAtLive();
-		// Start background history only when user is actually reading upward (not flinging)
-		if (
-			canFetchMore.value &&
-			!historyPrefetching.value &&
-			!moreFetching.value &&
-			!userScrollGuard.blocked &&
-			isNearHistoryTop(el)
-		) {
-			startHistoryPrefetch();
-		}
+		// Debounce: after scroll settles, clear pin + auto-load older history
+		if (settleTimer) clearTimeout(settleTimer);
+		settleTimer = setTimeout(() => {
+			settleTimer = null;
+			userScrollGuard.idleTick();
+			clearPinnedViewIfAtLive();
+			maybeLoadOlderHistory(sc);
+		}, userScrollGuard.blocked ? 140 : 50);
 	};
 	sc.addEventListener('scroll', onScroll, { passive: true });
+	void nextTick().then(() => bindHistorySentinelIo());
 	scrollListenCleanup = () => {
 		sc.removeEventListener('scroll', onScroll);
-		if (prefetchKickTimer) clearTimeout(prefetchKickTimer);
+		if (settleTimer) clearTimeout(settleTimer);
+		historyIo?.disconnect();
+		historyIo = null;
 		scrollListenCleanup = null;
 	};
 }
@@ -1567,12 +1583,6 @@ definePage(computed(() => {
 	font-size: 0.8em;
 	opacity: 0.7;
 	font-variant-numeric: tabular-nums;
-}
-
-.loadMoreManual {
-	font-size: 0.85em;
-	opacity: 0.75;
-	padding: 6px 12px;
 }
 
 .root {

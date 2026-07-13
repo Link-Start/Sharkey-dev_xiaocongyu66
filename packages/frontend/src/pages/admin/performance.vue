@@ -44,9 +44,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 			<MkFolder :defaultOpen="true">
 				<template #icon><i class="ti ti-bolt"></i></template>
-				<template #label>Misskey® Fan-out Timeline Technology™ (FTT)</template>
-				<template v-if="fttForm.savedState.enableFanoutTimeline" #suffix>Enabled</template>
-				<template v-else #suffix>Disabled</template>
+				<template #label>{{ tPerf('fttTitle') }}</template>
+				<template v-if="fttForm.savedState.enableFanoutTimeline" #suffix>{{ tPerf('enabled') }}</template>
+				<template v-else #suffix>{{ tPerf('disabled') }}</template>
 				<template v-if="fttForm.modified.value" #footer>
 					<MkFormFooter :form="fttForm"/>
 				</template>
@@ -67,19 +67,23 @@ SPDX-License-Identifier: AGPL-3.0-only
 						</MkSwitch>
 
 						<MkInput v-model="fttForm.state.perLocalUserUserTimelineCacheMax" type="number">
-							<template #label>perLocalUserUserTimelineCacheMax<span v-if="fttForm.modifiedStates.perLocalUserUserTimelineCacheMax" class="_modified">{{ i18n.ts.modified }}</span></template>
+							<template #label>{{ tPerf('perLocalUserUserTimelineCacheMax') }}<span v-if="fttForm.modifiedStates.perLocalUserUserTimelineCacheMax" class="_modified">{{ i18n.ts.modified }}</span></template>
+							<template #caption>{{ tPerf('cacheMaxCaption') }}</template>
 						</MkInput>
 
 						<MkInput v-model="fttForm.state.perRemoteUserUserTimelineCacheMax" type="number">
-							<template #label>perRemoteUserUserTimelineCacheMax<span v-if="fttForm.modifiedStates.perRemoteUserUserTimelineCacheMax" class="_modified">{{ i18n.ts.modified }}</span></template>
+							<template #label>{{ tPerf('perRemoteUserUserTimelineCacheMax') }}<span v-if="fttForm.modifiedStates.perRemoteUserUserTimelineCacheMax" class="_modified">{{ i18n.ts.modified }}</span></template>
+							<template #caption>{{ tPerf('cacheMaxCaption') }}</template>
 						</MkInput>
 
 						<MkInput v-model="fttForm.state.perUserHomeTimelineCacheMax" type="number">
-							<template #label>perUserHomeTimelineCacheMax<span v-if="fttForm.modifiedStates.perUserHomeTimelineCacheMax" class="_modified">{{ i18n.ts.modified }}</span></template>
+							<template #label>{{ tPerf('perUserHomeTimelineCacheMax') }}<span v-if="fttForm.modifiedStates.perUserHomeTimelineCacheMax" class="_modified">{{ i18n.ts.modified }}</span></template>
+							<template #caption>{{ tPerf('cacheMaxCaption') }}</template>
 						</MkInput>
 
 						<MkInput v-model="fttForm.state.perUserListTimelineCacheMax" type="number">
-							<template #label>perUserListTimelineCacheMax<span v-if="fttForm.modifiedStates.perUserListTimelineCacheMax" class="_modified">{{ i18n.ts.modified }}</span></template>
+							<template #label>{{ tPerf('perUserListTimelineCacheMax') }}<span v-if="fttForm.modifiedStates.perUserListTimelineCacheMax" class="_modified">{{ i18n.ts.modified }}</span></template>
+							<template #caption>{{ tPerf('cacheMaxCaption') }}</template>
 						</MkInput>
 					</template>
 				</div>
@@ -87,9 +91,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 			<MkFolder :defaultOpen="true">
 				<template #icon><i class="ti ti-bolt"></i></template>
-				<template #label>Misskey® Reactions Boost Technology™ (RBT)<span class="_beta">{{ i18n.ts.beta }}</span></template>
-				<template v-if="rbtForm.savedState.enableReactionsBuffering" #suffix>Enabled</template>
-				<template v-else #suffix>Disabled</template>
+				<template #label>{{ tPerf('rbtTitle') }}<span class="_beta">{{ i18n.ts.beta }}</span></template>
+				<template v-if="rbtForm.savedState.enableReactionsBuffering" #suffix>{{ tPerf('enabled') }}</template>
+				<template v-else #suffix>{{ tPerf('disabled') }}</template>
 				<template v-if="rbtForm.modified.value" #footer>
 					<MkFormFooter :form="rbtForm"/>
 				</template>
@@ -112,6 +116,7 @@ import * as os from '@/os.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import { fetchInstance } from '@/instance.js';
 import { i18n } from '@/i18n.js';
+import { miLocalStorage } from '@/local-storage.js';
 import { definePage } from '@/page.js';
 import MkSwitch from '@/components/MkSwitch.vue';
 import MkFolder from '@/components/MkFolder.vue';
@@ -119,6 +124,69 @@ import MkInput from '@/components/MkInput.vue';
 import MkLink from '@/components/MkLink.vue';
 import { useForm } from '@/use/use-form.js';
 import MkFormFooter from '@/components/MkFormFooter.vue';
+
+/** UI strings not always present in locale packs (FTT/RBT marketing names + cache labels) */
+const PERF_FB: Record<string, { en: string; zh: string; 'zh-TW'?: string; ja: string }> = {
+	fttTitle: {
+		en: 'Fan-out Timeline (FTT)',
+		zh: '扇出时间线缓存 (FTT)',
+		'zh-TW': '扇出時間軸快取 (FTT)',
+		ja: 'ファンアウトタイムライン (FTT)',
+	},
+	rbtTitle: {
+		en: 'Reactions Buffering (RBT)',
+		zh: '回应缓冲 (RBT)',
+		'zh-TW': '回應緩衝 (RBT)',
+		ja: 'リアクションバッファリング (RBT)',
+	},
+	enabled: { en: 'Enabled', zh: '已启用', 'zh-TW': '已啟用', ja: '有効' },
+	disabled: { en: 'Disabled', zh: '已禁用', 'zh-TW': '已停用', ja: '無効' },
+	perLocalUserUserTimelineCacheMax: {
+		en: 'Local user timeline cache size',
+		zh: '本地用户时间线缓存上限',
+		'zh-TW': '本機使用者時間軸快取上限',
+		ja: 'ローカルユーザーのタイムラインキャッシュ上限',
+	},
+	perRemoteUserUserTimelineCacheMax: {
+		en: 'Remote user timeline cache size',
+		zh: '远程用户时间线缓存上限',
+		'zh-TW': '遠端使用者時間軸快取上限',
+		ja: 'リモートユーザーのタイムラインキャッシュ上限',
+	},
+	perUserHomeTimelineCacheMax: {
+		en: 'Home timeline cache size',
+		zh: '首页时间线缓存上限',
+		'zh-TW': '首頁時間軸快取上限',
+		ja: 'ホームタイムラインキャッシュ上限',
+	},
+	perUserListTimelineCacheMax: {
+		en: 'List timeline cache size',
+		zh: '列表时间线缓存上限',
+		'zh-TW': '清單時間軸快取上限',
+		ja: 'リストタイムラインキャッシュ上限',
+	},
+	cacheMaxCaption: {
+		en: 'Maximum notes kept in Redis per user for this timeline type.',
+		zh: '该时间线类型在 Redis 中为每位用户保留的最大帖子数。',
+		'zh-TW': '此時間軸類型在 Redis 中為每位使用者保留的最大貼文數。',
+		ja: 'このタイムライン種別についてユーザーごとに Redis に保持するノートの上限です。',
+	},
+};
+
+function tPerf(key: keyof typeof PERF_FB): string {
+	const fb = PERF_FB[key];
+	const lang = (
+		miLocalStorage.getItem('lang')
+		|| (typeof navigator !== 'undefined' ? navigator.language : 'en-US')
+		|| 'en-US'
+	).replace('_', '-').toLowerCase();
+	if (lang.startsWith('zh-tw') || lang.startsWith('zh-hk') || lang.startsWith('zh-hant')) {
+		return fb['zh-TW'] || fb.zh;
+	}
+	if (lang.startsWith('zh')) return fb.zh;
+	if (lang.startsWith('ja')) return fb.ja;
+	return fb.en;
+}
 
 const meta = await misskeyApi('admin/meta');
 
