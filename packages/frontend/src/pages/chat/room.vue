@@ -237,6 +237,24 @@ import XInfo from './room.info.vue';
 import XManage from './room.manage.vue';
 import ChatAnnouncementBar from './ChatAnnouncementBar.vue';
 import { ChatHistoryPrefetcher, loadUntilMessageFound } from './chat-history-loader.js';
+import type { NormalizedChatMessage } from './chat-types.js';
+import { normalizeChatMessage } from './chat-normalize.js';
+import {
+	isNearLiveEdge,
+	isNearHistoryTop,
+	scrollElementToLiveEdge,
+	preserveScrollAfterPrepend,
+	createUserScrollGuard,
+} from './chat-scroll.js';
+import {
+	useChatMessages,
+	MAX_MESSAGES,
+	PAGE_LIMIT,
+	BACKGROUND_MESSAGE_CAP,
+	HISTORY_MEMORY_CAP,
+	NORMALIZE_POOL,
+} from './use-chat-messages.js';
+import { useChatMentions } from './use-chat-mentions.js';
 import type { PageHeaderItem } from '@/types/page-header.js';
 import * as os from '@/os.js';
 import { useStream, wakeStream, waitForStreamConnected } from '@/stream.js';
@@ -254,6 +272,9 @@ import { pleaseLogin } from '@/utility/please-login.js';
 import { chatT, chatFb, ensureChatLocaleFresh } from './chat-i18n.js';
 import { chatWsKey, chatRoomCanModerateKey, createChatWsFromConnection } from './chat-ws.js';
 import { formatApiError } from '@/utility/format-api-error.js';
+
+/** Re-export for any external importers that still point at room.vue */
+export type { NormalizedChatMessage } from './chat-types.js';
 
 const router = useRouter();
 const signedIn = computed(() => $i != null);
@@ -273,13 +294,6 @@ const props = defineProps<{
 	roomId?: string;
 }>();
 
-export type NormalizedChatMessage = Omit<Misskey.entities.ChatMessageLite, 'fromUser' | 'reactions'> & {
-	fromUser: Misskey.entities.UserLite;
-	reactions: (Misskey.entities.ChatMessageLite['reactions'][number] & {
-		user: Misskey.entities.UserLite;
-	})[];
-};
-
 const initializing = ref(true);
 const moreFetching = ref(false);
 /** True while loading older history — blocks stick-to-bottom / move jank */
@@ -287,20 +301,20 @@ const historyLoading = ref(false);
 /** Background async prefetch running (multi-page pipeline) */
 const historyPrefetching = ref(false);
 const historyPrefetchLabel = ref('');
-const messages = ref<NormalizedChatMessage[]>([]);
-const canFetchMore = ref(false);
-/** Soft cap at live edge: drop oldest when new msgs arrive (only when viewing newest). */
-const MAX_MESSAGES = 400;
-const PAGE_LIMIT = 40;
-/** Soft trim when tab is backgrounded (keep-alive / hidden) */
-const BACKGROUND_MESSAGE_CAP = 80;
-/** Background history memory ceiling */
-const HISTORY_MEMORY_CAP = 900;
-/** Concurrent normalize workers when merging a page */
-const NORMALIZE_POOL = 6;
+
+const {
+	messages,
+	canFetchMore,
+	knownMessageIds,
+	rebuildKnownIds,
+	mergeOlderPage: mergeOlderPageStore,
+} = useChatMessages();
+
+function mergeOlderPage(page: NormalizedChatMessage[]) {
+	mergeOlderPageStore(page, pinnedViewMessageId.value);
+}
 
 let historyPrefetcher: ChatHistoryPrefetcher<NormalizedChatMessage> | null = null;
-const knownMessageIds = new Set<string>();
 const user = ref<Misskey.entities.UserDetailed | null>(null);
 const room = ref<Misskey.entities.ChatRoom | null>(null);
 const replyTo = ref<NormalizedChatMessage | null>(null);
@@ -325,91 +339,24 @@ const isStaffViewer = computed(() => iAmModerator);
 /** Can read timeline: member or staff */
 const canViewTimeline = computed(() => isMember.value || isStaffViewer.value);
 
-/** Messages that @mention the current user (Telegram-style jump list) */
-const mentions = ref<Array<{ id: string; fromUserId: string; text: string | null }>>([]);
-const mentionCursor = ref(0);
-const mentionJumping = ref(false);
-const mentionsDismissed = ref(false);
-
-const mentionBarLabel = computed(() => {
-	const n = mentions.value.length;
-	if (n === 0) return '';
-	const i = Math.min(mentionCursor.value, n - 1) + 1;
-	return `${tChat('mentionsOfYou')} ${i}/${n}`;
+const {
+	mentions,
+	mentionCursor,
+	mentionJumping,
+	mentionsDismissed,
+	mentionBarLabel,
+	isMentionOfMe,
+	loadMentionsForRoom,
+	maybePushLiveMention,
+} = useChatMentions({
+	roomId: () => props.roomId,
+	messages,
 });
+
+const userScrollGuard = createUserScrollGuard();
 
 function onReply(message: NormalizedChatMessage | Misskey.entities.ChatMessage) {
 	replyTo.value = message as NormalizedChatMessage;
-}
-
-function dismissMentions() {
-	mentionsDismissed.value = true;
-	mentions.value = [];
-}
-
-function isMentionOfMe(text: string | null | undefined): boolean {
-	if (!text || !$i) return false;
-	const username = $i.username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-	// @username boundary (not part of longer handle)
-	const re = new RegExp(`(^|[^\\w])@${username}(?![\\w-])`, 'i');
-	return re.test(text);
-}
-
-async function loadMentionsForRoom() {
-	if (!props.roomId || !$i || mentionsDismissed.value) {
-		mentions.value = [];
-		return;
-	}
-	try {
-		const q = `@${$i.username}`;
-		const found = await misskeyApi('chat/messages/search', {
-			query: q,
-			roomId: props.roomId,
-			limit: 50,
-		} as never) as Array<{ id: string; fromUserId: string; text: string | null }>;
-
-		// newest first
-		const filtered = found
-			.filter(m => m.fromUserId !== $i!.id && isMentionOfMe(m.text))
-			.sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
-
-		mentions.value = filtered;
-		mentionCursor.value = 0;
-	} catch {
-		// search may fail; fall back to scanning loaded messages
-		const fromTimeline = messages.value
-			.filter(m => m.fromUserId !== $i!.id && isMentionOfMe(m.text))
-			.map(m => ({ id: m.id, fromUserId: m.fromUserId, text: m.text }));
-		mentions.value = fromTimeline;
-		mentionCursor.value = 0;
-	}
-}
-
-function rebuildKnownIds() {
-	knownMessageIds.clear();
-	for (const m of messages.value) knownMessageIds.add(m.id);
-}
-
-function mergeOlderPage(page: NormalizedChatMessage[]) {
-	if (!page.length) {
-		canFetchMore.value = false;
-		return;
-	}
-	const fresh = page.filter(m => !knownMessageIds.has(m.id));
-	if (!fresh.length) {
-		// All duplicates — still advance exhausted if short page handled by caller
-		return;
-	}
-	for (const m of fresh) knownMessageIds.add(m.id);
-	// Array is newest-first: older pages append at end
-	messages.value.push(...fresh);
-	if (messages.value.length > HISTORY_MEMORY_CAP && !pinnedViewMessageId.value) {
-		// Soft trim from oldest end when not pinned
-		const overflow = messages.value.length - HISTORY_MEMORY_CAP;
-		const dropped = messages.value.splice(messages.value.length - overflow, overflow);
-		for (const d of dropped) knownMessageIds.delete(d.id);
-		canFetchMore.value = true;
-	}
 }
 
 /** Prefer WS history when channel is open; REST fallback. */
@@ -530,7 +477,7 @@ function startHistoryPrefetch() {
 					if (reading && prevH > 0) {
 						// Keep viewport while reading older messages
 						preserveScrollAfterPrepend(sc, prevH, prevTop, anchorId, anchorTop);
-					} else if (nearLive && Date.now() >= userScrollUntil) {
+					} else if (nearLive && !userScrollGuard.blocked) {
 						// Stay at live edge when background prefetch grows the top
 						scrollToLiveEdge('instant');
 					}
@@ -969,38 +916,6 @@ function getChatScrollContainer(): HTMLElement | null {
 	return timelineEl.value ? getScrollContainer(timelineEl.value) : null;
 }
 
-/** Distance from bottom under which we treat as "at live edge" (newest) */
-const LIVE_EDGE_PX = 48;
-/** Near top of normal scroll → may load older history */
-const HISTORY_TOP_PX = 80;
-/** Ignore stick-to-live for a moment after user scrolls (stops twitch on finger-up) */
-let userScrollUntil = 0;
-let lastScrollTop = 0;
-
-function distanceFromLiveEdge(container: HTMLElement): number {
-	// Normal scroll: bottom = live edge
-	return container.scrollHeight - container.scrollTop - container.clientHeight;
-}
-
-function isNearLiveEdge(container: HTMLElement | null): boolean {
-	if (!container) return false;
-	return distanceFromLiveEdge(container) <= LIVE_EDGE_PX;
-}
-
-function isNearHistoryTop(container: HTMLElement | null): boolean {
-	if (!container) return false;
-	return container.scrollTop <= HISTORY_TOP_PX;
-}
-
-function markUserScrolling(container: HTMLElement) {
-	const top = container.scrollTop;
-	// Any real movement → user is in control; suppress auto stick briefly after stop
-	if (Math.abs(top - lastScrollTop) > 1) {
-		userScrollUntil = Date.now() + 450;
-	}
-	lastScrollTop = top;
-}
-
 /** User is reading history (search jump pin, or scrolled away from newest) */
 function isReadingHistory(container: HTMLElement | null = null): boolean {
 	if (pinnedViewMessageId.value) return true;
@@ -1012,35 +927,11 @@ function isReadingHistory(container: HTMLElement | null = null): boolean {
 function scrollToLiveEdge(behavior: ScrollBehavior | 'instant' = 'instant') {
 	const sc = getChatScrollContainer();
 	if (!sc) return;
-	// 'instant' is widely supported; fall back via cast for TS lib
-	sc.scrollTo({ top: sc.scrollHeight, behavior: behavior as ScrollBehavior });
+	scrollElementToLiveEdge(sc, behavior);
 }
 
-/**
- * After prepending older messages (top of chronological list), keep viewport
- * fixed with height-delta. Works reliably with normal (non-reversed) scroll.
- */
-function preserveScrollAfterPrepend(
-	scrollContainer: HTMLElement,
-	prevHeight: number,
-	prevTop: number,
-	anchorId: string | null,
-	anchorTopBefore: number | null,
-) {
-	const delta = scrollContainer.scrollHeight - prevHeight;
-	if (delta !== 0) {
-		scrollContainer.scrollTop = prevTop + delta;
-	}
-	// Fine-tune with element anchor if available
-	if (anchorId != null && anchorTopBefore != null) {
-		const el = window.document.getElementById(`chat-msg-${anchorId}`);
-		if (el) {
-			const drift = el.getBoundingClientRect().top - anchorTopBefore;
-			if (Math.abs(drift) > 0.5) {
-				scrollContainer.scrollTop += drift;
-			}
-		}
-	}
+function markUserScrolling(container: HTMLElement) {
+	userScrollGuard.markUserScrolling(container);
 }
 
 function markPinnedView(id: string) {
@@ -1066,7 +957,7 @@ function bindScrollLiveClear() {
 	if (scrollListenCleanup) return;
 	const sc = getChatScrollContainer();
 	if (!sc) return;
-	lastScrollTop = sc.scrollTop;
+	userScrollGuard.setLastScrollTop(sc.scrollTop);
 	const onScroll = () => {
 		markUserScrolling(sc);
 		clearPinnedViewIfAtLive();
@@ -1092,15 +983,7 @@ function bindScrollLiveClear() {
 // History: background async prefetch (startHistoryPrefetch) — not scroll IO chain.
 
 function normalizeMessage(message: Misskey.entities.ChatMessageLite | Misskey.entities.ChatMessage): NormalizedChatMessage {
-	const me = $i!;
-	return {
-		...message,
-		fromUser: message.fromUser ?? (message.fromUserId === me.id ? me : user.value!),
-		reactions: message.reactions.map(record => ({
-			...record,
-			user: record.user ?? (message.fromUserId === me.id ? user.value! : me),
-		})),
-	};
+	return normalizeChatMessage(message, $i!, user.value);
 }
 
 function bindChatChannelEvents() {
@@ -1582,14 +1465,14 @@ function onMessage(message: Misskey.entities.ChatMessageLite) {
 		}
 	} else if (nearLive && scrollContainer && !historyLoading.value) {
 		// Stick to bottom only if user is not mid/just-finished scrolling (avoids twitch)
-		if (Date.now() < userScrollUntil) {
+		if (userScrollGuard.blocked) {
 			// still reading / finger just lifted near edge — don't yank
 		} else {
 			void nextTick().then(() => {
 				requestAnimationFrame(() => {
 					if (
 						!historyLoading.value &&
-						Date.now() >= userScrollUntil &&
+						!userScrollGuard.blocked &&
 						!isReadingHistory(scrollContainer)
 					) {
 						scrollToLiveEdge('instant');
@@ -1600,19 +1483,7 @@ function onMessage(message: Misskey.entities.ChatMessageLite) {
 	}
 
 	// Live-update @mentions of me
-	if (
-		!mentionsDismissed.value &&
-		props.roomId &&
-		message.fromUserId !== $i.id &&
-		isMentionOfMe(message.text)
-	) {
-		if (!mentions.value.some(m => m.id === message.id)) {
-			mentions.value = [
-				{ id: message.id, fromUserId: message.fromUserId, text: message.text },
-				...mentions.value,
-			];
-		}
-	}
+	maybePushLiveMention(message, props.roomId);
 
 	// TODO: DOM的にバックグラウンドになっていないかどうかも考慮する
 	if (message.fromUserId !== $i.id && !window.document.hidden && isActivated) {

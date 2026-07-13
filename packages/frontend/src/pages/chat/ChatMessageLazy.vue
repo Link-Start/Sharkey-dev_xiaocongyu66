@@ -33,7 +33,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <script lang="ts" setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue';
-import type { NormalizedChatMessage } from './room.vue';
+import type { NormalizedChatMessage } from './chat-types.js';
 import XMessage from './XMessage.vue';
 import { getChatMsgHeight, rememberChatMsgHeight } from './chat-msg-heights.js';
 

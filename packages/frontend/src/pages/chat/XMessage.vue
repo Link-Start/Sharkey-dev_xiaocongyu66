@@ -113,7 +113,7 @@ import * as Misskey from 'misskey-js';
 import { url } from '@@/js/config.js';
 import { isLink } from '@@/js/is-link.js';
 import type { MenuItem } from '@/types/menu.js';
-import type { NormalizedChatMessage } from './room.vue';
+import type { NormalizedChatMessage } from './chat-types.js';
 import { ensureSignin } from '@/i.js';
 import { i18n } from '@/i18n.js';
 import MkFukidashi from '@/components/MkFukidashi.vue';
