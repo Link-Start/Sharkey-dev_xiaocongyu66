@@ -75,49 +75,51 @@ export class HashtagService {
 				if (inc) {
 				// 自分が初めてこのタグを使ったなら
 					if (!index.attachedUserIds.some(id => id === user.id)) {
-						set.attachedUserIds = () => `array_append("attachedUserIds", '${user.id}')`;
+						set.attachedUserIds = () => 'array_append("attachedUserIds", :userId)'; q.setParameter('userId', user.id);
 						set.attachedUsersCount = () => '"attachedUsersCount" + 1';
 					}
 					// 自分が(ローカル内で)初めてこのタグを使ったなら
 					if (isLocalUser(user) && !index.attachedLocalUserIds.some(id => id === user.id)) {
-						set.attachedLocalUserIds = () => `array_append("attachedLocalUserIds", '${user.id}')`;
+						set.attachedLocalUserIds = () => 'array_append("attachedLocalUserIds", :userId)'; q.setParameter('userId', user.id);
 						set.attachedLocalUsersCount = () => '"attachedLocalUsersCount" + 1';
 					}
 					// 自分が(リモートで)初めてこのタグを使ったなら
 					if (isRemoteUser(user) && !index.attachedRemoteUserIds.some(id => id === user.id)) {
-						set.attachedRemoteUserIds = () => `array_append("attachedRemoteUserIds", '${user.id}')`;
+						set.attachedRemoteUserIds = () => 'array_append("attachedRemoteUserIds", :userId)'; q.setParameter('userId', user.id);
 						set.attachedRemoteUsersCount = () => '"attachedRemoteUsersCount" + 1';
 					}
 				} else {
-					set.attachedUserIds = () => `array_remove("attachedUserIds", '${user.id}')`;
+					set.attachedUserIds = () => 'array_remove("attachedUserIds", :userId)'; q.setParameter('userId', user.id);
 					set.attachedUsersCount = () => '"attachedUsersCount" - 1';
 					if (isLocalUser(user)) {
-						set.attachedLocalUserIds = () => `array_remove("attachedLocalUserIds", '${user.id}')`;
+						set.attachedLocalUserIds = () => 'array_remove("attachedLocalUserIds", :userId)'; q.setParameter('userId', user.id);
 						set.attachedLocalUsersCount = () => '"attachedLocalUsersCount" - 1';
 					} else {
-						set.attachedRemoteUserIds = () => `array_remove("attachedRemoteUserIds", '${user.id}')`;
+						set.attachedRemoteUserIds = () => 'array_remove("attachedRemoteUserIds", :userId)'; q.setParameter('userId', user.id);
 						set.attachedRemoteUsersCount = () => '"attachedRemoteUsersCount" - 1';
 					}
 				}
 			} else {
 				// 自分が初めてこのタグを使ったなら
 				if (!index.mentionedUserIds.some(id => id === user.id)) {
-					set.mentionedUserIds = () => `array_append("mentionedUserIds", '${user.id}')`;
+					set.mentionedUserIds = () => 'array_append("mentionedUserIds", :userId)'; q.setParameter('userId', user.id);
 					set.mentionedUsersCount = () => '"mentionedUsersCount" + 1';
 				}
 				// 自分が(ローカル内で)初めてこのタグを使ったなら
 				if (isLocalUser(user) && !index.mentionedLocalUserIds.some(id => id === user.id)) {
-					set.mentionedLocalUserIds = () => `array_append("mentionedLocalUserIds", '${user.id}')`;
+					set.mentionedLocalUserIds = () => 'array_append("mentionedLocalUserIds", :userId)'; q.setParameter('userId', user.id);
 					set.mentionedLocalUsersCount = () => '"mentionedLocalUsersCount" + 1';
 				}
 				// 自分が(リモートで)初めてこのタグを使ったなら
 				if (isRemoteUser(user) && !index.mentionedRemoteUserIds.some(id => id === user.id)) {
-					set.mentionedRemoteUserIds = () => `array_append("mentionedRemoteUserIds", '${user.id}')`;
+					set.mentionedRemoteUserIds = () => 'array_append("mentionedRemoteUserIds", :userId)'; q.setParameter('userId', user.id);
 					set.mentionedRemoteUsersCount = () => '"mentionedRemoteUsersCount" + 1';
 				}
 			}
 
 			if (Object.keys(set).length > 0) {
+				// ensure userId is bound for array_* fragments (SK-2026-011)
+				q.setParameter('userId', user.id);
 				q.set(set);
 				await q.execute();
 			}

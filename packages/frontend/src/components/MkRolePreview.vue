@@ -4,7 +4,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <template>
-<MkA :to="forModeration ? `/admin/roles/${role.id}` : `/roles/${role.id}`" :class="$style.root" tabindex="-1" :style="{ '--color': role.color }">
+<MkA :to="forModeration ? `/admin/roles/${role.id}` : `/roles/${role.id}`" :class="$style.root" tabindex="-1" :style="{ '--color': safeCssHexColor(role.color, '#777777') }">
 	<template v-if="forModeration">
 		<i v-if="role.isPublic" class="ti ti-world" :class="$style.icon" style="color: var(--MI_THEME-success)"></i>
 		<i v-else class="ti ti-lock" :class="$style.icon" style="color: var(--MI_THEME-warn)"></i>
@@ -37,6 +37,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 import { } from 'vue';
 import * as Misskey from 'misskey-js';
 import { i18n } from '@/i18n.js';
+import { safeCssHexColor } from '@/utility/color.js';
 
 const props = withDefaults(defineProps<{
 	role: Misskey.entities.Role;

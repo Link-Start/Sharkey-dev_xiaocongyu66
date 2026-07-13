@@ -9,8 +9,11 @@ import { Endpoint } from '@/server/api/endpoint-base.js';
 import { QueueService } from '@/core/QueueService.js';
 
 export const meta = {
+	// SK-2026-039: full emoji pack export is expensive; staff only
 	secure: true,
 	requireCredential: true,
+	requireModerator: true,
+	kind: 'read:admin:emoji',
 	limit: {
 		duration: ms('1hour'),
 		max: 1,

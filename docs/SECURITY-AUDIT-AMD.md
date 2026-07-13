@@ -183,6 +183,7 @@ Remove global `style`; use allowlist of tags only; prefer MFM/plain text for rul
 |--|--|
 | **Severity** | **L–M** (abuse / UX / phishing) |
 | **CWE** | CWE-79 (limited), CWE-400 |
+| **Status** | **Partially fixed** — position clamped ±50em; animation duration floor 0.05s / cap 120s |
 | **Components** | `packages/frontend/src/components/global/MkMfm.ts` |
 
 **Description**  
@@ -275,6 +276,7 @@ Honest UX (“escrow / operator can read”); require dedicated `chatEscrowSecre
 |--|--|
 | **Severity** | **M** (pattern) / **L** (current exploitability) |
 | **CWE** | CWE-89 |
+| **Status** | **Mostly fixed** — poll, chat reactions, note reactions, hashtag array_* parameterized |
 | **Status** | **Partially fixed** — poll vote `noteId` parameterized; chat reaction array_append/remove parameterized. HashtagService / ReactionService patterns may remain. |
 | **Components** | |
 
@@ -424,6 +426,7 @@ Prefer CSPRNG for all ID random parts.
 |--|--|
 | **Severity** | **L** |
 | **CWE** | CWE-862 (logic) |
+| **Status** | **Partially fixed** — event name truncated; var JSON size capped |
 | **Components** | `endpoints/page-push.ts` |
 
 **Description**  
@@ -572,6 +575,7 @@ Documented intentional XSS prevention for SVG. Keep tests for regressions.
 |--|--|
 | **Severity** | **M** if exposed |
 | **CWE** | CWE-306 / CWE-798 |
+| **Status** | **Partially fixed** — production requires API_KEY env |
 | **Components** | `services/x-algorithm-gateway/server.mjs` |
 
 **Description**  
@@ -615,6 +619,7 @@ Admin-defined role colors without hex validation.
 |--|--|
 | **Severity** | **L–M** (sandbox dependent) |
 | **CWE** | CWE-94 (if sandbox breaks) |
+| **Status** | **Fixed in tree** — `safeCssHexColor` on role chips/previews |
 | **Components** | `flash/create`, `pages/create` — free `script` strings |
 
 **Description**  
@@ -734,6 +739,7 @@ Document data sharing; optional local-only translator; restrict translator polic
 |--|--|
 | **Severity** | **L** |
 | **CWE** | CWE-770 |
+| **Status** | **Fixed in tree** — requireModerator |
 | **Components** | `endpoints/export-custom-emojis.ts` — `secure: true`, 1/hour |
 
 **Description**  
@@ -874,6 +880,7 @@ Internet
 | 0.3 | 2026-07-14 | Chat stream gate + escrow setupPassword cut |
 | 0.4 | 2026-07-14 | Batch fix: SSRF always-on, OAuth stub, channel color, invite CSPRNG, room invite blocks, sw unregister, sponsors forceUpdate, federation update-remote-user auth, storage path, docs |
 | 0.5 | 2026-07-14 | P1: fetch-rss auth, webhook URL https, poll/chat SQL params, sanitize-html no style, frontend safe colors |
+| 0.6 | 2026-07-14 | Reaction/Hashtag SQL params, MFM clamps, export-emoji staff-only, page-push bounds, gateway API_KEY in prod, role colors |
 
 ---
 

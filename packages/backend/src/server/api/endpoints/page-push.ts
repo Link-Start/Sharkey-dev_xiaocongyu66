@@ -55,10 +55,23 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.noSuchPage);
 			}
 
+			// SK-2026-019: bound event name / var size to reduce stream harassment
+			const event = typeof ps.event === 'string' ? ps.event.slice(0, 128) : '';
+			if (event.length === 0) return;
+			let variable: unknown = ps.var;
+			try {
+				const json = JSON.stringify(variable ?? null);
+				if (json != null && json.length > 8_192) {
+					variable = { _truncated: true };
+				}
+			} catch {
+				variable = null;
+			}
+
 			this.globalEventService.publishMainStream(page.userId, 'pageEvent', {
 				pageId: ps.pageId,
-				event: ps.event,
-				var: ps.var,
+				event,
+				var: variable,
 				userId: me.id,
 				user: await this.userEntityService.pack(me.id, { id: page.userId }, {
 					schema: 'UserDetailed',

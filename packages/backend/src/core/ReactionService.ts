@@ -208,16 +208,18 @@ export class ReactionService implements OnModuleInit {
 		if (this.meta.enableReactionsBuffering) {
 			await this.reactionsBufferingService.create(note.id, user.id, reaction, note.reactionAndUserPairCache);
 		} else {
-			const sql = `jsonb_set("reactions", '{${reaction}}', (COALESCE("reactions"->>'${reaction}', '0')::int + 1)::text::jsonb)`;
-			await this.notesRepository.createQueryBuilder().update()
-				.set({
-					reactions: () => sql,
-					...(note.reactionAndUserPairCache.length < PER_NOTE_REACTION_USER_PAIR_CACHE_MAX ? {
-						reactionAndUserPairCache: () => `array_append("reactionAndUserPairCache", '${user.id}/${reaction}')`,
-					} : {}),
-				})
-				.where('id = :id', { id: note.id })
-				.execute();
+			// SK-2026-011: bind reaction key + pair token
+			const pairToken = `${user.id}/${reaction}`;
+			await this.notesRepository.query(
+				`UPDATE "note" SET
+					"reactions" = jsonb_set("reactions", ARRAY[$1]::text[], (COALESCE("reactions"->>$1, '0')::int + 1)::text::jsonb),
+					"reactionAndUserPairCache" = CASE
+						WHEN cardinality("reactionAndUserPairCache") < $3 THEN array_append("reactionAndUserPairCache", $2)
+						ELSE "reactionAndUserPairCache"
+					END
+				WHERE "id" = $4`,
+				[reaction, pairToken, PER_NOTE_REACTION_USER_PAIR_CACHE_MAX, note.id],
+			);
 		}
 
 		this.collapsedQueueService.updateUserQueue.enqueue(user.id, { updatedAt: this.timeService.date });
@@ -333,14 +335,14 @@ export class ReactionService implements OnModuleInit {
 		if (this.meta.enableReactionsBuffering) {
 			await this.reactionsBufferingService.delete(note.id, user.id, exist.reaction);
 		} else {
-			const sql = `jsonb_set("reactions", '{${exist.reaction}}', (COALESCE("reactions"->>'${exist.reaction}', '0')::int - 1)::text::jsonb)`;
-			await this.notesRepository.createQueryBuilder().update()
-				.set({
-					reactions: () => sql,
-					reactionAndUserPairCache: () => `array_remove("reactionAndUserPairCache", '${user.id}/${exist.reaction}')`,
-				})
-				.where('id = :id', { id: note.id })
-				.execute();
+			const pairToken = `${user.id}/${exist.reaction}`;
+			await this.notesRepository.query(
+				`UPDATE "note" SET
+					"reactions" = jsonb_set("reactions", ARRAY[$1]::text[], (COALESCE("reactions"->>$1, '0')::int - 1)::text::jsonb),
+					"reactionAndUserPairCache" = array_remove("reactionAndUserPairCache", $2)
+				WHERE "id" = $3`,
+				[exist.reaction, pairToken, note.id],
+			);
 		}
 
 		this.collapsedQueueService.updateUserQueue.enqueue(user.id, { updatedAt: this.timeService.date });

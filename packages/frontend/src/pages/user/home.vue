@@ -76,7 +76,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						</MkFukidashi>
 					</div>
 					<div v-if="user.roles.length > 0" class="roles">
-						<span v-for="role in user.roles" :key="role.id" v-tooltip="role.description" class="role" :style="{ '--color': role.color }">
+						<span v-for="role in user.roles" :key="role.id" v-tooltip="role.description" class="role" :style="{ '--color': safeCssHexColor(role.color, '#777777') }">
 							<MkA v-adaptive-bg :to="`/roles/${role.id}`">
 								<img v-if="role.iconUrl" style="height: 1.3em; vertical-align: -22%;" :src="role.iconUrl"/>
 								{{ role.name }}
@@ -210,6 +210,7 @@ import { defineAsyncComponent, computed, onMounted, onUnmounted, nextTick, watch
 import * as Misskey from 'misskey-js';
 import { getScrollPosition } from '@@/js/scroll.js';
 import { useMuteOverrides } from '@/utility/check-word-mute.js';
+import { safeCssHexColor } from '@/utility/color.js';
 import MkTab from '@/components/MkTab.vue';
 import MkNotes from '@/components/MkNotes.vue';
 import MkFollowButton from '@/components/MkFollowButton.vue';

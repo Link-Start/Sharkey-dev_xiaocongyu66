@@ -76,7 +76,14 @@ export default function MkMfm(props: MfmProps, { emit }: { emit: SetupContext<Mf
 	const validTime = (t: string | boolean | null | undefined) => {
 		if (t == null) return null;
 		if (typeof t === 'boolean') return null;
-		return t.match(/^\-?[0-9.]+s$/) ? t : null;
+		// SK-2026-007: reject absurd animation durations (CPU / vestibular abuse)
+		const m = t.match(/^(-?[0-9]*\.?[0-9]+)s$/);
+		if (!m) return null;
+		const sec = Number(m[1]);
+		if (!Number.isFinite(sec)) return null;
+		// min 0.05s (no near-zero spin), max 120s
+		if (Math.abs(sec) < 0.05 || Math.abs(sec) > 120) return null;
+		return `${sec}s`;
 	};
 
 	const validColor = (c: unknown): string | null => {
@@ -285,8 +292,9 @@ export default function MkMfm(props: MfmProps, { emit }: { emit: SetupContext<Mf
 					}
 					case 'position': {
 						if (!prefer.s.advancedMfm) break;
-						const x = safeParseFloat(token.props.args.x) ?? 0;
-						const y = safeParseFloat(token.props.args.y) ?? 0;
+						// SK-2026-007: clamp position to avoid full-viewport overlay / mis-clicks
+						const x = clamp(safeParseFloat(token.props.args.x) ?? 0, -50, 50);
+						const y = clamp(safeParseFloat(token.props.args.y) ?? 0, -50, 50);
 						style = `transform: translateX(${x}em) translateY(${y}em);`;
 						break;
 					}

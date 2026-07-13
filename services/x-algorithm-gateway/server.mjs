@@ -255,6 +255,11 @@ const server = http.createServer(async (req, res) => {
 		return send(404, { error: 'not found' });
 	}
 
+	// SK-2026-028: require API_KEY in production (optional only outside production)
+	const requireKey = process.env.NODE_ENV === 'production' || process.env.REQUIRE_API_KEY === '1';
+	if (requireKey && !API_KEY) {
+		return send(503, { error: 'API_KEY not configured' });
+	}
 	if (API_KEY) {
 		const auth = req.headers.authorization || '';
 		if (auth !== `Bearer ${API_KEY}`) return send(401, { error: 'unauthorized' });
