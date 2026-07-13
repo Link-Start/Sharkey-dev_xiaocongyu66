@@ -2056,6 +2056,21 @@ _moderationLogTypes:
 _reversi:
   total: "Tổng cộng"
 _customEmojisManager:
+  _fields:
+    name: "Name"
+    category: "Category"
+    aliases: "Aliases"
+    type: "Type"
+    license: "License"
+    sensitive: "Sensitive"
+    localOnly: "Local only"
+    updatedAtFrom: "Updated at (from)"
+    updatedAtTo: "Updated at (to)"
+    role: "Role"
+    host: "Host"
+    uri: "URI"
+    publicUrl: "Public URL"
+
   _local:
     _list:
       confirmDeleteEmojisDescription: "Xóa các biểu tượng cảm xúc {count} đã chọn. Bạn có muốn chạy nó không?"

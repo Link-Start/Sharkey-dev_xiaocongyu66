@@ -1385,6 +1385,21 @@ _contextMenu:
   appWithShift: "Aplicatie ce utilizeaza tasta ,,shift\""
   native: "Nativ"
 _customEmojisManager:
+  _fields:
+    name: "Name"
+    category: "Category"
+    aliases: "Aliases"
+    type: "Type"
+    license: "License"
+    sensitive: "Sensitive"
+    localOnly: "Local only"
+    updatedAtFrom: "Updated at (from)"
+    updatedAtTo: "Updated at (to)"
+    role: "Role"
+    host: "Host"
+    uri: "URI"
+    publicUrl: "Public URL"
+
   _gridCommon:
     copySelectionRows: "Copiază rândurile selectate"
     copySelectionRanges: "Copiază selecția"

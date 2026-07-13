@@ -2956,6 +2956,21 @@ _gridComponent:
 _roleSelectDialog:
   notSelected: "未選擇"
 _customEmojisManager:
+  _fields:
+    name: "名稱"
+    category: "分類"
+    aliases: "別名"
+    type: "類型"
+    license: "授權"
+    sensitive: "敏感"
+    localOnly: "僅本地"
+    updatedAtFrom: "更新時間（起）"
+    updatedAtTo: "更新時間（止）"
+    role: "角色"
+    host: "主機"
+    uri: "URI"
+    publicUrl: "公開 URL"
+
   _gridCommon:
     copySelectionRows: "複製選取的行"
     copySelectionRanges: "複製選取的範圍"

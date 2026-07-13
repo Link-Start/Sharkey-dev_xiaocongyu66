@@ -23,7 +23,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 							:class="[$style.col1, $style.row1]"
 							@enter="onSearchRequest"
 						>
-							<template #label>name</template>
+							<template #label>{{ emojiFieldLabel('name', 'name') }}</template>
 						</MkInput>
 						<MkInput
 							v-model="queryHost"
@@ -32,7 +32,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 							:class="[$style.col2, $style.row1]"
 							@enter="onSearchRequest"
 						>
-							<template #label>host</template>
+							<template #label>{{ emojiFieldLabel('host', 'host') }}</template>
 						</MkInput>
 						<MkInput
 							v-model="queryLicense"
@@ -41,7 +41,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 							:class="[$style.col3, $style.row1]"
 							@enter="onSearchRequest"
 						>
-							<template #label>license</template>
+							<template #label>{{ emojiFieldLabel('license', 'license') }}</template>
 						</MkInput>
 
 						<MkInput
@@ -51,7 +51,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 							:class="[$style.col1, $style.row2]"
 							@enter="onSearchRequest"
 						>
-							<template #label>uri</template>
+							<template #label>{{ emojiFieldLabel('uri', 'uri') }}</template>
 						</MkInput>
 						<MkInput
 							v-model="queryPublicUrl"
@@ -60,7 +60,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 							:class="[$style.col2, $style.row2]"
 							@enter="onSearchRequest"
 						>
-							<template #label>publicUrl</template>
+							<template #label>{{ emojiFieldLabel('publicUrl', 'publicUrl') }}</template>
 						</MkInput>
 					</div>
 
@@ -173,6 +173,15 @@ type GridItem = {
 
 function setupGrid(): GridSetting {
 	const $style = useCssModule();
+
+function emojiFieldLabel(fieldKey: string, fallback: string): string {
+	const fields = (i18n.ts as any)._customEmojisManager?._fields;
+	const fromFields = fields?.[fieldKey];
+	if (typeof fromFields === 'string' && fromFields.length > 0) return fromFields;
+	const top = (i18n.ts as any)[fieldKey];
+	if (typeof top === 'string' && top.length > 0 && top !== fieldKey) return top;
+	return fallback;
+}
 
 	return {
 		row: {

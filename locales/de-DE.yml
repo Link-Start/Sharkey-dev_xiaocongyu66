@@ -2947,6 +2947,21 @@ _gridComponent:
 _roleSelectDialog:
   notSelected: "Nicht ausgewählt"
 _customEmojisManager:
+  _fields:
+    name: "Name"
+    category: "Kategorie"
+    aliases: "Aliase"
+    type: "Typ"
+    license: "Lizenz"
+    sensitive: "Sensibel"
+    localOnly: "Nur lokal"
+    updatedAtFrom: "Aktualisiert (von)"
+    updatedAtTo: "Aktualisiert (bis)"
+    role: "Rolle"
+    host: "Host"
+    uri: "URI"
+    publicUrl: "Öffentliche URL"
+
   _gridCommon:
     copySelectionRows: "Ausgewählte Zeilen kopieren"
     copySelectionRanges: "Auswahl kopieren"

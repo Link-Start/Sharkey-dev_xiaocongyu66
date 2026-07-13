@@ -2953,6 +2953,21 @@ _gridComponent:
 _roleSelectDialog:
   notSelected: "未选中"
 _customEmojisManager:
+  _fields:
+    name: "名称"
+    category: "分类"
+    aliases: "别名"
+    type: "类型"
+    license: "许可证"
+    sensitive: "敏感"
+    localOnly: "仅本地"
+    updatedAtFrom: "更新时间（起）"
+    updatedAtTo: "更新时间（止）"
+    role: "角色"
+    host: "主机"
+    uri: "URI"
+    publicUrl: "公开 URL"
+
   _gridCommon:
     copySelectionRows: "复制所选行"
     copySelectionRanges: "复制所选范围"

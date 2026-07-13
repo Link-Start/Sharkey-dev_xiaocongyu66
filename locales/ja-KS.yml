@@ -2743,6 +2743,21 @@ _gridComponent:
 _roleSelectDialog:
   notSelected: "選択されとらんで"
 _customEmojisManager:
+  _fields:
+    name: "名前"
+    category: "カテゴリ"
+    aliases: "エイリアス"
+    type: "種類"
+    license: "ライセンス"
+    sensitive: "センシティブ"
+    localOnly: "ローカルのみ"
+    updatedAtFrom: "更新日時（開始）"
+    updatedAtTo: "更新日時（終了）"
+    role: "ロール"
+    host: "ホスト"
+    uri: "URI"
+    publicUrl: "公開URL"
+
   _gridCommon:
     copySelectionRows: "選択行をコピーするで"
     copySelectionRanges: "選択範囲をコピーするで"

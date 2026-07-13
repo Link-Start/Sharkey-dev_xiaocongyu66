@@ -2946,6 +2946,21 @@ _gridComponent:
 _roleSelectDialog:
   notSelected: "선택하지 않았습니다."
 _customEmojisManager:
+  _fields:
+    name: "이름"
+    category: "카테고리"
+    aliases: "별칭"
+    type: "유형"
+    license: "라이선스"
+    sensitive: "민감"
+    localOnly: "로컬만"
+    updatedAtFrom: "업데이트(부터)"
+    updatedAtTo: "업데이트(까지)"
+    role: "역할"
+    host: "호스트"
+    uri: "URI"
+    publicUrl: "공개 URL"
+
   _gridCommon:
     copySelectionRows: "선택한 행을 복사하기"
     copySelectionRanges: "선택범위를 복사하기"
