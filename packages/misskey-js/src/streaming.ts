@@ -81,10 +81,14 @@ export default class Stream extends EventEmitter<StreamEvents> implements IStrea
 		// eslint-disable-next-line no-param-reassign
 		options = options ?? { };
 
-		// SK-2026-059: do not put session token in the WS URL (proxy logs / Referer).
-		// Auth via Sec-WebSocket-Protocol: misskey + misskey.i.<token>
-		// (legacy servers still accept ?i=; we omit it from modern clients)
+		// SK-2026-059: prefer Sec-WebSocket-Protocol (misskey + misskey.i.<token>) so
+		// tokens are not only in the URL. Also send legacy ?i= so clients work when
+		// the frontend is newer than the backend (old servers ignore subprotocols).
+		// New backends prefer Bearer → protocol → query. Dual-send avoids mixed-deploy
+		// auth failures (timeline / notifications / chat realtime).
 		const query = urlQuery({
+			// Legacy query token — required for old backends; new backends still accept it
+			i: user?.token,
 			// To prevent cache of an HTML such as error screen
 			_t: Date.now(),
 		});

@@ -181,8 +181,10 @@ export class StreamingApiServerService implements BeforeApplicationShutdown {
 			? new URL(request.url, `https://${request.headers.host}`).searchParams
 			: new URLSearchParams();
 
-		// SK-2026-059: prefer non-URL credentials (Bearer or Sec-WebSocket-Protocol)
-		// before legacy query `?i=` (logs / Referer / history leak).
+		// SK-2026-059 auth order (all supported for mixed deploy):
+		// 1) Authorization: Bearer (non-browser clients)
+		// 2) Sec-WebSocket-Protocol misskey.i.<token> (preferred over URL)
+		// 3) Query ?i= (legacy + dual-send from modern clients for old backends)
 		// Protocol form: misskey.i.<token> (browser-safe; no custom headers).
 		let tokenFromProtocol: string | null = null;
 		const protoHeader = request.headers['sec-websocket-protocol'];

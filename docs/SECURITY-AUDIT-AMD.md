@@ -1265,18 +1265,20 @@ WS (`StreamingApiServerService`): same Bearer **or** `q.get('i')`.
 |--|--|
 | **Severity** | **L–M** (token theft via logs / Referer / shared URLs) |
 | **CWE** | CWE-598 |
-| **Status** | **Partially fixed in tree** — modern WS client uses `Sec-WebSocket-Protocol: misskey.i.<token>`; server accepts protocol before legacy `?i=` |
-| **Components** | `misskey-js/streaming.ts`; `StreamingApiServerService`; residual: GET `allowGet` + `body.i` / legacy `?i=` still accepted |
+| **Status** | **Partially fixed in tree** — dual-send: `Sec-WebSocket-Protocol` **and** legacy `?i=` so mixed FE/BE deploys keep realtime working |
+| **Components** | `misskey-js/streaming.ts`; `StreamingApiServerService`; residual: GET `allowGet` + body/`?i=` still accepted |
 
 **Attack / reverse technique**  
-1. Intercept or log `wss://host/streaming?i=NATIVE_TOKEN` (legacy clients)  
+1. Intercept or log `wss://host/streaming?i=NATIVE_TOKEN` (still dual-sent for compatibility)  
 2. Replay as `Authorization: Bearer` or POST `{ "i": "..." }`  
 
 **Fix summary**  
-Browser client no longer puts token in WS URL; uses subprotocol. Server prefers Bearer → protocol → query `i`.  
+Server prefers Bearer → protocol → query `i`. Modern client sends **both** protocol and `?i=` so:  
+- new backend can use protocol (preferred)  
+- old backend still authenticates via `?i=` (no “FE first / BE lag” blackout)  
 
 **Residual**  
-Legacy `?i=` still works for old clients; GET endpoints may still take `i` in query when `allowGet`.
+Token may still appear in proxy logs via `?i=` until a future release drops dual-send after all backends understand protocol. Prefer “backend first” when rolling out, but dual-send makes FE-first survivable.
 
 ---
 
@@ -1432,7 +1434,7 @@ Internet
 | 26 | **SK-054** Meili filter/sort injection | **DONE** |
 | 27 | **SK-057** WS serverStats meta gate | **DONE** |
 | 28 | **SK-058** WS queueStats moderator-only | **DONE** |
-| 29 | **SK-059** WS token via Sec-WebSocket-Protocol (not URL) | **PARTIAL** (modern client; legacy `?i=` kept) |
+| 29 | **SK-059** WS protocol + dual-send `?i=` for mixed deploy | **PARTIAL** (URL residual until protocol-only later) |
 | 30 | **SK-060** public API catalog | **Accepted design** (optional lock-down) |
 
 ### P3 — hygiene
