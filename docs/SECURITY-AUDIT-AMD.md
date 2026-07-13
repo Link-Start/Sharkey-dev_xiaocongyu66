@@ -87,6 +87,9 @@ Sharkey inherits a mature Misskey security baseline (private-IP SSRF guards, SVG
 | **047** | Favorite visibility gate |
 | **048** | Chat reaction dedupe / race |
 | **049** | X-algo endpoint gate + fallback default |
+| **051** | Import APIs require drive file ownership |
+| **052** | Private Flash visibility on show/like |
+| **053** | Admin emoji only own/unowned drive files |
 
 #### Still open / residual (not “all clear”)
 
@@ -107,9 +110,6 @@ Sharkey inherits a mature Misskey security baseline (private-IP SSRF guards, SVG
 | **007** residual | MFM UI abuse (scale/animation/phishing) still possible within clamps |
 | **046** residual | Making a private clip public does not re-scan already-attached notes |
 | **050** | Site mod can mute/rate-limit any room (open-ops privilege — skip for product) |
-| **051** | **Import APIs: no drive file ownership (IDOR) — HIGH — fix** |
-| **052** | **Private Flash readable by id (authz bypass) — MEDIUM — fix** |
-| **053** | Admin emoji can detach any drive file (staff-only) |
 
 #### Ops-only (not closed by code alone)
 
@@ -1028,42 +1028,14 @@ Screening focused on **IDOR, authz bypass, secret exposure** — not “site mod
 |--|--|
 | **Severity** | **H** |
 | **CWE** | CWE-639 / CWE-862 |
-| **Status** | **Open** |
+| **Status** | **Fixed in tree** — all listed import endpoints use `findOneBy({ id, userId: me.id })` |
 | **Components** | `i/import-following.ts`, `i/import-blocking.ts`, `i/import-muting.ts`, `i/import-user-lists.ts`, `i/import-antennas.ts`, `i/import-notes.ts` |
 
 **Description**  
-All of these load the file as:
+Prior: imports loaded any drive file by id and processed it as the caller.
 
-```ts
-const file = await this.driveFilesRepository.findOneBy({ id: ps.fileId });
-// no: file.userId === me.id
-```
-
-Then enqueue jobs that **download and parse** `file.url` as the caller (`me`). Contrast with `drive/files/show|delete|update`, which require owner or moderator.
-
-**Attack**  
-1. Attacker obtains or guesses another user’s `fileId` (UUID — hard to guess, but IDs leak via shared links, admin tools, logs, XSS, shoulder-surfing, etc.).  
-2. Calls e.g. `i/import-following` with that `fileId` (needs role policy `canImportFollowing` etc.).  
-3. Server fetches victim’s drive object and processes contents under attacker’s account.
-
-**Impact**  
-
-| Endpoint | Impact |
-|----------|--------|
-| import-following / muting / blocking / user-lists | Read victim CSV/list content; apply follows/mutes/blocks from victim data |
-| import-antennas | Read victim antenna JSON (config secrets if any) |
-| import-notes | Process victim archive into attacker’s notes pipeline |
-
-Even without guessing UUIDs, any leak of `fileId` is enough. **This is a clear authorization bug**, not an open-ops feature.
-
-**Remediation**  
-On every import endpoint (and processors as defense-in-depth):
-
-```ts
-if (file.userId !== me.id) throw new ApiError(noSuchFile); // or ACCESS_DENIED
-```
-
-Prefer `findOneBy({ id, userId: me.id })`.
+**Fix summary**  
+Query scoped to caller ownership; missing/other-user file → `NO_SUCH_FILE`.
 
 ---
 
@@ -1073,23 +1045,14 @@ Prefer `findOneBy({ id, userId: me.id })`.
 |--|--|
 | **Severity** | **M** |
 | **CWE** | CWE-639 / CWE-284 |
-| **Status** | **Open** |
-| **Components** | `flash/show.ts`, `FlashEntityService.pack` |
+| **Status** | **Fixed in tree** — private only for owner on show; like rejects private |
+| **Components** | `flash/show.ts`, `flash/like.ts` (`FlashService.featured` already public-only) |
 
 **Description**  
-`flash/create` and `update` support `visibility: 'private' | 'public'`.  
-`flash/show` loads by id only and packs full payload including **`script`** with no owner/visibility check:
+Prior: `flash/show` packed private scripts for anyone with `flashId`.
 
-```ts
-const flash = await this.flashsRepository.findOneBy({ id: ps.flashId });
-return await this.flashEntityService.pack(flash, me); // always returns script
-```
-
-**Impact**  
-Private Play/Flash is not private: knowing/guessing id exposes AiScript source and metadata to unauthenticated callers (`requireCredential: false`).
-
-**Remediation**  
-If `visibility === 'private'`, allow only `me.id === flash.userId` (and optionally moderators). Featured/list queries must already filter `public` only — verify.
+**Fix summary**  
+`visibility === 'private'` → only owner on show; like treats private as not found.
 
 ---
 
@@ -1099,10 +1062,14 @@ If `visibility === 'private'`, allow only `me.id === flash.userId` (and optional
 |--|--|
 | **Severity** | **L** (requires admin/mod emoji rights) |
 | **CWE** | CWE-862 |
-| **Status** | **Open** (staff power; note for least-privilege) |
-| **Components** | `admin/emoji/add.ts` — `update(driveFile.id, { user: null })` without checking file owner |
+| **Status** | **Fixed in tree** — only `userId === me.id` or already-unowned files |
+| **Components** | `admin/emoji/add.ts` |
 
-Staff can repurpose any user’s drive file as emoji and clear ownership. Acceptable if all emoji admins are fully trusted; otherwise require file owned by staff or already unowned.
+**Description**  
+Prior: staff could detach any user’s drive file into emoji storage.
+
+**Fix summary**  
+Reject files owned by others; clear ownership only on own files.
 
 ---
 
@@ -1122,12 +1089,11 @@ Internet
 ```
 
 **Highest residual ROI after remediation (for attackers / next hardening)**  
-1. **SK-051** import IDOR — any permitted user can process another user’s drive file by id  
-2. **SK-052** private Flash/Play script leak by id  
-3. Session/token theft (SK-017/020)  
-4. Authenticated SSRF-ish surfaces (`/proxy`, webhooks) if allowlists misconfigured  
-5. Escrow key compromise (SK-010)  
-6. Mis-deploy: `NODE_ENV=test`, gateway without API key
+1. Session/token theft (SK-017/020)  
+2. Authenticated SSRF-ish surfaces (`/proxy`, webhooks) if allowlists misconfigured  
+3. Escrow key compromise (SK-010)  
+4. Mis-deploy: `NODE_ENV=test`, gateway without API key  
+5. MFM UI abuse within clamps (SK-007 residual)
 
 ---
 
@@ -1176,8 +1142,9 @@ Internet
 | 20 | **SK-046/047** clip/favorite visibility on write | **DONE** |
 | 21 | **SK-048** chat reaction race / dedupe | **DONE** |
 | 22 | **SK-049** x-algo fallback / isEnabled endpoint gate | **DONE** (working tree; ensure committed) |
-| 23 | **SK-051** import endpoints: require `file.userId === me.id` | **OPEN — priority fix** |
-| 24 | **SK-052** private flash: enforce visibility on show/pack | **OPEN — priority fix** |
+| 23 | **SK-051** import endpoints: require `file.userId === me.id` | **DONE** |
+| 24 | **SK-052** private flash: enforce visibility on show/like | **DONE** |
+| 25 | **SK-053** admin emoji only own/unowned drive files | **DONE** |
 
 ### P3 — hygiene
 
@@ -1255,7 +1222,8 @@ Further work is **P2/P3 + ops + optional dynamic testing**, not “all findings 
 | 0.8 | 2026-07-14 | **Pass 2 logic screening:** SK-043..050 (ignored invite join, re-invite, unreact auth, public clip private notes, favorite visibility, reaction race, x-algo black-hole) |
 | 0.9 | 2026-07-14 | **Pass 2 remediations:** SK-043..049 fixed in code (invite ignore/join, re-invite, unreact auth, clip/favorite visibility, reaction race, x-algo); matrix + P2 plan updated |
 | 0.9b | 2026-07-14 | **Pass 3 real vulns (skip open-ops):** SK-051 import file IDOR (**H**); SK-052 private flash leak (**M**); SK-053 admin emoji file detach (L); residual matrix + ROI updated |
-| 0.9 | 2026-07-14 | **§8 Project optimization evaluation** (multi-pass code review): scores, chat perf/WS/escrow/algo, engineering process, residual backlog, production gate |
+| 0.9c | 2026-07-14 | **§8 Project optimization evaluation** (multi-pass code review): scores, chat perf/WS/escrow/algo, engineering process, residual backlog, production gate |
+| 1.0 | 2026-07-14 | **Pass 3 remediations + chat scroll:** SK-051/052/053 fixed; fling scroll anti-twitch; AMD matrix updated |
 
 ---
 
@@ -1295,7 +1263,7 @@ This section records the **optimization / engineering judgment** for the same tr
 | Dimension | Score | One-line |
 |-----------|-------|----------|
 | **Performance direction** | **8.0** | Chat history prefetch, lazy mount, media unload, WS-over-REST hit real SPA bottlenecks |
-| **Security hardening (code)** | **8.5** | P0/P1 largely committed (`f95ed57`…`4eb55e4`); residuals are design/ops/logic pass-2 |
+| **Security hardening (code)** | **8.7** | P0/P1 + pass2/3 IDOR fixes (051–053); residuals mainly design/ops |
 | **Chat correctness / UX** | **8.0** | Scroll stability, catch-up, 1:1 `fromUser` pack (WIP) address real races |
 | **Maintainability** | **7.0** | Composables extracted; `room.vue` still ~1720+ lines |
 | **Product / privacy honesty** | **6.0–7.0** | Escrow ≠ E2EE; field still named `isE2ee`; forced-E2EE was reverted |

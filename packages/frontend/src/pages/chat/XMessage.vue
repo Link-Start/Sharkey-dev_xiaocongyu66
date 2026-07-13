@@ -5,7 +5,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <template>
 <div
-	:id="`chat-msg-${message.id}`"
 	:class="[$style.root, { [$style.isMe]: isMe, [$style.highlighted]: highlighted }]"
 	:data-message-id="message.id"
 >

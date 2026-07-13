@@ -13,6 +13,7 @@ import { ChatHistoryPrefetcher, loadUntilMessageFound } from './chat-history-loa
 import {
 	isNearLiveEdge,
 	preserveScrollAfterPrepend,
+	createScrollRestoreCoalescer,
 } from './chat-scroll.js';
 import type { NormalizedChatMessage } from './chat-types.js';
 import {
@@ -44,6 +45,7 @@ export function useChatHistory(opts: {
 	const historyPrefetching = ref(false);
 	const historyPrefetchLabel = ref('');
 	const moreFetching = ref(false);
+	const restoreCoalesce = createScrollRestoreCoalescer();
 
 	let historyPrefetcher: ChatHistoryPrefetcher<NormalizedChatMessage> | null = null;
 
@@ -52,6 +54,7 @@ export function useChatHistory(opts: {
 		historyPrefetcher = null;
 		historyPrefetching.value = false;
 		historyPrefetchLabel.value = '';
+		restoreCoalesce.cancel();
 	}
 
 	/**
@@ -68,7 +71,11 @@ export function useChatHistory(opts: {
 			maxPages: 30,
 			maxMessages: HISTORY_MEMORY_CAP,
 			fetchPage: opts.makeTimelineFetcher(),
-			shouldPause: () => !opts.isActivated() || window.document.hidden,
+			// Pause while user is flinging so merge/restore doesn't fight inertia
+			shouldPause: () =>
+				!opts.isActivated()
+				|| window.document.hidden
+				|| opts.isUserScrollBlocked(),
 			onPage: (page) => {
 				if (!page.length) {
 					opts.canFetchMore.value = false;
@@ -76,14 +83,14 @@ export function useChatHistory(opts: {
 					historyPrefetchLabel.value = '';
 					return;
 				}
-				const sc = opts.getScrollContainer();
-				const reading = opts.isReadingHistory(sc);
-				const nearLive = !reading && isNearLiveEdge(sc);
+				const sc0 = opts.getScrollContainer();
+				const reading = opts.isReadingHistory(sc0);
+				const nearLive = !reading && isNearLiveEdge(sc0);
 				const anchorId = opts.messages.value[opts.messages.value.length - 1]?.id ?? oldestId;
 				const anchorEl = anchorId ? window.document.getElementById(`chat-msg-${anchorId}`) : null;
 				const anchorTop = anchorEl?.getBoundingClientRect().top ?? null;
-				const prevH = sc?.scrollHeight ?? 0;
-				const prevTop = sc?.scrollTop ?? 0;
+				const prevH = sc0?.scrollHeight ?? 0;
+				const prevTop = sc0?.scrollTop ?? 0;
 
 				opts.mergeOlderPage(page);
 				opts.canFetchMore.value = page.length >= PAGE_LIMIT && !historyPrefetcher?.isExhausted;
@@ -91,16 +98,22 @@ export function useChatHistory(opts: {
 					? `${opts.messages.value.length}`
 					: '';
 
-				void nextTick().then(() => {
-					requestAnimationFrame(() => {
-						if (!sc?.isConnected) return;
-						if (reading && prevH > 0) {
-							preserveScrollAfterPrepend(sc, prevH, prevTop, anchorId, anchorTop);
-						} else if (nearLive && !opts.isUserScrollBlocked()) {
-							opts.scrollToLiveEdge('instant');
-						} else if (prevH > 0 && sc.scrollHeight !== prevH) {
-							preserveScrollAfterPrepend(sc, prevH, prevTop, anchorId, anchorTop);
-						}
+				// Height-delta restore must run ASAP (stale prevTop if delayed past fling).
+				// Stick-to-live only when idle near bottom — never during user fling.
+				// Coalesce burst pages into one rAF write to avoid multi-frame twitch.
+				restoreCoalesce.schedule(() => {
+					void nextTick().then(() => {
+						requestAnimationFrame(() => {
+							const sc = opts.getScrollContainer();
+							if (!sc?.isConnected) return;
+							if (nearLive && !opts.isUserScrollBlocked() && !reading) {
+								opts.scrollToLiveEdge('instant');
+								return;
+							}
+							if (prevH > 0) {
+								preserveScrollAfterPrepend(sc, prevH, prevTop, anchorId, anchorTop);
+							}
+						});
 					});
 				});
 

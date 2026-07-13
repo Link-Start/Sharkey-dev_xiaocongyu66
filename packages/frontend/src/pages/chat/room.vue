@@ -146,6 +146,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 								:message="item.data"
 								:highlighted="highlightId === item.data.id"
 								:forceMount="item.data.id === pinnedViewMessageId || item.data.id === highlightId || item.data.id === messages[0]?.id"
+								:estimateHeight="estimateChatMsgHeight(item.data)"
 								@reply="onReply"
 								@scrollToReply="scrollToMessage"
 							/>
@@ -246,6 +247,7 @@ import {
 	createUserScrollGuard,
 	createPageScrollMemory,
 } from './chat-scroll.js';
+import { estimateChatMsgHeight } from './chat-msg-heights.js';
 import { loadRoomMeta as loadRoomMetaApi, loadUserMeta as loadUserMetaApi, patchAvatarUrls } from './chat-meta.js';
 import { fetchChatTimelinePage, type TimelineTarget } from './chat-timeline.js';
 import {
@@ -805,15 +807,30 @@ function bindScrollLiveClear() {
 	const sc = getChatScrollContainer();
 	if (!sc) return;
 	userScrollGuard.setLastScrollTop(sc.scrollTop);
+	let prefetchKickTimer: ReturnType<typeof setTimeout> | null = null;
 	const onScroll = () => {
-		markUserScrolling(sc);
+		userScrollGuard.markUserScrolling(sc);
+		// Don't clear pin / kick prefetch mid-fling — wait until scroll settles
+		if (userScrollGuard.blocked) {
+			if (prefetchKickTimer) clearTimeout(prefetchKickTimer);
+			prefetchKickTimer = setTimeout(() => {
+				prefetchKickTimer = null;
+				if (!userScrollGuard.blocked) onScrollSettled(sc);
+			}, 180);
+			return;
+		}
+		onScrollSettled(sc);
+	};
+	const onScrollSettled = (el: HTMLElement) => {
+		userScrollGuard.idleTick();
 		clearPinnedViewIfAtLive();
-		// Start background history only when user is actually reading upward
+		// Start background history only when user is actually reading upward (not flinging)
 		if (
 			canFetchMore.value &&
 			!historyPrefetching.value &&
 			!moreFetching.value &&
-			isNearHistoryTop(sc)
+			!userScrollGuard.blocked &&
+			isNearHistoryTop(el)
 		) {
 			startHistoryPrefetch();
 		}
@@ -821,6 +838,7 @@ function bindScrollLiveClear() {
 	sc.addEventListener('scroll', onScroll, { passive: true });
 	scrollListenCleanup = () => {
 		sc.removeEventListener('scroll', onScroll);
+		if (prefetchKickTimer) clearTimeout(prefetchKickTimer);
 		scrollListenCleanup = null;
 	};
 }

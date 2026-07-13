@@ -86,11 +86,15 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			const nameNfc = ps.name.normalize('NFC');
 			const driveFile = await this.driveFilesRepository.findOneBy({ id: ps.fileId });
 			if (driveFile == null) throw new ApiError(meta.errors.noSuchFile);
+			// SK-2026-053: only staff's own files or already-unowned drive objects
+			if (driveFile.userId != null && driveFile.userId !== me.id) {
+				throw new ApiError(meta.errors.noSuchFile);
+			}
 			const isDuplicate = await this.customEmojiService.checkDuplicate(nameNfc);
 			if (isDuplicate) throw new ApiError(meta.errors.duplicateName);
 			if (!FILE_TYPE_IMAGE.includes(driveFile.type)) throw new ApiError(meta.errors.unsupportedFileType);
 
-			if (driveFile.user !== null) await this.driveFilesRepository.update(driveFile.id, { user: null });
+			if (driveFile.userId != null) await this.driveFilesRepository.update(driveFile.id, { userId: null });
 
 			const emoji = await this.customEmojiService.createEmoji({
 				originalUrl: driveFile.url,

@@ -71,8 +71,9 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private roleService: RoleService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
+			// SK-2026-051: only caller's own drive files
 			const [file, policies] = await Promise.all([
-				this.driveFilesRepository.findOneBy({ id: ps.fileId }),
+				this.driveFilesRepository.findOneBy({ id: ps.fileId, userId: me.id }),
 				this.roleService.getUserPolicies(me),
 			]);
 

@@ -5,14 +5,15 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <!--
   Lazy mount for chat rows: light placeholder until near viewport, then mount
-  XMessage. Once mounted we keep it mounted and remember measured height so
-  tab switches / remounts use a correct placeholder (media-heavy history).
+  XMessage. Keeps a stable minHeight (remembered / estimated) so fast fling
+  doesn't collapse rows and multi-correct scroll (twitch / "multiple screens").
 -->
 <template>
 <div
 	ref="rootEl"
+	:id="`chat-msg-${message.id}`"
 	:class="[$style.root, { [$style.mounted]: mounted }]"
-	:style="placeholderStyle"
+	:style="rootStyle"
 >
 	<XMessage
 		v-if="mounted"
@@ -35,7 +36,11 @@ SPDX-License-Identifier: AGPL-3.0-only
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue';
 import type { NormalizedChatMessage } from './chat-types.js';
 import XMessage from './XMessage.vue';
-import { getChatMsgHeight, rememberChatMsgHeight } from './chat-msg-heights.js';
+import {
+	estimateChatMsgHeight,
+	getChatMsgHeight,
+	rememberChatMsgHeight,
+} from './chat-msg-heights.js';
 
 const props = defineProps<{
 	message: NormalizedChatMessage;
@@ -52,26 +57,40 @@ const emit = defineEmits<{
 }>();
 
 const rootEl = useTemplateRef<HTMLElement>('rootEl');
-const measuredH = ref(getChatMsgHeight(props.message.id) || 0);
+const estimated = props.estimateHeight || estimateChatMsgHeight(props.message);
+const measuredH = ref(getChatMsgHeight(props.message.id) || estimated);
 // Prefer known height as placeholder; only force-mount when asked
 const mounted = ref(!!props.forceMount);
 
-const placeholderStyle = computed(() => {
-	if (mounted.value) return undefined;
-	const h = measuredH.value || props.estimateHeight || 72;
-	return { minHeight: `${h}px` };
+/**
+ * Always reserve height — even after mount — until real measure is ≥ reserve.
+ * Stops placeholder→content jump that yanks the whole list during fling.
+ */
+const rootStyle = computed(() => {
+	const minH = Math.max(measuredH.value || 0, estimated, 56);
+	return {
+		minHeight: `${minH}px`,
+		// Isolate layout thrash of one row from siblings during mount
+		contain: 'layout style',
+	} as Record<string, string>;
 });
 
 let io: IntersectionObserver | null = null;
 let ro: ResizeObserver | null = null;
+let measureTimers: number[] = [];
 
 function measure() {
 	const el = rootEl.value;
 	if (!el || !mounted.value) return;
 	const h = Math.round(el.getBoundingClientRect().height);
 	if (h > 0) {
-		measuredH.value = h;
-		rememberChatMsgHeight(props.message.id, h);
+		// Only grow reserve (media loads late); shrinking would re-jump scroll
+		if (h > measuredH.value) {
+			measuredH.value = h;
+			rememberChatMsgHeight(props.message.id, h);
+		} else {
+			rememberChatMsgHeight(props.message.id, Math.max(measuredH.value, h));
+		}
 	}
 }
 
@@ -82,8 +101,6 @@ function setupIo() {
 		mounted.value = true;
 		return;
 	}
-	// If we already know a solid height from a previous visit, mount immediately
-	// when near previous height was large (media) — still use IO for light rows
 	const el = rootEl.value;
 	if (!el || typeof IntersectionObserver === 'undefined') {
 		mounted.value = true;
@@ -104,14 +121,20 @@ function setupIo() {
 	io = new IntersectionObserver((entries) => {
 		for (const e of entries) {
 			if (e.isIntersecting) {
-				mounted.value = true;
+				// Defer mount one frame so fling paint isn't blocked by many XMessages
+				const id = props.message.id;
+				requestAnimationFrame(() => {
+					if (props.message.id !== id) return;
+					mounted.value = true;
+				});
 				io?.disconnect();
 				io = null;
 			}
 		}
 	}, {
 		root: root ?? null,
-		rootMargin: '200% 0px',
+		// Large margin: mount before row enters viewport during fast fling
+		rootMargin: '120% 0px',
 		threshold: 0,
 	});
 	io.observe(el);
@@ -140,9 +163,12 @@ watch(mounted, async (v) => {
 		requestAnimationFrame(() => {
 			measure();
 			// Late media (images/video) may grow — remeasure a few times
-			window.setTimeout(measure, 200);
-			window.setTimeout(measure, 800);
-			window.setTimeout(measure, 2000);
+			for (const t of measureTimers) window.clearTimeout(t);
+			measureTimers = [
+				window.setTimeout(measure, 200),
+				window.setTimeout(measure, 800),
+				window.setTimeout(measure, 2000),
+			];
 		});
 	}
 });
@@ -161,6 +187,8 @@ onBeforeUnmount(() => {
 	io = null;
 	ro?.disconnect();
 	ro = null;
+	for (const t of measureTimers) window.clearTimeout(t);
+	measureTimers = [];
 });
 </script>
 
@@ -175,6 +203,9 @@ onBeforeUnmount(() => {
 	padding: 6px 0;
 	opacity: 0.35;
 	pointer-events: none;
+	/* Fill reserved minHeight so empty gap doesn't flash */
+	min-height: inherit;
+	box-sizing: border-box;
 }
 
 .phAvatar {

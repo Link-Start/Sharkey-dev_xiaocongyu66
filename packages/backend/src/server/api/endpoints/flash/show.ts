@@ -27,6 +27,11 @@ export const meta = {
 			code: 'NO_SUCH_FLASH',
 			id: 'f0d34a1a-d29a-401d-90ba-1982122b5630',
 		},
+		accessDenied: {
+			message: 'Access denied.',
+			code: 'ACCESS_DENIED',
+			id: '8c2e1b5e-0c4a-4f6a-9e3d-2a1b0c9d8e7f',
+		},
 	},
 
 	// 10 calls per 5 seconds
@@ -57,6 +62,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			if (flash == null) {
 				throw new ApiError(meta.errors.noSuchFlash);
+			}
+
+			// SK-2026-052: private Play/Flash only for owner
+			if (flash.visibility === 'private' && (me == null || flash.userId !== me.id)) {
+				throw new ApiError(meta.errors.accessDenied);
 			}
 
 			return await this.flashEntityService.pack(flash, me);

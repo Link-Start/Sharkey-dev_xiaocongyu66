@@ -34,24 +34,32 @@ export function scrollElementToLiveEdge(
 /**
  * After prepending older messages (top of chronological list), keep viewport
  * fixed with height-delta. Works reliably with normal (non-reversed) scroll.
+ *
+ * Uses **current** scrollTop + delta (not a frozen prevTop) so a fling that
+ * moved between measure and apply is not yanked back. Optional element anchor
+ * fine-tunes once only.
  */
 export function preserveScrollAfterPrepend(
 	scrollContainer: HTMLElement,
 	prevHeight: number,
-	prevTop: number,
+	_prevTop: number,
 	anchorId: string | null,
 	anchorTopBefore: number | null,
 ) {
 	const delta = scrollContainer.scrollHeight - prevHeight;
+	if (delta === 0 && (anchorId == null || anchorTopBefore == null)) return;
+
+	// Relative correction: keep whatever the user/browser already scrolled to
 	if (delta !== 0) {
-		scrollContainer.scrollTop = prevTop + delta;
+		scrollContainer.scrollTop += delta;
 	}
-	// Fine-tune with element anchor if available
+
+	// One anchor fine-tune only (avoid second write unless needed)
 	if (anchorId != null && anchorTopBefore != null) {
 		const el = window.document.getElementById(`chat-msg-${anchorId}`);
 		if (el) {
 			const drift = el.getBoundingClientRect().top - anchorTopBefore;
-			if (Math.abs(drift) > 0.5) {
+			if (Math.abs(drift) > 1) {
 				scrollContainer.scrollTop += drift;
 			}
 		}
@@ -59,25 +67,39 @@ export function preserveScrollAfterPrepend(
 }
 
 /**
- * Tracks recent user scroll so auto stick-to-live can be suppressed briefly
- * after the finger lifts (stops twitch).
+ * Tracks recent user scroll so auto stick-to-live / history restore can be
+ * suppressed during flings (stops multi-frame "hit with a stick" twitch).
  */
 export function createUserScrollGuard() {
-	/** Ignore stick-to-live for a moment after user scrolls */
 	let userScrollUntil = 0;
 	let lastScrollTop = 0;
+	let lastScrollAt = 0;
+	/** EMA of |Δscroll| / Δt (px/ms) */
+	let velocityEma = 0;
 
 	return {
 		markUserScrolling(container: HTMLElement) {
 			const top = container.scrollTop;
-			// Any real movement → user is in control; suppress auto stick briefly after stop
-			if (Math.abs(top - lastScrollTop) > 1) {
-				userScrollUntil = Date.now() + 450;
+			const now = performance.now();
+			const dt = Math.max(1, now - (lastScrollAt || now));
+			const dy = Math.abs(top - lastScrollTop);
+			if (dy > 0.5) {
+				const v = dy / dt;
+				velocityEma = velocityEma * 0.55 + v * 0.45;
+				// Fast fling → longer grace so stick-to-live / restore don't fight inertia
+				const grace =
+					velocityEma > 2.5 ? 1400
+						: velocityEma > 1.0 ? 1000
+							: velocityEma > 0.35 ? 700
+								: 500;
+				userScrollUntil = Date.now() + grace;
 			}
 			lastScrollTop = top;
+			lastScrollAt = now;
 		},
 		setLastScrollTop(top: number) {
 			lastScrollTop = top;
+			lastScrollAt = performance.now();
 		},
 		/** True while user scroll grace window is active */
 		get blocked() {
@@ -85,6 +107,43 @@ export function createUserScrollGuard() {
 		},
 		get until() {
 			return userScrollUntil;
+		},
+		/** Recent fling speed (px/ms EMA) — for pause/throttle decisions */
+		get velocity() {
+			return velocityEma;
+		},
+		/** Decay velocity when idle (call from rAF if needed) */
+		idleTick() {
+			if (Date.now() >= userScrollUntil) {
+				velocityEma *= 0.85;
+				if (velocityEma < 0.05) velocityEma = 0;
+			}
+		},
+	};
+}
+
+/**
+ * Coalesce multiple scroll restorations into one rAF (history prefetch bursts).
+ */
+export function createScrollRestoreCoalescer() {
+	let pending: (() => void) | null = null;
+	let raf = 0;
+
+	return {
+		schedule(fn: () => void) {
+			pending = fn;
+			if (raf) return;
+			raf = requestAnimationFrame(() => {
+				raf = 0;
+				const job = pending;
+				pending = null;
+				job?.();
+			});
+		},
+		cancel() {
+			if (raf) cancelAnimationFrame(raf);
+			raf = 0;
+			pending = null;
 		},
 	};
 }

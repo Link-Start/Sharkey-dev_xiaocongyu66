@@ -71,6 +71,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.noSuchFlash);
 			}
 
+			// Private flashes are not publicly interactable (SK-2026-052)
+			if (flash.visibility === 'private') {
+				throw new ApiError(meta.errors.noSuchFlash);
+			}
+
 			if (flash.userId === me.id) {
 				throw new ApiError(meta.errors.yourFlash);
 			}

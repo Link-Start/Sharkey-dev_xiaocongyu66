@@ -175,8 +175,8 @@ export class ChatHistoryPrefetcher<T extends { id: string }> {
 				}
 				this.untilId = oldestId;
 
-				// Yield so scroll/input stay smooth (async cooperative multitasking)
-				await idle(0);
+				// Yield longer so scroll fling isn't starved by merge/layout every frame
+				await idle(this.opts.shouldPause?.() ? 280 : 48);
 			}
 		} catch {
 			// Network blip — stop; user can retry via load more

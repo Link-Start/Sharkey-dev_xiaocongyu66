@@ -70,7 +70,8 @@ export default class extends Endpoint<typeof meta, typeof paramDef> {
 		private downloadService: DownloadService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			const file = await this.driveFilesRepository.findOneBy({ id: ps.fileId });
+			// SK-2026-051: only caller's own drive files
+			const file = await this.driveFilesRepository.findOneBy({ id: ps.fileId, userId: me.id });
 			if (file === null) throw new ApiError(meta.errors.noSuchFile);
 			if (file.size === 0) throw new ApiError(meta.errors.emptyFile);
 
