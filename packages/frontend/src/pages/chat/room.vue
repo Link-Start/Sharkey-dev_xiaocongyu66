@@ -1648,6 +1648,55 @@ async function inviteUser() {
 
 const tab = ref('chat');
 
+/**
+ * Page scroll lives on PageWithHeader root (_pageScrollable), not the message list.
+ * Leaving chat (manage/info/…) hides the tall timeline via v-show → container
+ * scrollHeight collapses and the browser clamps scrollTop to 0. Coming back
+ * without restore lands at the top of the thread. Save/restore across tab changes.
+ */
+let savedChatPageScrollTop: number | null = null;
+
+function saveChatPageScroll() {
+	const sc = getChatScrollContainer();
+	if (sc) savedChatPageScrollTop = sc.scrollTop;
+}
+
+function restoreChatPageScroll() {
+	const top = savedChatPageScrollTop;
+	if (top == null) return;
+	const apply = () => {
+		const sc = getChatScrollContainer();
+		if (!sc) return;
+		sc.scrollTop = top;
+		// Layout (footer / sticky header) may settle one frame later
+		requestAnimationFrame(() => {
+			const sc2 = getChatScrollContainer();
+			if (sc2) sc2.scrollTop = top;
+		});
+	};
+	void nextTick().then(() => {
+		requestAnimationFrame(apply);
+	});
+}
+
+// Leaving chat: save while timeline is still laid out (pre-flush, before v-show hides it)
+watch(tab, (next, prev) => {
+	if (prev === 'chat' && next !== 'chat') {
+		saveChatPageScroll();
+	}
+}, { flush: 'pre' });
+
+// Returning to chat: restore after DOM is shown again
+watch(tab, (next, prev) => {
+	if (next === 'chat' && prev !== 'chat') {
+		void nextTick(() => {
+			// Search/mention jump owns scroll via pinnedViewMessageId
+			if (pinnedViewMessageId.value) return;
+			restoreChatPageScroll();
+		});
+	}
+});
+
 const headerTabs = computed(() => {
 	// On narrow screens icon-only tabs shrink the second header row ("chin")
 	const narrow = typeof window !== 'undefined' && window.matchMedia('(max-width: 500px)').matches;
