@@ -37,17 +37,18 @@ class ChatRoomChannel extends Channel {
 
 	@bindThis
 	public async init(params: JsonObject): Promise<boolean> {
+		if (!this.user) return false;
 		if (typeof params.roomId !== 'string') return false;
 		this.roomId = params.roomId;
 
-		const exists = await this.chatRoomsRepository.findOne({
-			select: { id: true },
-			where: { id: this.roomId },
-		}) != null;
-
-		if (!exists) return true;
-
-		this.subscriber.on(`chatRoomStream:${this.roomId}`, this.onEvent);
+		const room = await this.chatService.findRoomById(this.roomId);
+		// Allow channel shell for join-gate / roomShow without live stream.
+		// Only members (or site moderators) may receive realtime room events —
+		// otherwise any logged-in user could subscribe to chatRoomStream:roomId
+		// and observe messages without membership.
+		if (room != null && await this.chatService.hasPermissionToViewRoomTimeline(this.user, room)) {
+			this.subscriber.on(`chatRoomStream:${this.roomId}`, this.onEvent);
+		}
 
 		return true;
 	}
@@ -64,7 +65,11 @@ class ChatRoomChannel extends Channel {
 		switch (type) {
 			case 'read':
 				if (this.roomId) {
-					this.chatService.readRoomChatMessage(this.user.id, this.roomId);
+					// Read receipts only for actual members (not staff-readonly viewers)
+					const room = await this.chatService.findRoomById(this.roomId);
+					if (room != null && await this.chatService.isRoomMember(room, this.user.id)) {
+						this.chatService.readRoomChatMessage(this.user.id, this.roomId);
+					}
 				}
 				break;
 
@@ -258,9 +263,7 @@ class ChatRoomChannel extends Channel {
 						this.send('roomError', { code: 'NO_SUCH_ROOM' });
 						return;
 					}
-					if (!(await this.chatService.hasPermissionToViewRoomTimeline(this.user, room)) && !(await this.chatService.isRoomMember(room, this.user.id))) {
-						// still allow show for join gate if public — packRoom handles membership flags
-					}
+					// packRoom is safe for non-members (join gate); does not leak message bodies.
 					const packed = await this.chatEntityService.packRoom(room, this.user);
 					const reqId = typeof body?.reqId === 'string' ? body.reqId : null;
 					this.send('room', { reqId, room: packed });

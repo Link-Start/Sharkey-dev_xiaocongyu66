@@ -12510,6 +12510,18 @@ export interface Locale extends ILocale {
          */
         "disableConfirm": string;
         /**
+         * リモートノートをブロック
+         */
+        "blockRemoteNotes": string;
+        /**
+         * 有効にすると管理者/モデレーター以外（ゲスト含む）はタイムラインや検索などでリモート連合ノートを見られません。管理画面の「リモート / 非表示」では引き続き管理できます。
+         */
+        "blockRemoteNotesCaption": string;
+        /**
+         * 一般ユーザー向けにすべてのリモートノートをブロックしますか？管理者とモデレーターのみ閲覧できます。
+         */
+        "blockRemoteConfirm": string;
+        /**
          * ローカル投稿のみ。管理者は IP とブラウザ指紋を確認できます。
          */
         "listHint": string;
@@ -12529,6 +12541,134 @@ export interface Locale extends ILocale {
          * 投稿指紋
          */
         "postFingerprint": string;
+        /**
+         * ユーザー名
+         */
+        "filterUsername": string;
+        /**
+         * メール
+         */
+        "filterEmail": string;
+        /**
+         * 連合（リモート）ノートを表示
+         */
+        "includeRemote": string;
+        /**
+         * ローカル
+         */
+        "tabAll": string;
+        /**
+         * リモート
+         */
+        "tabRemote": string;
+        /**
+         * 非表示
+         */
+        "tabHidden": string;
+        /**
+         * ローカルノート（非表示以外）
+         */
+        "scopeLocalHint": string;
+        /**
+         * リモート連合ノート（非表示以外）
+         */
+        "scopeRemoteHint": string;
+        /**
+         * 管理者が非表示にしたノート（ローカル + リモート）
+         */
+        "scopeHiddenHint": string;
+        /**
+         * 選択中
+         */
+        "selected": string;
+        /**
+         * このページを全選択
+         */
+        "selectAll": string;
+        /**
+         * 選択解除
+         */
+        "clearSelection": string;
+        /**
+         * 一括削除
+         */
+        "batchDelete": string;
+        /**
+         * 一括非表示
+         */
+        "batchHide": string;
+        /**
+         * 一括再表示
+         */
+        "batchUnhide": string;
+        /**
+         * 非表示
+         */
+        "hide": string;
+        /**
+         * 再表示
+         */
+        "unhide": string;
+        /**
+         * 非表示
+         */
+        "hidden": string;
+        /**
+         * 選択したノートを非表示にしますか？一般ユーザーには見えなくなります。
+         */
+        "hideConfirm": string;
+        /**
+         * 選択したノートの非表示を解除しますか？
+         */
+        "unhideConfirm": string;
+        /**
+         * このノートを非表示にしますか？
+         */
+        "hideOneConfirm": string;
+        /**
+         * このノートの非表示を解除しますか？
+         */
+        "unhideOneConfirm": string;
+        /**
+         * このノートを完全に削除しますか？元に戻せません。
+         */
+        "deleteConfirm": string;
+        /**
+         * 選択したノートを完全に削除しますか？元に戻せません。
+         */
+        "batchDeleteConfirm": string;
+        /**
+         * このユーザーを凍結しますか？ノートは非表示になり、アカウントは制限されます。
+         */
+        "suspendConfirm": string;
+        /**
+         * このユーザーのチャット履歴も非表示にする
+         */
+        "suspendHideChat": string;
+        /**
+         * キーワードブロック
+         */
+        "keywordBlock": string;
+        /**
+         * 1行1ルール。同一行のスペース区切りは AND。/regex/flags で正規表現。禁止語は投稿拒否、センシティブ語は強制センシティブ。
+         */
+        "keywordBlockCaption": string;
+        /**
+         * 禁止語（投稿不可）
+         */
+        "prohibitedWords": string;
+        /**
+         * 一致すると作成/編集を拒否。1行1ルール。スペース=AND。/regex/i 可。
+         */
+        "prohibitedWordsCaption": string;
+        /**
+         * センシティブ語（強制）
+         */
+        "sensitiveWords": string;
+        /**
+         * 一致するとノートをセンシティブ扱いにします。形式は同上。
+         */
+        "sensitiveWordsCaption": string;
         /**
          * ログイン履歴
          */

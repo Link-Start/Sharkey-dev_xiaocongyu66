@@ -156,60 +156,21 @@ import { useStream, wakeStream } from '@/stream.js';
 
 const router = useRouter();
 
-const anFb = {
+/** Prefer locales._adminNotes; thin zh fallback only if locale pack is stale */
+const anFb: Record<string, string> = {
 	title: '帖子管理',
-	siteWide: '全站发帖',
-	siteWideCaption: '控制本站用户是否可以发帖。禁用后，版主与管理员仍可发帖。',
-	disableLocalNoteCreation: '禁止全站发帖',
-	disableLocalNoteCreationCaption: '启用后，非版主的本站用户将无法发帖。',
-	disableConfirm: '确定禁止全站用户发帖？版主仍可发帖。',
 	blockRemoteNotes: '屏蔽远程帖子',
-	blockRemoteNotesCaption: '启用后，除管理员/版主外，所有人（含游客）在时间线、搜索等处看不到远程联合帖子。后台「远程 / 已隐藏」仍可管理。',
-	blockRemoteConfirm: '确定对普通用户屏蔽所有远程帖子？仅管理员与版主仍可见。',
-	listHint: '本站帖子按时间线样式展示。',
-	openUser: '打开用户',
-	suspendUser: '封禁用户',
-	postIp: '发帖 IP',
-	postFingerprint: '指纹',
-	filterUsername: '用户名',
-	filterEmail: '邮箱',
-	includeRemote: '显示联合（远程）帖子',
 	tabAll: '本站',
 	tabRemote: '远程',
 	tabHidden: '已隐藏',
-	scopeLocalHint: '本站帖子（未隐藏）',
-	scopeRemoteHint: '联合远程帖子（未隐藏）',
-	scopeHiddenHint: '管理员隐藏的帖子（本站 + 远程）',
-	selected: '已选',
-	selectAll: '全选本页',
-	clearSelection: '取消选择',
-	batchDelete: '批量删除',
-	batchHide: '批量隐藏',
-	batchUnhide: '批量取消隐藏',
-	hide: '隐藏',
-	unhide: '取消隐藏',
-	hidden: '已隐藏',
-	hideConfirm: '确定隐藏所选帖子？隐藏后普通用户不可见，管理员仍可在「已隐藏」中查看。',
-	unhideConfirm: '确定取消隐藏所选帖子？',
-	hideOneConfirm: '确定隐藏这条帖子？',
-	unhideOneConfirm: '确定取消隐藏这条帖子？',
-	deleteConfirm: '确定永久删除这条帖子？此操作不可恢复。',
-	batchDeleteConfirm: '确定永久删除已选帖子？此操作不可恢复。',
-	suspendConfirm: '确定封禁该用户？其帖子将被隐藏，账号将无法正常使用。',
-	suspendHideChat: '同时隐藏该用户的聊天记录',
-	keywordBlock: '屏蔽关键词',
-	keywordBlockCaption: '支持多种格式：每行一条规则；同一行内空格分隔的词需同时匹配（AND）；使用 /正则/flags 可写正则。敏感词命中会强制标为敏感，禁止词命中将拒绝发帖。',
-	prohibitedWords: '禁止词（无法发帖）',
-	prohibitedWordsCaption: '命中后拒绝创建/编辑帖子。一行一条；空格=AND；/regex/i=正则。',
-	sensitiveWords: '敏感词（强制敏感）',
-	sensitiveWordsCaption: '命中后帖子标记为敏感/需遮罩。格式同上。',
-} as const;
+};
 
-const an = new Proxy(anFb as Record<string, string>, {
+const an = new Proxy(anFb, {
 	get(target, prop: string) {
-		const block = (i18n.ts as any)._adminNotes;
+		const block = (i18n.ts as any)._adminNotes as Record<string, string> | undefined;
 		const v = block?.[prop];
-		return typeof v === 'string' && v.length > 0 ? v : target[prop] ?? prop;
+		if (typeof v === 'string' && v.length > 0) return v;
+		return target[prop] ?? prop;
 	},
 });
 

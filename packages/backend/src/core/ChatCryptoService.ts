@@ -247,10 +247,11 @@ export class ChatCryptoService {
 			});
 		}
 
+		// Dedicated chat escrow secret only — never reuse setupPassword / install credentials
+		// as message encryption material (would couple crypto to a shared admin secret).
 		const fallback =
 			(this.config as any).chatEscrowSecret
 			|| process.env.CHAT_ESCROW_SECRET
-			|| this.config.setupPassword
 			|| null;
 		if (fallback && String(fallback).length > 0 && !seen.has(CHAT_ESCROW_FALLBACK_KEY_ID)) {
 			out.push({
