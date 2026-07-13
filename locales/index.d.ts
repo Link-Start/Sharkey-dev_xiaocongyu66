@@ -1147,6 +1147,10 @@ export interface Locale extends ILocale {
      */
     "announcements": string;
     /**
+     * お知らせ
+     */
+    "announcement": string;
+    /**
      * 画像URL
      */
     "imageUrl": string;
@@ -3138,6 +3142,14 @@ export interface Locale extends ILocale {
      * 実験的機能
      */
     "experimentalFeatures": string;
+    /**
+     * ノート描画スキップを有効化
+     */
+    "enableNoteRenderSkipping": string;
+    /**
+     * スタッキングルータービューを有効化
+     */
+    "enableStackingRouterView": string;
     /**
      * 実験的
      */
@@ -11860,6 +11872,60 @@ export interface Locale extends ILocale {
         "notSelected": string;
     };
     "_customEmojisManager": {
+        "_fields": {
+            /**
+             * 名前
+             */
+            "name": string;
+            /**
+             * カテゴリ
+             */
+            "category": string;
+            /**
+             * エイリアス
+             */
+            "aliases": string;
+            /**
+             * 種類
+             */
+            "type": string;
+            /**
+             * ライセンス
+             */
+            "license": string;
+            /**
+             * センシティブ
+             */
+            "sensitive": string;
+            /**
+             * ローカルのみ
+             */
+            "localOnly": string;
+            /**
+             * 更新日時（開始）
+             */
+            "updatedAtFrom": string;
+            /**
+             * 更新日時（終了）
+             */
+            "updatedAtTo": string;
+            /**
+             * ロール
+             */
+            "role": string;
+            /**
+             * ホスト
+             */
+            "host": string;
+            /**
+             * URI
+             */
+            "uri": string;
+            /**
+             * 公開URL
+             */
+            "publicUrl": string;
+        };
         "_gridCommon": {
             /**
              * 選択行をコピー
