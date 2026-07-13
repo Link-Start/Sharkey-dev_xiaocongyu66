@@ -32,18 +32,17 @@ import { ModerationLogService } from '@/core/ModerationLogService.js';
 import { TimeService } from '@/global/TimeService.js';
 import { CacheService } from '@/core/CacheService.js';
 import { isLocalUser } from '@/models/User.js';
+import { secureRndstr } from '@/misc/secure-rndstr.js';
 
 const MAX_ROOM_MEMBERS = 200;
 const MAX_REACTIONS_PER_MESSAGE = 100;
 const isCustomEmojiRegexp = /^:([\w+-]+)(?:@\.)?:$/;
 
+/** CSPRNG invite codes (SK-2026-008) — avoid Math.random */
 function generateInviteCode(): string {
+	// Ambiguous chars removed (0/O, 1/l/I) similar to prior alphabet
 	const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
-	let out = '';
-	for (let i = 0; i < 16; i++) {
-		out += alphabet[Math.floor(Math.random() * alphabet.length)];
-	}
-	return out;
+	return secureRndstr(16, { chars: alphabet });
 }
 
 // TODO: ReactionServiceのやつと共通化
@@ -939,7 +938,13 @@ export class ChatService {
 			throw new Error('room is full');
 		}
 
-		// TODO: cehck block
+		// SK-2026-009: honor user blocks both ways (same idea as 1:1 chat)
+		const blocked =
+			await this.userBlockingService.checkBlocked(inviteeId, inviterId)
+			|| await this.userBlockingService.checkBlocked(inviterId, inviteeId);
+		if (blocked) {
+			throw new Error('blocked');
+		}
 
 		const invitation = {
 			id: this.idService.gen(),

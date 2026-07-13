@@ -91,9 +91,9 @@ class HttpRequestServiceAgent extends http.Agent {
 	public createConnection(options: net.NetConnectOpts, callback?: (err: Error | null, stream: net.Socket) => void): net.Socket {
 		const socket = super.createConnection(options, callback)
 			.on('connect', () => {
-				if (this.envService.env.NODE_ENV === 'production') {
-					validateSocketConnect(this.config.allowedPrivateNetworks, socket);
-				}
+				// Always enforce private-IP / non-unicast deny (SK-2026-002).
+				// allowedPrivateNetworks remains the only intentional escape hatch.
+				validateSocketConnect(this.config.allowedPrivateNetworks, socket);
 			});
 		return socket;
 	}
@@ -112,9 +112,8 @@ class HttpsRequestServiceAgent extends https.Agent {
 	public createConnection(options: net.NetConnectOpts, callback?: (err: Error | null, stream: net.Socket) => void): net.Socket {
 		const socket = super.createConnection(options, callback)
 			.on('connect', () => {
-				if (this.envService.env.NODE_ENV === 'production') {
-					validateSocketConnect(this.config.allowedPrivateNetworks, socket);
-				}
+				// Always enforce private-IP / non-unicast deny (SK-2026-002).
+				validateSocketConnect(this.config.allowedPrivateNetworks, socket);
 			});
 		return socket;
 	}

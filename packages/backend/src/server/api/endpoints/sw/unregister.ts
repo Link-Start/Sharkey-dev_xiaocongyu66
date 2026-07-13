@@ -12,7 +12,9 @@ import { PushNotificationService } from '@/core/PushNotificationService.js';
 export const meta = {
 	tags: ['account'],
 
-	requireCredential: false,
+	// SK-2026-036: always require login; never delete by endpoint alone
+	requireCredential: true,
+	secure: true,
 
 	description: 'Unregister from receiving push notifications.',
 
@@ -41,13 +43,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 	) {
 		super(meta, paramDef, async (ps, me) => {
 			await this.swSubscriptionsRepository.delete({
-				...(me ? { userId: me.id } : {}),
+				userId: me.id,
 				endpoint: ps.endpoint,
 			});
 
-			if (me) {
-				await this.pushNotificationService.refreshCache(me.id);
-			}
+			await this.pushNotificationService.refreshCache(me.id);
 		});
 	}
 }

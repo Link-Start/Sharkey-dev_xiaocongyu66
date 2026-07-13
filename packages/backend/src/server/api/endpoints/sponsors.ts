@@ -70,9 +70,10 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private sponsorsService: SponsorsService,
 	) {
 		super(meta, paramDef, async (ps) => {
+			// SK-2026-013: ignore public forceUpdate to prevent unauthenticated cache-bust DoS
 			const sponsors = ps.instance
-				? await this.sponsorsService.instanceSponsors(ps.forceUpdate)
-				: await this.sponsorsService.sharkeySponsors(ps.forceUpdate);
+				? await this.sponsorsService.instanceSponsors(false)
+				: await this.sponsorsService.sharkeySponsors(false);
 
 			return {
 				sponsor_data: sponsors.map(s => ({

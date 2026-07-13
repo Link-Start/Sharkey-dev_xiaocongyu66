@@ -48,7 +48,7 @@ export const paramDef = {
 		name: { type: 'string', minLength: 1, maxLength: 128 },
 		description: { type: 'string', nullable: true, minLength: 1, maxLength: 2048 },
 		bannerId: { type: 'string', format: 'misskey:id', nullable: true },
-		color: { type: 'string', minLength: 1, maxLength: 16 },
+		color: { type: 'string', pattern: '^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$', minLength: 4, maxLength: 7 },
 		isSensitive: { type: 'boolean', nullable: true },
 		allowRenoteToExternal: { type: 'boolean', nullable: true },
 	},
@@ -87,7 +87,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				description: ps.description ?? null,
 				bannerId: banner ? banner.id : null,
 				isSensitive: ps.isSensitive ?? false,
-				...(ps.color !== undefined ? { color: ps.color } : {}),
+				...(ps.color !== undefined ? { color: /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(ps.color) ? ps.color : '#86b300' } : {}),
 				allowRenoteToExternal: ps.allowRenoteToExternal ?? true,
 			} as MiChannel);
 

@@ -23,7 +23,23 @@ export class InternalStorageService {
 
 	@bindThis
 	public resolvePath(key: string) {
-		return Path.resolve(this.config.mediaDirectory, key);
+		// SK-2026-026: reject path traversal / absolute keys
+		if (
+			typeof key !== 'string'
+			|| key.length === 0
+			|| key.includes('..')
+			|| key.includes('/')
+			|| key.includes('\\')
+			|| key.includes('\0')
+		) {
+			throw new Error('invalid storage key');
+		}
+		const root = Path.resolve(this.config.mediaDirectory);
+		const resolved = Path.resolve(root, key);
+		if (resolved !== root && !resolved.startsWith(root + Path.sep)) {
+			throw new Error('invalid storage key');
+		}
+		return resolved;
 	}
 
 	@bindThis

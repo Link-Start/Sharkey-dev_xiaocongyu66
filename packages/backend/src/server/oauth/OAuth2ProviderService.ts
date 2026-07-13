@@ -103,7 +103,17 @@ export class OAuth2ProviderService {
 			fastify.get<{ Querystring: Record<string, string | string[] | undefined> }>(url, async (request, reply) => {
 				if (typeof(request.query.client_id) !== 'string') return reply.code(400).send({ error: 'BAD_REQUEST', error_description: 'Missing required query "client_id"' });
 
-				const redirectUri = new URL(Buffer.from(request.query.client_id, 'base64').toString());
+				// SK-2026-022: only allow http(s) redirects from base64 client_id (open-redirect hardening).
+				let redirectUri: URL;
+				try {
+					const decoded = Buffer.from(request.query.client_id, 'base64').toString('utf8');
+					redirectUri = new URL(decoded);
+				} catch {
+					return reply.code(400).send({ error: 'BAD_REQUEST', error_description: 'Invalid client_id' });
+				}
+				if (redirectUri.protocol !== 'http:' && redirectUri.protocol !== 'https:') {
+					return reply.code(400).send({ error: 'BAD_REQUEST', error_description: 'Invalid client_id scheme' });
+				}
 				redirectUri.searchParams.set('mastodon', 'true');
 				if (request.query.state) redirectUri.searchParams.set('state', String(request.query.state));
 				if (request.query.redirect_uri) redirectUri.searchParams.set('redirect_uri', String(request.query.redirect_uri));
@@ -116,13 +126,12 @@ export class OAuth2ProviderService {
 			const body = request.body ?? request.query;
 
 			if (body.grant_type === 'client_credentials') {
-				const ret = {
-					access_token: uuid(),
-					token_type: 'Bearer',
-					scope: 'read',
-					created_at: Math.floor(this.timeService.now / 1000),
-				};
-				return reply.send(ret);
+				// SK-2026-003: do not mint non-persisted dummy Bearer tokens.
+				// Mastodon client_credentials is unsupported; reject explicitly.
+				return reply.code(400).send({
+					error: 'unsupported_grant_type',
+					error_description: 'client_credentials is not supported',
+				});
 			}
 
 			try {

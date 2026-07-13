@@ -13,7 +13,9 @@ import { ApiError } from '@/server/api/error.js';
 export const meta = {
 	tags: ['federation'],
 
-	requireCredential: false,
+	// SK-2026-012: unauthenticated remote re-fetch is an amplification vector
+	requireCredential: true,
+	kind: 'write:account',
 
 	errors: {
 		noSuchUser: {
