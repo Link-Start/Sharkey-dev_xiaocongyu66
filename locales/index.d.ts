@@ -5432,6 +5432,222 @@ export interface Locale extends ILocale {
     "scrollToClose": string;
     "_chat": {
         /**
+         * お知らせ
+         */
+        "roomAnnouncement": string;
+        /**
+         * エンドツーエンド暗号化
+         */
+        "e2eeAlwaysOn": string;
+        /**
+         * チャットは保存時に暗号化（AES-GCM）。参加者およびサーバー運用者のみ読めます。公開ノートは暗号化されません。
+         */
+        "e2eeAlwaysOnHint": string;
+        /**
+         * エスクロー暗号化：あなた・相手/部屋のメンバー・サーバー運用者のみ。
+         */
+        "chatEscrowHint": string;
+        /**
+         * 相手の鍵を待っています…
+         */
+        "e2eeWaitingPeer": string;
+        /**
+         * 鍵フィンガープリント
+         */
+        "e2eeFingerprint": string;
+        /**
+         * 相手の暗号鍵が更新されました。新しい鍵で同期します。
+         */
+        "e2eeKeyRotated": string;
+        /**
+         * ダイレクトメッセージはエンドツーエンド暗号化が必須です。
+         */
+        "e2eePlaintextRejected": string;
+        /**
+         * メッセージを同期中…
+         */
+        "wsCatchingUp": string;
+        /**
+         * [動画]
+         */
+        "replyVideo": string;
+        /**
+         * [画像]
+         */
+        "replyImage": string;
+        /**
+         * [音声]
+         */
+        "replyAudio": string;
+        /**
+         * [ファイル]
+         */
+        "replyFile": string;
+        /**
+         * [暗号化]
+         */
+        "replyE2ee": string;
+        /**
+         * 発言制限（秒）
+         */
+        "messageRateLimit": string;
+        /**
+         * 0 で無制限。例: 5 は 5 秒に 1 通。オーナー・ルーム管理者・インスタンスのモデレーターは対象外。
+         */
+        "messageRateLimitHint": string;
+        /**
+         * 送信が早すぎます。少し待ってから再送してください。
+         */
+        "roomRateLimited": string;
+        /**
+         * スタッフ閲覧（非メンバー）
+         */
+        "staffReadonlyView": string;
+        /**
+         * モデレーションのためルームを閲覧できます。送信には参加が必要です。
+         */
+        "staffReadonlyViewHint": string;
+        /**
+         * 送信中…
+         */
+        "sending": string;
+        /**
+         * メッセージを送信しています。しばらくお待ちください…
+         */
+        "sendingHint": string;
+        /**
+         * キック
+         */
+        "kickMember": string;
+        /**
+         * このメンバーをルームからキックしますか？参加ポリシーが許せば再参加できます。
+         */
+        "kickMemberConfirm": string;
+        /**
+         * ブラックリスト
+         */
+        "banMember": string;
+        /**
+         * このユーザーをブラックリストに追加して退出させますか？解除まで再参加できません。
+         */
+        "banMemberConfirm": string;
+        /**
+         * ブラックリストから外す
+         */
+        "unbanMember": string;
+        /**
+         * ミュート
+         */
+        "muteMember": string;
+        /**
+         * ミュート解除
+         */
+        "unmuteMember": string;
+        /**
+         * ミュート時間
+         */
+        "muteDuration": string;
+        /**
+         * 10 分
+         */
+        "mute10m": string;
+        /**
+         * 30 分
+         */
+        "mute30m": string;
+        /**
+         * 1 時間
+         */
+        "mute1h": string;
+        /**
+         * 2 時間
+         */
+        "mute2h": string;
+        /**
+         * 1 日
+         */
+        "mute1d": string;
+        /**
+         * 1 か月
+         */
+        "mute1mo": string;
+        /**
+         * カスタム…
+         */
+        "muteCustom": string;
+        /**
+         * カスタムミュート時間
+         */
+        "muteCustomTitle": string;
+        /**
+         * 単位
+         */
+        "muteUnit": string;
+        /**
+         * 秒
+         */
+        "muteUnitSeconds": string;
+        /**
+         * 分
+         */
+        "muteUnitMinutes": string;
+        /**
+         * 時間
+         */
+        "muteUnitHours": string;
+        /**
+         * 日
+         */
+        "muteUnitDays": string;
+        /**
+         * 月
+         */
+        "muteUnitMonths": string;
+        /**
+         * 数値
+         */
+        "muteAmount": string;
+        /**
+         * ミュート期限
+         */
+        "mutedUntil": string;
+        /**
+         * ブラックリスト
+         */
+        "blacklist": string;
+        /**
+         * ブラックリストは空です。
+         */
+        "blacklistEmpty": string;
+        /**
+         * ブラックリストのユーザーは解除まで再参加できません。
+         */
+        "blacklistHint": string;
+        /**
+         * メッセージを削除
+         */
+        "modDeleteMessage": string;
+        /**
+         * このメッセージを全員から削除しますか？
+         */
+        "modDeleteMessageConfirm": string;
+        /**
+         * メンバー操作
+         */
+        "memberActions": string;
+        /**
+         * このルームでミュートされているため送信できません。
+         */
+        "youAreMuted": string;
+        /**
+         * このルームからBANされています。
+         */
+        "bannedFromRoom": string;
+        /**
+         * 理由（任意）
+         */
+        "banReason": string;
+        /**
          * あなたのメンション
          */
         "mentionsOfYou": string;

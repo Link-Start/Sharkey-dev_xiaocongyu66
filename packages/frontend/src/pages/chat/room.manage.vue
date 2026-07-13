@@ -115,7 +115,7 @@ const chatWs = inject(chatWsKey, null);
 const announcementLabel = computed(() => {
 	const v = (i18n.ts as any).announcement;
 	if (typeof v === 'string' && v.length > 0 && !v.includes('announcement')) return v;
-	return tChat('roomAnnouncement', chatFb.roomAnnouncement);
+	return tChat('roomAnnouncement');
 });
 
 const props = defineProps<{

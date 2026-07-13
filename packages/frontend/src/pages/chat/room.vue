@@ -236,7 +236,6 @@ import XMembers from './room.members.vue';
 import XInfo from './room.info.vue';
 import XManage from './room.manage.vue';
 import ChatAnnouncementBar from './ChatAnnouncementBar.vue';
-import { ChatHistoryPrefetcher, loadUntilMessageFound } from './chat-history-loader.js';
 import type { NormalizedChatMessage, ChatRoomView } from './chat-types.js';
 import { normalizeChatMessage } from './chat-normalize.js';
 import {
@@ -254,11 +253,10 @@ import {
 	MAX_MESSAGES,
 	PAGE_LIMIT,
 	BACKGROUND_MESSAGE_CAP,
-	HISTORY_MEMORY_CAP,
-	NORMALIZE_POOL,
 } from './use-chat-messages.js';
 import { useChatMentions } from './use-chat-mentions.js';
 import { useChatChannel } from './use-chat-channel.js';
+import { useChatHistory } from './use-chat-history.js';
 import type { PageHeaderItem } from '@/types/page-header.js';
 import * as os from '@/os.js';
 import { wakeStream } from '@/stream.js';
@@ -299,12 +297,6 @@ const props = defineProps<{
 }>();
 
 const initializing = ref(true);
-const moreFetching = ref(false);
-/** True while loading older history — blocks stick-to-bottom / move jank */
-const historyLoading = ref(false);
-/** Background async prefetch running (multi-page pipeline) */
-const historyPrefetching = ref(false);
-const historyPrefetchLabel = ref('');
 
 const {
 	messages,
@@ -318,7 +310,6 @@ function mergeOlderPage(page: NormalizedChatMessage[]) {
 	mergeOlderPageStore(page, pinnedViewMessageId.value);
 }
 
-let historyPrefetcher: ChatHistoryPrefetcher<NormalizedChatMessage> | null = null;
 const user = ref<Misskey.entities.UserDetailed | null>(null);
 const room = ref<ChatRoomView | null>(null);
 
@@ -343,6 +334,8 @@ const highlightId = ref<string | null>(null);
 const pinnedViewMessageId = ref<string | null>(null);
 let highlightTimer: ReturnType<typeof setTimeout> | null = null;
 let scrollListenCleanup: (() => void) | null = null;
+/** keep-alive activation flag — history prefetcher pauses when false */
+let isActivated = true;
 const needJoin = ref(false);
 const joining = ref(false);
 const joinCode = ref('');
@@ -387,6 +380,10 @@ function timelineTarget(): TimelineTarget | null {
 	return null;
 }
 
+function normalizeMessage(message: Misskey.entities.ChatMessageLite | Misskey.entities.ChatMessage): NormalizedChatMessage {
+	return normalizeChatMessage(message, $i!, user.value);
+}
+
 /** Prefer WS history when channel is open; REST fallback. */
 async function fetchTimelinePage(args: {
 	limit: number;
@@ -414,117 +411,47 @@ function makeTimelineFetcher() {
 	};
 }
 
-/**
- * Start / restart background async history pipeline (not tied to scroll chain).
- * Uses cooperative multi-async page loading with UI idle yields.
- */
-function startHistoryPrefetch() {
-	stopHistoryPrefetch();
-	if (!canFetchMore.value || messages.value.length === 0) return;
-	if (!props.roomId && !props.userId) return;
+const timelineEl = useTemplateRef('timelineEl');
 
-	const oldestId = messages.value[messages.value.length - 1]?.id ?? null;
-	historyPrefetcher = new ChatHistoryPrefetcher<NormalizedChatMessage>({
-		pageSize: PAGE_LIMIT,
-		maxPages: 30,
-		maxMessages: HISTORY_MEMORY_CAP,
-		fetchPage: makeTimelineFetcher(),
-		shouldPause: () => !isActivated || window.document.hidden,
-		onPage: (page, meta) => {
-			if (!page.length) {
-				canFetchMore.value = false;
-				historyPrefetching.value = false;
-				historyPrefetchLabel.value = '';
-				return;
-			}
-			// Preserve scroll when user is reading history and older msgs append
-			// (array is newest-first → older pages grow scrollHeight from the top
-			// of chronological DOM). Anchor the currently visible oldest loaded
-			// message (end of newest-first array), not messages[0] (newest).
-			const sc = getChatScrollContainer();
-			const reading = isReadingHistory(sc);
-			const nearLive = !reading && isNearLiveEdge(sc);
-			const anchorId = messages.value[messages.value.length - 1]?.id ?? oldestId;
-			const anchorEl = anchorId ? window.document.getElementById(`chat-msg-${anchorId}`) : null;
-			const anchorTop = anchorEl?.getBoundingClientRect().top ?? null;
-			const prevH = sc?.scrollHeight ?? 0;
-			const prevTop = sc?.scrollTop ?? 0;
-
-			mergeOlderPage(page);
-			canFetchMore.value = page.length >= PAGE_LIMIT && !historyPrefetcher?.isExhausted;
-			historyPrefetchLabel.value = canFetchMore.value
-				? `${messages.value.length}`
-				: '';
-
-			void nextTick().then(() => {
-				requestAnimationFrame(() => {
-					if (!sc?.isConnected) return;
-					if (reading && prevH > 0) {
-						// Keep viewport while reading older messages
-						preserveScrollAfterPrepend(sc, prevH, prevTop, anchorId, anchorTop);
-					} else if (nearLive && !userScrollGuard.blocked) {
-						// Stay at live edge when background prefetch grows the top
-						scrollToLiveEdge('instant');
-					}
-					// Mid-scroll (not reading history, not live): leave scrollTop
-					// alone after height-delta only when height changed at top —
-					// still apply delta so content doesn't jump under the finger.
-					else if (prevH > 0 && sc.scrollHeight !== prevH) {
-						preserveScrollAfterPrepend(sc, prevH, prevTop, anchorId, anchorTop);
-					}
-				});
-			});
-
-			if (historyPrefetcher?.isExhausted) {
-				canFetchMore.value = false;
-				historyPrefetching.value = false;
-				historyPrefetchLabel.value = '';
-			}
-		},
-	});
-	historyPrefetching.value = true;
-	historyPrefetchLabel.value = '…';
-	historyPrefetcher.start(oldestId);
+function getChatScrollContainer(): HTMLElement | null {
+	return timelineEl.value ? getScrollContainer(timelineEl.value) : null;
 }
 
-function stopHistoryPrefetch() {
-	historyPrefetcher?.stop();
-	historyPrefetcher = null;
-	historyPrefetching.value = false;
-	historyPrefetchLabel.value = '';
+function isReadingHistory(container: HTMLElement | null = null): boolean {
+	if (pinnedViewMessageId.value) return true;
+	const sc = container ?? getChatScrollContainer();
+	if (!sc) return false;
+	return !isNearLiveEdge(sc);
 }
 
-async function ensureMessageLoaded(id: string): Promise<boolean> {
-	if (knownMessageIds.has(id) || messages.value.some(m => m.id === id) || window.document.getElementById(`chat-msg-${id}`)) {
-		return true;
-	}
-	if (!props.roomId && !props.userId) return false;
-
-	// Async multi-page walk until target appears (not scroll-driven)
-	historyLoading.value = true;
-	moreFetching.value = true;
-	try {
-		const oldestId = messages.value[messages.value.length - 1]?.id ?? null;
-		const { pages, found, exhausted } = await loadUntilMessageFound<NormalizedChatMessage>({
-			targetId: id,
-			oldestId,
-			pageSize: PAGE_LIMIT,
-			maxPages: 40,
-			fetchPage: makeTimelineFetcher(),
-			mapConcurrency: NORMALIZE_POOL,
-		});
-		for (const page of pages) {
-			mergeOlderPage(page);
-		}
-		if (exhausted) canFetchMore.value = false;
-		else if (pages.length) canFetchMore.value = true;
-		await nextTick();
-		return found || messages.value.some(m => m.id === id) || !!window.document.getElementById(`chat-msg-${id}`);
-	} finally {
-		moreFetching.value = false;
-		historyLoading.value = false;
-	}
+function scrollToLiveEdge(behavior: ScrollBehavior | 'instant' = 'instant') {
+	const sc = getChatScrollContainer();
+	if (!sc) return;
+	scrollElementToLiveEdge(sc, behavior);
 }
+
+const {
+	historyLoading,
+	historyPrefetching,
+	historyPrefetchLabel,
+	moreFetching,
+	getHistoryPrefetcher,
+	startHistoryPrefetch,
+	stopHistoryPrefetch,
+	ensureMessageLoaded,
+} = useChatHistory({
+	messages,
+	canFetchMore,
+	knownMessageIds,
+	mergeOlderPage,
+	makeTimelineFetcher,
+	getScrollContainer: getChatScrollContainer,
+	isReadingHistory,
+	isUserScrollBlocked: () => userScrollGuard.blocked,
+	scrollToLiveEdge,
+	isActivated: () => isActivated,
+	hasConversation: () => !!(props.roomId || props.userId),
+});
 
 /**
  * Each tap: jump to one @ mention, then drop it (viewed once).
@@ -827,7 +754,6 @@ function onMsgError(err: { message?: string; code?: string; remainingSeconds?: n
 	}
 	os.alert({ type: 'error', text: String(text) });
 }
-const timelineEl = useTemplateRef('timelineEl');
 /** API order: newest-first. Separators built on that order. */
 const timelineNewestFirst = makeDateSeparatedTimelineComputedRef(messages);
 /**
@@ -853,28 +779,6 @@ function doLogin() {
 	} catch {
 		// pleaseLogin throws after opening the sign-in dialog
 	}
-}
-
-function getChatScrollContainer(): HTMLElement | null {
-	return timelineEl.value ? getScrollContainer(timelineEl.value) : null;
-}
-
-/** User is reading history (search jump pin, or scrolled away from newest) */
-function isReadingHistory(container: HTMLElement | null = null): boolean {
-	if (pinnedViewMessageId.value) return true;
-	const sc = container ?? getChatScrollContainer();
-	if (!sc) return false;
-	return !isNearLiveEdge(sc);
-}
-
-function scrollToLiveEdge(behavior: ScrollBehavior | 'instant' = 'instant') {
-	const sc = getChatScrollContainer();
-	if (!sc) return;
-	scrollElementToLiveEdge(sc, behavior);
-}
-
-function markUserScrolling(container: HTMLElement) {
-	userScrollGuard.markUserScrolling(container);
 }
 
 function markPinnedView(id: string) {
@@ -919,14 +823,6 @@ function bindScrollLiveClear() {
 		sc.removeEventListener('scroll', onScroll);
 		scrollListenCleanup = null;
 	};
-}
-
-// No MutationObserver stick-to-bottom: media layout thrash yanks viewport.
-// Stick only on new WS messages when already near live edge (see onMessage).
-// History: background async prefetch (startHistoryPrefetch) — not scroll IO chain.
-
-function normalizeMessage(message: Misskey.entities.ChatMessageLite | Misskey.entities.ChatMessage): NormalizedChatMessage {
-	return normalizeChatMessage(message, $i!, user.value);
 }
 
 function bindChatChannelEvents() {
@@ -1211,14 +1107,13 @@ async function initialize() {
 	}
 }
 
-let isActivated = true;
-
 /** Manual load-more / resume background async pipeline (not scroll-chained). */
 async function fetchMore() {
 	if (moreFetching.value || !canFetchMore.value) return;
 	if (messages.value.length === 0) return;
 
 	// Prefer resuming background prefetcher
+	const historyPrefetcher = getHistoryPrefetcher();
 	if (historyPrefetcher && !historyPrefetcher.isRunning && !historyPrefetcher.isExhausted) {
 		const oldestId = messages.value[messages.value.length - 1]?.id ?? null;
 		historyPrefetching.value = true;
