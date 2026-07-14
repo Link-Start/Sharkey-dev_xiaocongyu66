@@ -9,6 +9,8 @@ import { Endpoint } from '@/server/api/endpoint-base.js';
 import { DI } from '@/di-symbols.js';
 import { CacheService } from '@/core/CacheService.js';
 import { QueryService } from '@/core/QueryService.js';
+import { NoteVisibilityService } from '@/core/NoteVisibilityService.js';
+import { ApiError } from '../../error.js';
 
 export const meta = {
 	tags: ['notes'],
@@ -36,6 +38,14 @@ export const meta = {
 				type: 'boolean',
 				optional: false, nullable: false,
 			},
+		},
+	},
+
+	errors: {
+		noSuchNote: {
+			message: 'No such note.',
+			code: 'NO_SUCH_NOTE',
+			id: 'a1b2c3d4-state-4e5f-8901-abcdef123456',
 		},
 	},
 
@@ -68,9 +78,18 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 		private readonly cacheService: CacheService,
 		private readonly queryService: QueryService,
+		private readonly noteVisibilityService: NoteVisibilityService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
-			const note = await this.notesRepository.findOneByOrFail({ id: ps.noteId });
+			// SK-2026-076: no existence oracle for inaccessible notes
+			const note = await this.notesRepository.findOneBy({ id: ps.noteId });
+			if (note == null) {
+				throw new ApiError(meta.errors.noSuchNote);
+			}
+			const { accessible } = await this.noteVisibilityService.checkNoteVisibilityAsync(note, me);
+			if (!accessible) {
+				throw new ApiError(meta.errors.noSuchNote);
+			}
 
 			const [favorite, threadMuting, noteMuting, renoted] = await Promise.all([
 				// favorite

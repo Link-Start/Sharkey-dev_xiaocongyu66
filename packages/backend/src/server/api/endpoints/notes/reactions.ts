@@ -11,6 +11,9 @@ import { Endpoint } from '@/server/api/endpoint-base.js';
 import { NoteReactionEntityService } from '@/core/entities/NoteReactionEntityService.js';
 import { DI } from '@/di-symbols.js';
 import { QueryService } from '@/core/QueryService.js';
+import { GetterService } from '@/server/api/GetterService.js';
+import { NoteVisibilityService } from '@/core/NoteVisibilityService.js';
+import { ApiError } from '../../error.js';
 
 export const meta = {
 	tags: ['notes', 'reactions'],
@@ -65,8 +68,20 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 		private noteReactionEntityService: NoteReactionEntityService,
 		private queryService: QueryService,
+		private getterService: GetterService,
+		private readonly noteVisibilityService: NoteVisibilityService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
+			// SK-2026-075: seed note must be accessible
+			const seed = await this.getterService.getNote(ps.noteId).catch(err => {
+				if (err.id === '9725d0ce-ba28-4dde-95a7-2cbb2c15de24') throw new ApiError(meta.errors.noSuchNote);
+				throw err;
+			});
+			const { accessible } = await this.noteVisibilityService.checkNoteVisibilityAsync(seed, me);
+			if (!accessible) {
+				throw new ApiError(meta.errors.noSuchNote);
+			}
+
 			const query = this.queryService.makePaginationQuery(this.noteReactionsRepository.createQueryBuilder('reaction'), ps.sinceId, ps.untilId)
 				.andWhere('reaction.noteId = :noteId', { noteId: ps.noteId })
 				.leftJoinAndSelect('reaction.user', 'user')

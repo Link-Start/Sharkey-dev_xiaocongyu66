@@ -26,13 +26,15 @@ Sharkey inherits a mature Misskey security baseline (private-IP SSRF guards, SVG
 |-------|--------|
 | **Code: pre-AI P0/P1 (SK-001…060 class)** | **Mostly done** in this tree |
 | **Code: Pass 7 AI / Mastodon SSRF (SK-061…067)** | **Remediated in tree (2026-07-14, `5bfc08a`)** |
-| **Code: Pass 8 session / chat / webhook (SK-068…072)** | **Remediated in tree (2026-07-14)** |
+| **Code: Pass 8 session / chat / webhook (SK-068…072)** | **Remediated in tree (2026-07-14, `2768c40`)** |
+| **Code: Pass 9 note visibility / social graph (SK-073…077)** | **Remediated in tree (2026-07-14)** |
+| **Code: Pass 10 poll / note-oracle (SK-078…080)** | **OPEN** |
 | **Design / privacy / product honesty** | Residual open (escrow ≠ E2EE; AI LLM privacy) |
 | **Ops / deploy configuration** | Operator checklist still required |
 | **Dynamic pentest / full regression** | **Not completed** (audit was static) |
 
 **One-line conclusion (security):**  
-**“Pass 7 High SSRF closed (`5bfc08a`). Pass 8 (SK-068…072) remediated: password change/reset revokes sessions; chat room show membership-gated; webhook test/admin URL validation aligned; join-by-code rate-limited.”**
+**“Pass 7–8 closed in code. Pass 9 visibility/social-graph gaps remain (073–077). Pass 10: `notes/polls/vote` and `polls/refresh` lack note visibility (SK-078, M–H); unauthenticated `notes/clips` / `notes/renotes` seed existence oracles (SK-079); admin WS is kind-gated only (SK-080, L).”**
 
 **One-line conclusion (optimization / engineering — see §8):**  
 **“Performance and chat architecture investments are sound; Pass 7–8 code remediations landed — composite ~8.2/10 pending deploy verification.”**
@@ -50,14 +52,14 @@ Sharkey inherits a mature Misskey security baseline (private-IP SSRF guards, SVG
 
 **Must verify on deploy:** the above commits (or equivalent) are present in production builds.
 
-### 0.3 Finding counts (through Pass 8)
+### 0.3 Finding counts (through Pass 10)
 
 | Severity | Count (approx.) | Themes |
 |----------|-----------------|--------|
 | **Critical / High** | 5–7 historical (mostly fixed); **0 new open High in Pass 8** | Prior: chat WS, SSRF, OAuth, AI/Mastodon (remediated) |
 | **Medium** | 25+ | Prior residuals + **session non-revocation, webhook URL gaps, chat room metadata** |
 | **Low / Info** | 25+ | Token length, join-by-code rate limit, privacy, misconfig |
-| **Total IDs** | **SK-2026-001 … 072** | Living document (pass 8: session / chat meta / webhook) |
+| **Total IDs** | **SK-2026-001 … 080** | Living document (pass 10: poll vote ACL / note oracles) |
 
 ### 0.4 Remediation status matrix (code vs residual)
 
@@ -146,6 +148,26 @@ Sharkey inherits a mature Misskey security baseline (private-IP SSRF guards, SVG
 | **071** | System webhook create/update no URL hardening | **M** | **Fixed** — same https + no-userinfo as user webhooks |
 | **072** | Join-by-code rate residual | **L** | **Mitigated** — 5/min endpoint limit |
 
+
+#### Pass 9 — remediated in tree (2026-07-14)
+
+| ID | Topic | Severity |
+|----|--------|----------|
+| **073** | notes/conversation without seed/parent ACL | **M** | **Fixed** — visibility on seed + parents |
+| **074** | `users/get-frequently-replied-users` unauthenticated; counts private/followers replies | **M** |
+| **075** | `notes/reactions` list has no seed visibility gate (existence / reaction meta oracle) | **L–M** |
+| **076** | `notes/state` no visibility; confirms private note existence + personal flags | **L** |
+| **077** | `notes/thread-muting/create` no visibility check on seed note | **L** |
+
+
+#### Pass 10 — OPEN (2026-07-14)
+
+| ID | Topic | Severity |
+|----|--------|----------|
+| **078** | `notes/polls/vote` (+ `polls/refresh`) no note visibility — vote/act on private polls | **M–H** |
+| **079** | `notes/clips` / `notes/renotes` seed via `getNote` without ACL (existence oracle; unauth) | **L–M** |
+| **080** | WS `admin` channel: `kind: read:admin:stream` only, no `isModerator` role check | **L** |
+
 #### Ops-only (not closed by code alone)
 
 - [ ] Public nodes: `NODE_ENV=production`
@@ -156,6 +178,8 @@ Sharkey inherits a mature Misskey security baseline (private-IP SSRF guards, SVG
 - [ ] Deploy includes `5bfc08a` (Pass 7) or equivalent
 - [x] **Pass 8:** password change/reset auto-revokes tokens (verify on deploy)
 - [ ] **Pass 7 residual:** do not enable `aiAbuseControlConfig.autoSuspend` without human review (SK-063)
+- [ ] **Pass 9:** treat private-note ID as sensitive until SK-073/075 closed
+- [ ] **Pass 10:** do not share private poll note ids; fix vote ACL before public prod
 
 ---
 
@@ -1826,6 +1850,270 @@ Lower max (e.g. 5/min), track failures per user+IP, optional captcha after N fai
 
 ---
 
+
+## 1i. Pass 9 (2026-07-14) — note visibility & social-graph leakage
+
+**Focus:** endpoints that use `GetterService.getNote` (no ACL) vs `notes/show` (SQL `generateVisibilityQueryFor`); unauthenticated social analytics.
+
+**Verified fixed (not reopened):** Pass 7 AI/Mastodon SSRF; Pass 8 session revoke (`SessionRevocationService`), chat rooms/show membership, webhook URL validation.
+
+---
+
+### SK-2026-073 — `notes/conversation` loads reply chain without seed visibility
+
+| | |
+|--|--|
+| **Severity** | **M** |
+| **CWE** | CWE-639 / CWE-862 |
+| **Status** | **Fixed in tree** (seed + parent visibility; no inaccessible shells)|
+| **Components** | `endpoints/notes/conversation.ts`; `GetterService.getNote`; `NoteEntityService.packMany` / `redactNoteContents` |
+
+**Description**  
+`notes/show` enforces visibility in SQL. `notes/conversation` does:
+
+```ts
+const note = await this.getterService.getNote(ps.noteId); // no visibility
+// walk note.replyId parents via findOneBy — no visibility
+return await this.noteEntityService.packMany(conversation, me);
+```
+
+`getNote` only checks existence. Parent walk loads **any** ancestor by id. `packMany` eventually **redacts** inaccessible content (`text: null`, `isHidden: true`) but still returns note **ids**, authors, timestamps, visibility enum, and structure of the chain.
+
+**Impact**
+
+- Confirm private/followers/DM notes exist (if id known or guessed).  
+- Map reply-thread topology and participant user ids even when bodies are redacted.  
+- Weaker than full text leak; stronger than pure 404.
+
+**Related endpoints** (same `getNote` without pre-check; some gate later):  
+`notes/renotes`, `notes/clips` (existence oracle), `notes/translate` (has visibility after get — OK for body), favorites create (SK-047 gated).
+
+**Remediation**  
+1. On seed note: `checkNoteVisibilityAsync` / same SQL as `notes/show`; 404 if inaccessible.  
+2. On each parent: visibility filter or drop from response (do not return redacted shells for unauthorized).  
+3. Prefer not packing inaccessible notes at all.
+
+---
+
+### SK-2026-074 — Unauthenticated frequent-reply graph from private notes
+
+| | |
+|--|--|
+| **Severity** | **M** |
+| **CWE** | CWE-359 / CWE-200 |
+| **Status** | **Fixed in tree** (count public/home notes and targets only)|
+| **Components** | `endpoints/users/get-frequently-replied-users.ts` |
+
+**Description**  
+Unauthenticated endpoint:
+
+```ts
+const recentNotes = await this.notesRepository.find({
+  where: { userId: user.id, replyId: Not(IsNull()) },
+  take: 1000,
+  select: ['replyId'],
+});
+// load reply targets — no visibility filter on either side
+```
+
+Includes **followers-only and specified** notes of the subject user. Aggregates `replyId → userId` frequency and returns top peers with `UserDetailed` by default.
+
+**Impact**
+
+- Infer who a user DMs / privately replies to most (social graph).  
+- Works for any local user id without login.  
+- Does not return note text, but relationship strength is privacy-sensitive.
+
+**Remediation**  
+Count only `visibility IN ('public','home')` notes (and optionally only public reply targets). Require credential or respect profile privacy settings. Cap and rate-limit further.
+
+---
+
+### SK-2026-075 — `notes/reactions` list without seed-note ACL
+
+| | |
+|--|--|
+| **Severity** | **L–M** |
+| **CWE** | CWE-639 |
+| **Status** | **Fixed in tree** (seed note visibility before list)|
+| **Components** | `endpoints/notes/reactions.ts` vs `ReactionService.create` (which **does** check visibility) |
+
+**Description**  
+List path filters by `reaction.noteId` only — **no** join/filter ensuring the caller may see the note. Empty vs non-empty distinguishes “no reactions” from “note has reactions,” and returns reactor users for private notes if reactions exist (e.g. author self-react edge cases or historical data).
+
+Write path `reactions/create` correctly uses `checkNoteVisibilityAsync` (good asymmetry).
+
+**Remediation**  
+Require accessible seed note (same as favorites/create) before listing; 404 otherwise.
+
+---
+
+### SK-2026-076 — `notes/state` existence oracle without visibility
+
+| | |
+|--|--|
+| **Severity** | **L** |
+| **CWE** | CWE-203 |
+| **Status** | **Fixed in tree** (inaccessible → NO_SUCH_NOTE)|
+| **Components** | `endpoints/notes/state.ts` |
+
+**Description**  
+```ts
+const note = await this.notesRepository.findOneByOrFail({ id: ps.noteId });
+// returns isFavorited / isMutedThread / isRenoted for me
+```
+
+Any authenticated user learns that a note id **exists** (else 500/fail on `findOneByOrFail`) and their personal flags, even for notes they cannot read.
+
+**Remediation**  
+Visibility check first; map inaccessible → same as missing (`NO_SUCH_NOTE`).
+
+---
+
+### SK-2026-077 — Thread mute without note visibility
+
+| | |
+|--|--|
+| **Severity** | **L** |
+| **CWE** | CWE-862 |
+| **Status** | **Fixed in tree** (visibility before mute)|
+| **Components** | `endpoints/notes/thread-muting/create.ts` |
+
+**Description**  
+Loads note via `getNote` and inserts mute on `threadId` without accessibility check. Allows muting threads the user cannot read (side channel + storage spam). Low direct confidentiality impact.
+
+**Remediation**  
+Require accessible seed note before insert.
+
+---
+
+### Pass 9 — notes (checked OK / lower priority)
+
+| Check | Result |
+|-------|--------|
+| Pass 8 session revoke | **Present** (`SessionRevocationService`, change/reset/admin paths) |
+| Pass 8 chat rooms/show | **Membership gated** |
+| Pass 8 webhook URL | **Validated** |
+| `notes/show` / children / replies | Visibility SQL present |
+| `users/following` birthday SQL | Pattern-validated `YYYY-MM-DD` — not injectable |
+| Reaction **create** | Visibility enforced in `ReactionService` |
+| Favorite **create** | SK-047 visibility gate |
+
+**Highest ROI after Pass 9**
+
+1. **SK-073** conversation + pack policy for inaccessible notes  
+2. **SK-074** frequent-reply social graph  
+3. **SK-075** reactions list oracle  
+4. Residual: SK-017 token length, SK-059 `?i=`, SK-010 escrow honesty  
+
+---
+
+
+## 1j. Pass 10 (2026-07-14) — poll write ACL & note existence oracles
+
+**Focus:** write paths that use `GetterService.getNote` without `checkNoteVisibilityAsync`, and unauthenticated list endpoints that only need a note id.
+
+**Still open from Pass 9:** SK-073…077 (conversation, frequent-reply graph, reactions list, state, thread-mute).
+
+---
+
+### SK-2026-078 — Poll vote / refresh without note visibility
+
+| | |
+|--|--|
+| **Severity** | **M–H** |
+| **CWE** | CWE-862 Missing Authorization |
+| **Status** | **OPEN** |
+| **Components** | `endpoints/notes/polls/vote.ts`; `endpoints/notes/polls/refresh.ts`; contrast `ReactionService.create` / `favorites/create` |
+
+**Description**  
+`notes/polls/vote` (authenticated, `write:votes`):
+
+```ts
+const note = await this.getterService.getNote(ps.noteId); // existence only
+// block check only
+// no checkNoteVisibilityAsync
+// insert poll_vote + increment votes + publishNoteStream pollVoted
+```
+
+`NoteCreateService` and reaction create **do** call `checkNoteVisibilityAsync` for reply/renote/react. Poll vote does **not**.
+
+Impact for `visibility: followers` or `specified` notes that attach a poll:
+
+- Any logged-in user who learns the note id can **cast votes**, mutate vote counts, and emit `pollVoted` stream events.  
+- Confirms poll existence (`noPoll` vs success path).  
+- May receive remote AP Vote delivery side effects for remote notes.
+
+`notes/polls/refresh` similarly loads via `getNote`, only checks block, then `apQuestionService.updateQuestion` and **`pack(note, me, { detail: true })`** — amplifies existence + triggers remote fetch.
+
+**Remediation**  
+Before vote/refresh: `checkNoteVisibilityAsync`; if `!accessible` throw `NO_SUCH_NOTE` (same as favorites). Optionally require `hasPoll` only after ACL.
+
+---
+
+### SK-2026-079 — Unauthenticated `notes/clips` / `notes/renotes` seed existence oracle
+
+| | |
+|--|--|
+| **Severity** | **L–M** |
+| **CWE** | CWE-203 / CWE-639 |
+| **Status** | **OPEN** (related family to SK-075) |
+| **Components** | `endpoints/notes/clips.ts` (`requireCredential: false`); `endpoints/notes/renotes.ts` (`requireCredential: false`) |
+
+**Description**  
+Both call `getterService.getNote(noteId)` without visibility.  
+- Missing note → `NO_SUCH_NOTE`.  
+- Existing private note → continues (clips returns public clips containing it; renotes lists renotes with visibility SQL on **renote rows**, not seed).
+
+Thus an anonymous client can distinguish **existing vs non-existing** private note ids (and whether any public clip references them).
+
+**Remediation**  
+Seed ACL same as `notes/show` before further work; 404 if inaccessible.
+
+---
+
+### SK-2026-080 — WebSocket `admin` channel lacks moderator role check
+
+| | |
+|--|--|
+| **Severity** | **L** |
+| **CWE** | CWE-862 |
+| **Status** | **OPEN** (defense-in-depth) |
+| **Components** | `stream/channels/admin.ts`; `stream/Connection.ts` (kind check only) |
+
+**Description**  
+```ts
+public static kind = 'read:admin:stream';
+// init: only requires this.user; subscribes adminStream:${this.user.id}
+```
+
+Connection enforces token `permission` includes kind when using app token; native user tokens bypass kind. Events are published to `adminStream:${adminUserId}` only for real staff in normal code paths, so non-mods typically receive nothing. Residual risk: (1) free permission strings on apps (SK-056) + mistaken publish; (2) future admin events incorrectly targeted.
+
+**Remediation**  
+`init()`: `roleService.isModerator(this.user)` or fail. Align with `queueStats` moderator gate (SK-058).
+
+---
+
+### Pass 10 — checked OK
+
+| Check | Result |
+|-------|--------|
+| Antenna / user-list WS ownership | Enforced |
+| Chat-user WS | Own stream only; msg ACL in service |
+| Drive find-by-hash / check-existence | Scoped to `me.id` |
+| Note create reply/renote | `NoteCreateService` visibility checks |
+| Gallery create fileIds | Owner-scoped |
+| Export notes | `secure` + credential |
+
+**Highest ROI after Pass 10**
+
+1. **SK-078** poll vote/refresh ACL (**fix first**)  
+2. **SK-073/074** conversation + frequent-reply graph  
+3. **SK-075/079** list/oracle endpoints  
+4. **SK-076/077/080** low hygiene  
+
+---
+
 ## 2. Attack surface map (abbreviated)
 
 ```
@@ -1894,9 +2182,14 @@ Internet
 | **P1-AI** | **SK-066** third-party LLM privacy UX | **PARTIAL** |
 | **P1-FP** | **SK-063** fingerprint soft signal / seed-only suspend | **PARTIAL** |
 | **P1-CR** | **SK-067** escrow reveal independent of preference | **Fixed** |
-| **P1-S8** | **SK-068** revoke tokens on password change/reset | **OPEN** |
-| **P1-S8** | **SK-070/071** webhook test + system-webhook URL validation | **OPEN** |
-| **P1-S8** | **SK-069** chat rooms/show membership | **OPEN** |
+| **P1-S8** | **SK-068** revoke tokens on password change/reset | **Fixed** |
+| **P1-S8** | **SK-070/071** webhook test + system-webhook URL validation | **Fixed** |
+| **P1-S8** | **SK-069** chat rooms/show membership | **Fixed** |
+| **P1-S9** | **SK-073** notes/conversation seed+parent visibility | **OPEN** |
+| **P1-S9** | **SK-074** frequent-reply private graph | **OPEN** |
+| **P1-S9** | **SK-075** notes/reactions list seed ACL | **OPEN** |
+| **P1-S10** | **SK-078** poll vote/refresh visibility | **OPEN** |
+| **P1-S10** | **SK-079** notes/clips+renotes seed ACL | **OPEN** |
 
 ### P2 — medium term (residual backlog)
 
@@ -1935,9 +2228,9 @@ Internet
 | 23 | Translator privacy documentation | **OPEN** (SK-038 / overlaps SK-066) |
 | 24 | Join-by-code tighter rate limit | **OPEN** (SK-072) |
 
-### P0/P1 code remediation: **Pass 7 complete; Pass 8 open**
+### P0/P1 code remediation: **Pass 7–8 complete; Pass 9–10 open**
 
-Pre-AI + Pass 7 High SSRF are **DONE** in tree (`5bfc08a`). Next code priority: **SK-068** (session kill on password events) and **SK-070/071** (webhook URL parity).
+Pre-AI + Pass 7–8 are **DONE**. Next code priority: **SK-078** (poll vote ACL), then **SK-073/074/075/079**.
 
 ---
 
@@ -2015,6 +2308,8 @@ Pre-AI + Pass 7 High SSRF are **DONE** in tree (`5bfc08a`). Next code priority: 
 | 1.4 | 2026-07-14 | **Pass 7:** SK-061…067 AI native-fetch SSRF, Mastodon Host loopback, fingerprint auto-suspend, chat translate policy, uncensored exfil, escrow reveal preference; exec summary + P0 reopened |
 | 1.5 | 2026-07-14 | **Pass 7 remediation:** SK-061…067 code fixes/mitigations (HttpRequestService AI outbound, user baseUrl strip, Mastodon config.url, canUseTranslator, escrow reveal keys, seed-only auto-suspend, safer AI defaults) |
 | 1.6 | 2026-07-14 | **Pass 8:** verified Pass 7 live; SK-068 session non-revocation on password change/reset; SK-069 chat rooms/show metadata IDOR; SK-070 webhook test override URL; SK-071 system-webhook URL gap; SK-072 join-by-code rate residual |
+| 1.7 | 2026-07-14 | **Pass 8 remediation noted** (`2768c40`); **Pass 9:** SK-073 notes/conversation visibility; SK-074 frequent-reply graph; SK-075 reactions list oracle; SK-076 notes/state oracle; SK-077 thread-mute without ACL |
+| 1.8 | 2026-07-14 | **Pass 10:** SK-078 poll vote/refresh without visibility; SK-079 clips/renotes seed oracle; SK-080 admin WS kind-only |
 
 ---
 
@@ -2034,6 +2329,7 @@ Pre-AI + Pass 7 High SSRF are **DONE** in tree (`5bfc08a`). Next code priority: 
 | Mastodon Host loopback | `server/api/mastodon/MastodonClientService.ts`, `server/api/mastodon/endpoints/search.ts`, `server/ServerService.ts` |
 | Session / password | `endpoints/i/change-password.ts`, `endpoints/reset-password.ts`, `endpoints/admin/reset-password.ts`, `endpoints/i/regenerate-token.ts` |
 | Chat room meta | `endpoints/chat/rooms/show.ts`, `core/entities/ChatEntityService.ts` (`packRoom`) |
+| Note visibility gaps | `endpoints/notes/conversation.ts`, `endpoints/notes/reactions.ts`, `endpoints/notes/state.ts`, `endpoints/users/get-frequently-replied-users.ts`, `GetterService.getNote` |
 | Webhook test / system | `core/WebhookTestService.ts`, `endpoints/i/webhooks/test.ts`, `endpoints/admin/system-webhook/*` |
 | Media proxy | `server/FileServerService.ts` |
 | MFM | `frontend/src/components/global/MkMfm.ts` |
@@ -2274,4 +2570,4 @@ Performance and security **directions are correct**. Completeness is gated by un
 
 ---
 
-*End of AMD document (includes §8 optimization evaluation + Pass 7 SK-061…067 + Pass 8 SK-068…072). Continue appending findings as `SK-2026-0xx`; update §8 scores when major streams land.*
+*End of AMD document (includes §8 optimization evaluation + Pass 7 SK-061…067 + Pass 8 SK-068…072 + Pass 9 SK-073…077 + Pass 10 SK-078…080). Continue appending findings as `SK-2026-0xx`; update §8 scores when major streams land.*

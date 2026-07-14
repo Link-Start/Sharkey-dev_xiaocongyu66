@@ -12,6 +12,7 @@ import { GetterService } from '@/server/api/GetterService.js';
 import { DI } from '@/di-symbols.js';
 import { CacheService } from '@/core/CacheService.js';
 import { ApiError } from '../../../error.js';
+import { NoteVisibilityService } from '@/core/NoteVisibilityService.js';
 
 export const meta = {
 	tags: ['notes'],
@@ -57,12 +58,19 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private getterService: GetterService,
 		private idService: IdService,
 		private readonly cacheService: CacheService,
+		private readonly noteVisibilityService: NoteVisibilityService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
 			const note = await this.getterService.getNote(ps.noteId).catch(err => {
 				if (err.id === '9725d0ce-ba28-4dde-95a7-2cbb2c15de24') throw new ApiError(meta.errors.noSuchNote);
 				throw err;
 			});
+
+			// SK-2026-077: only mute threads the user can see
+			const { accessible } = await this.noteVisibilityService.checkNoteVisibilityAsync(note, me);
+			if (!accessible) {
+				throw new ApiError(meta.errors.noSuchNote);
+			}
 
 			/*
 			const mutedNotes = await this.notesRepository.find({

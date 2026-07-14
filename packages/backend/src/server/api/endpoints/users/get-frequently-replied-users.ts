@@ -85,11 +85,12 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw err;
 			});
 
-			// Fetch recent notes
+			// SK-2026-074: only public/home replies — exclude followers/specified/private graph
 			const recentNotes = await this.notesRepository.find({
 				where: {
 					userId: user.id,
 					replyId: Not(IsNull()),
+					visibility: In(['public', 'home']) as any,
 				},
 				order: {
 					id: -1,
@@ -107,6 +108,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			const replyTargetNotes = await this.notesRepository.find({
 				where: {
 					id: In(recentNotes.map(p => p.replyId)),
+					visibility: In(['public', 'home']) as any,
 				},
 				select: ['userId'],
 			});

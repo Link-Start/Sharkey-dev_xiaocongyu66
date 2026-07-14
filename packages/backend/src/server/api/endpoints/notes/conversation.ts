@@ -10,6 +10,7 @@ import { Endpoint } from '@/server/api/endpoint-base.js';
 import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
 import { DI } from '@/di-symbols.js';
 import { GetterService } from '@/server/api/GetterService.js';
+import { NoteVisibilityService } from '@/core/NoteVisibilityService.js';
 import { ApiError } from '../../error.js';
 
 export const meta = {
@@ -60,6 +61,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 		private noteEntityService: NoteEntityService,
 		private getterService: GetterService,
+		private readonly noteVisibilityService: NoteVisibilityService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
 			const note = await this.getterService.getNote(ps.noteId).catch(err => {
@@ -67,13 +69,23 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw err;
 			});
 
+			// SK-2026-073: seed note must be visible
+			const { accessible: seedOk } = await this.noteVisibilityService.checkNoteVisibilityAsync(note, me);
+			if (!seedOk) {
+				throw new ApiError(meta.errors.noSuchNote);
+			}
+
 			const conversation: MiNote[] = [];
 			let i = 0;
 
-			const get = async (id: any) => {
+			const get = async (id: string) => {
 				i++;
 				const p = await this.notesRepository.findOneBy({ id });
 				if (p == null) return;
+
+				// SK-2026-073: skip inaccessible parents (no redacted shells)
+				const { accessible } = await this.noteVisibilityService.checkNoteVisibilityAsync(p, me);
+				if (!accessible) return;
 
 				if (i > ps.offset!) {
 					conversation.push(p);
