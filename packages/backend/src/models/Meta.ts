@@ -47,6 +47,57 @@ export const defaultXAlgorithmConfig: XAlgorithmConfig = {
 	fallbackToSharkeyTimeline: true,
 };
 
+/**
+ * AI note moderation via OpenAI-compatible HTTP APIs
+ * (chat/completions, responses, and generic /v1/* style bases).
+ */
+export type AiNoteModerationConfig = {
+	/** Moderate local users' notes */
+	enableLocalNotes: boolean;
+	/** Moderate remote (federated) notes on ingest */
+	enableRemoteNotes: boolean;
+	/**
+	 * OpenAI-compatible base URL ending with /v1 (or without; /v1 is appended).
+	 * Examples: https://api.openai.com/v1 , https://api.x.ai/v1 , self-hosted gateway
+	 */
+	baseUrl: string | null;
+	apiKey: string | null;
+	/** Model id as required by the provider */
+	model: string;
+	/**
+	 * chat.completions → POST {base}/chat/completions
+	 * responses → POST {base}/responses
+	 * auto → try chat.completions then responses
+	 */
+	apiStyle: 'chat.completions' | 'responses' | 'auto';
+	requestTimeoutMs: number;
+	/** Extra system instructions (optional) */
+	systemPrompt: string | null;
+	/**
+	 * When AI flags content:
+	 * reject = block create (local); remote may soft-hide instead if failOpen-like
+	 * cw = force content warning
+	 * hide = mark note isHidden
+	 * home = downgrade public → home
+	 */
+	action: 'reject' | 'cw' | 'hide' | 'home';
+	/** If AI call fails, allow the note (true) or block (false) */
+	failOpen: boolean;
+};
+
+export const defaultAiNoteModerationConfig: AiNoteModerationConfig = {
+	enableLocalNotes: false,
+	enableRemoteNotes: false,
+	baseUrl: null,
+	apiKey: null,
+	model: 'gpt-4o-mini',
+	apiStyle: 'auto',
+	requestTimeoutMs: 8000,
+	systemPrompt: null,
+	action: 'reject',
+	failOpen: true,
+};
+
 @Entity('meta')
 export class MiMeta {
 	@PrimaryColumn({
@@ -839,6 +890,11 @@ export class MiMeta {
 		default: defaultXAlgorithmConfig,
 	})
 	public xAlgorithmConfig: XAlgorithmConfig;
+
+	@Column('jsonb', {
+		default: defaultAiNoteModerationConfig,
+	})
+	public aiNoteModerationConfig: AiNoteModerationConfig;
 
 	/**
 	 * Chat escrow (DM + rooms only; never notes/posts).

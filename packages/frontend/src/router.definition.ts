@@ -520,6 +520,10 @@ export const ROUTE_DEF = [{
 		name: 'algorithm',
 		component: page(() => import('@/pages/admin/algorithm.vue')),
 	}, {
+		path: '/ai-note-moderation',
+		name: 'ai-note-moderation',
+		component: page(() => import('@/pages/admin/ai-note-moderation.vue')),
+	}, {
 		path: '/chat-escrow',
 		name: 'chat-escrow',
 		component: page(() => import('@/pages/admin/chat-escrow.vue')),

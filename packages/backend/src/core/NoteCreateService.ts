@@ -59,6 +59,7 @@ import { TimeService } from '@/global/TimeService.js';
 import { MfmService } from '@/core/MfmService.js';
 import { NoteVisibilityService } from '@/core/NoteVisibilityService.js';
 import { CollapsedQueueService } from '@/core/CollapsedQueueService.js';
+import { AiNoteModerationService } from '@/core/AiNoteModerationService.js';
 
 type NotificationType = 'reply' | 'renote' | 'quote' | 'mention';
 
@@ -151,6 +152,8 @@ type Option = {
 	clientIp?: string | null;
 	/** Admin audit: browser fingerprint when the note was created (local only). */
 	clientFingerprint?: string | null;
+	/** Soft-hide from non-moderator timelines (AI moderation / staff). */
+	isHidden?: boolean | null;
 };
 
 export type PureRenoteOption = Option & { renote: MiNote } & ({ text?: null } | { cw?: null } | { reply?: null } | { poll?: null } | { files?: null | [] });
@@ -231,6 +234,7 @@ export class NoteCreateService implements OnApplicationShutdown {
 		private readonly noteVisibilityService: NoteVisibilityService,
 		private readonly collapsedQueueService: CollapsedQueueService,
 		private readonly mfmService: MfmService,
+		private readonly aiNoteModerationService: AiNoteModerationService,
 	) {
 	}
 
@@ -282,6 +286,25 @@ export class NoteCreateService implements OnApplicationShutdown {
 
 		if (hasProhibitedWords) {
 			throw new IdentifiableError('689ee33f-f97c-479a-ac49-1b9f8140af99', 'Note contains prohibited words');
+		}
+
+		// AI note moderation (local / remote switches; OpenAI-compatible v1 APIs)
+		const isRemoteNote = user.host != null;
+		const aiResult = await this.aiNoteModerationService.moderate({
+			text: data.text,
+			cw: data.cw,
+			pollChoices: data.poll?.choices ?? null,
+			isRemote: isRemoteNote,
+			userId: user.id,
+		});
+		const aiApply = this.aiNoteModerationService.applyAction(data, aiResult, isRemoteNote);
+		if (aiApply === 'reject') {
+			throw new IdentifiableError(
+				'c3d4e5f6-a7b8-9012-cdef-123456789012',
+				aiResult.reason
+					? `Note rejected by AI moderation: ${aiResult.reason}`
+					: 'Note rejected by AI moderation',
+			);
 		}
 
 		const inSilencedInstance = this.utilityService.isSilencedHost(this.meta.silencedHosts, user.host);
@@ -520,6 +543,7 @@ export class NoteCreateService implements OnApplicationShutdown {
 			// Local notes only: store client IP / fingerprint for admin moderation
 			clientIp: user.host == null ? (data.clientIp ?? null) : null,
 			clientFingerprint: user.host == null ? (data.clientFingerprint ?? null) : null,
+			isHidden: data.isHidden === true,
 		});
 
 		if (data.uri != null) insert.uri = data.uri;

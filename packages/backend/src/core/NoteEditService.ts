@@ -52,6 +52,7 @@ import { NoteCreateService } from '@/core/NoteCreateService.js';
 import { TimeService } from '@/global/TimeService.js';
 import { NoteVisibilityService } from '@/core/NoteVisibilityService.js';
 import { CollapsedQueueService } from '@/core/CollapsedQueueService.js';
+import { AiNoteModerationService } from '@/core/AiNoteModerationService.js';
 
 type NotificationType = 'reply' | 'renote' | 'quote' | 'mention' | 'edited';
 
@@ -227,6 +228,7 @@ export class NoteEditService implements OnApplicationShutdown {
 		private readonly timeService: TimeService,
 		private readonly noteVisibilityService: NoteVisibilityService,
 		private readonly collapsedQueueService: CollapsedQueueService,
+		private readonly aiNoteModerationService: AiNoteModerationService,
 	) {
 	}
 
@@ -300,6 +302,25 @@ export class NoteEditService implements OnApplicationShutdown {
 
 		if (hasProhibitedWords) {
 			throw new IdentifiableError('689ee33f-f97c-479a-ac49-1b9f8140af99', 'Note contains prohibited words');
+		}
+
+		// AI note moderation on edit (same switches as create)
+		const isRemoteNote = user.host != null;
+		const aiResult = await this.aiNoteModerationService.moderate({
+			text: data.text,
+			cw: data.cw,
+			pollChoices: data.poll?.choices ?? null,
+			isRemote: isRemoteNote,
+			userId: user.id,
+		});
+		const aiApply = this.aiNoteModerationService.applyAction(data as any, aiResult, isRemoteNote);
+		if (aiApply === 'reject') {
+			throw new IdentifiableError(
+				'c3d4e5f6-a7b8-9012-cdef-123456789012',
+				aiResult.reason
+					? `Note rejected by AI moderation: ${aiResult.reason}`
+					: 'Note rejected by AI moderation',
+			);
 		}
 
 		const inSilencedInstance = this.utilityService.isSilencedHost(this.meta.silencedHosts, user.host);
@@ -545,6 +566,8 @@ export class NoteEditService implements OnApplicationShutdown {
 				userHost: user.host,
 				reactionAndUserPairCache: oldNote.reactionAndUserPairCache,
 				mandatoryCW: data.mandatoryCW,
+				// AI moderation may soft-hide on edit
+				isHidden: (data as any).isHidden === true ? true : oldNote.isHidden,
 			});
 
 			if (data.uri != null) note.uri = data.uri;

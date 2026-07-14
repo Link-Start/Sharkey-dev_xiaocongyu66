@@ -269,6 +269,16 @@ const menuDef = computed<SuperMenuDef[]>(() => [{
 		to: '/admin/algorithm',
 		active: currentPage.value?.route.name === 'algorithm',
 	}, {
+		icon: 'ti ti-robot',
+		text: (() => {
+			const lang = (typeof navigator !== 'undefined' ? navigator.language : 'en').toLowerCase();
+			if (lang.startsWith('zh')) return '帖子 AI 审核';
+			if (lang.startsWith('ja')) return 'ノートAI審査';
+			return 'AI note moderation';
+		})(),
+		to: '/admin/ai-note-moderation',
+		active: currentPage.value?.route.name === 'ai-note-moderation',
+	}, {
 		icon: 'ti ti-message-2-lock',
 		text: '聊天托管加密',
 		to: '/admin/chat-escrow',

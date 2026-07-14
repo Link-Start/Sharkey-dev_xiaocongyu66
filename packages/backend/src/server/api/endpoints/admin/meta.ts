@@ -648,6 +648,10 @@ export const meta = {
 				type: 'object',
 				optional: false, nullable: false,
 			},
+			aiNoteModerationConfig: {
+				type: 'object',
+				optional: false, nullable: false,
+			},
 		},
 	},
 } as const;
@@ -819,6 +823,10 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				enableProxyAccount: instance.enableProxyAccount,
 				deliverSuspendedSoftware: instance.deliverSuspendedSoftware,
 				xAlgorithmConfig: instance.xAlgorithmConfig,
+				aiNoteModerationConfig: instance.aiNoteModerationConfig == null ? undefined : {
+					...instance.aiNoteModerationConfig,
+					apiKey: instance.aiNoteModerationConfig.apiKey == null ? null : '<redacted>',
+				},
 			};
 		});
 	}

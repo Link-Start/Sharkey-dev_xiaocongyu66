@@ -4,7 +4,7 @@
  */
 
 import { Inject, Injectable, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
-import { defaultXAlgorithmConfig, type MiMeta } from '@/models/Meta.js';
+import { defaultXAlgorithmConfig, defaultAiNoteModerationConfig, type MiMeta } from '@/models/Meta.js';
 import { ModerationLogService } from '@/core/ModerationLogService.js';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import { MetaService } from '@/core/MetaService.js';
@@ -250,6 +250,22 @@ export const paramDef = {
 				enableAdsBlending: { type: 'boolean' },
 				modelArtifactsPath: { type: 'string', nullable: true },
 				fallbackToSharkeyTimeline: { type: 'boolean' },
+			},
+		},
+		aiNoteModerationConfig: {
+			type: 'object',
+			nullable: true,
+			properties: {
+				enableLocalNotes: { type: 'boolean' },
+				enableRemoteNotes: { type: 'boolean' },
+				baseUrl: { type: 'string', nullable: true },
+				apiKey: { type: 'string', nullable: true },
+				model: { type: 'string' },
+				apiStyle: { type: 'string', enum: ['chat.completions', 'responses', 'auto'] },
+				requestTimeoutMs: { type: 'integer', minimum: 1000, maximum: 60000 },
+				systemPrompt: { type: 'string', nullable: true },
+				action: { type: 'string', enum: ['reject', 'cw', 'hide', 'home'] },
+				failOpen: { type: 'boolean' },
 			},
 		},
 	},
@@ -824,6 +840,21 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				};
 			}
 
+			if (ps.aiNoteModerationConfig !== undefined) {
+				const current = this.serverSettings.aiNoteModerationConfig ?? defaultAiNoteModerationConfig;
+				const next = {
+					...defaultAiNoteModerationConfig,
+					...current,
+					...(ps.aiNoteModerationConfig ?? {}),
+				};
+				// Keep existing apiKey when client sends empty/redacted placeholder
+				const incomingKey = (ps.aiNoteModerationConfig as any)?.apiKey;
+				if (incomingKey === '' || incomingKey === '<redacted>' || incomingKey == null) {
+					next.apiKey = current.apiKey ?? null;
+				}
+				set.aiNoteModerationConfig = next;
+			}
+
 			if (Array.isArray(ps.federationHosts)) {
 				set.federationHosts = ps.federationHosts.filter(Boolean).map(x => x.toLowerCase());
 			}
@@ -862,6 +893,10 @@ function sanitize(meta: Partial<MiMeta & OnApplicationShutdown & OnApplicationBo
 		xAlgorithmConfig: meta.xAlgorithmConfig == null ? undefined : {
 			...meta.xAlgorithmConfig,
 			apiKey: meta.xAlgorithmConfig.apiKey == null ? null : '<redacted>',
+		},
+		aiNoteModerationConfig: meta.aiNoteModerationConfig == null ? undefined : {
+			...meta.aiNoteModerationConfig,
+			apiKey: meta.aiNoteModerationConfig.apiKey == null ? null : '<redacted>',
 		},
 		deeplAuthKey: '<redacted>',
 		libreTranslateKey: '<redacted>',
