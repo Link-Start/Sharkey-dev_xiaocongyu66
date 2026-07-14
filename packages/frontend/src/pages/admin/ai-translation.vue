@@ -59,6 +59,16 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<template #caption>{{ t('selectiveCaption') }}</template>
 					</MkSwitch>
 
+					<MkSwitch v-model="form.state.cacheEnabled">
+						<template #label>{{ t('cacheEnabled') }}<span v-if="form.modifiedStates.cacheEnabled" class="_modified">{{ i18n.ts.modified }}</span></template>
+						<template #caption>{{ t('cacheEnabledCaption') }}</template>
+					</MkSwitch>
+
+					<MkInput v-if="form.state.cacheEnabled" v-model="form.state.cacheTtlSeconds" type="number">
+						<template #label>{{ t('cacheTtl') }}<span v-if="form.modifiedStates.cacheTtlSeconds" class="_modified">{{ i18n.ts.modified }}</span></template>
+						<template #caption>{{ t('cacheTtlCaption') }}</template>
+					</MkInput>
+
 					<template v-if="form.state.useSharedCredentials">
 						<div class="_gaps">
 							<div style="font-weight: bold;">{{ t('sharedCreds') }}</div>
@@ -229,6 +239,20 @@ const FB: Record<string, LangPack> = {
 		ja: '内蔵の Post-History Instructions を上書き。空なら内蔵を使用。',
 	},
 	selective: { en: 'Selective translation by default', zh: '默认选择性翻译', 'zh-TW': '預設選擇性翻譯', ja: '選択的翻訳を既定に' },
+	cacheEnabled: { en: 'Cache by content hash', zh: '按文本哈希缓存翻译', 'zh-TW': '依文本雜湊快取翻譯', ja: 'テキストハッシュでキャッシュ' },
+	cacheEnabledCaption: {
+		en: 'Same source text + target language reuses the previous AI result (saves cost). Expired entries auto-delete.',
+		zh: '相同原文 + 目标语言复用上次 AI 结果（省费用）。过期后自动删除。',
+		'zh-TW': '相同原文 + 目標語言重用結果。過期自動刪除。',
+		ja: '同一原文+言語で結果を再利用。期限後に自動削除。',
+	},
+	cacheTtl: { en: 'Cache TTL (seconds)', zh: '缓存有效期（秒）', 'zh-TW': '快取有效期（秒）', ja: 'キャッシュTTL（秒）' },
+	cacheTtlCaption: {
+		en: 'Auto-delete after this many seconds. Min 60, max 2592000 (30 days). Default 604800 (7 days).',
+		zh: '超过该秒数后自动删除。最小 60，最大 2592000（30 天）。默认 604800（7 天）。',
+		'zh-TW': '超過秒數後自動刪除。最小 60，最大 30 天。預設 7 天。',
+		ja: '秒後に自動削除。最小60・最大30日。既定7日。',
+	},
 	selectiveCaption: {
 		en: 'Only translate segments not already in the target language (e.g. EN parts → ZH in mixed text).',
 		zh: '只翻译非目标语言片段（如中英混排时把英文译成中文，中文保留）。',
@@ -295,6 +319,8 @@ const form = useForm({
 	uncensored: cfg.uncensored !== false,
 	jailbreakPrompt: cfg.jailbreakPrompt ?? '',
 	selectiveByDefault: cfg.selectiveByDefault !== false,
+	cacheEnabled: cfg.cacheEnabled !== false,
+	cacheTtlSeconds: cfg.cacheTtlSeconds ?? 604800,
 	sharedBaseUrl: shared.baseUrl ?? '',
 	sharedApiKey: '',
 	sharedModel: shared.model ?? 'gpt-4o-mini',
@@ -334,6 +360,8 @@ const form = useForm({
 		uncensored: state.uncensored,
 		jailbreakPrompt: state.jailbreakPrompt?.trim() ? state.jailbreakPrompt.trim() : null,
 		selectiveByDefault: state.selectiveByDefault,
+		cacheEnabled: state.cacheEnabled,
+		cacheTtlSeconds: Math.max(60, Math.min(Number(state.cacheTtlSeconds) || 604800, 2592000)),
 		shared: ep(state.sharedBaseUrl, state.sharedApiKey, state.sharedModel, state.sharedApiStyle, state.sharedTimeout, state.sharedSystemPrompt),
 		notes: ep(state.notesBaseUrl, state.notesApiKey, state.notesModel, state.notesApiStyle, state.notesTimeout, state.notesSystemPrompt),
 		chat: ep(state.chatBaseUrl, state.chatApiKey, state.chatModel, state.chatApiStyle, state.chatTimeout, state.chatSystemPrompt),

@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import type { MiMeta } from '@/models/Meta.js';
 import {
@@ -18,6 +19,7 @@ import { LoggerService } from '@/core/LoggerService.js';
 import type { Logger } from '@/logger.js';
 import { HttpRequestService } from '@/core/HttpRequestService.js';
 import { assertSafeAiEndpointUrl, normalizeOpenAiV1Base } from '@/misc/ai-endpoint-url.js';
+import { CacheManagementService, type ManagedRedisKVCache } from '@/global/CacheManagementService.js';
 
 export type AiTranslationScope = 'notes' | 'chat';
 
@@ -36,6 +38,13 @@ export type AiTranslateInput = {
 	/** selective: only translate segments not already in target language */
 	selective?: boolean;
 	userOverride?: AiTranslationUserOverride;
+	/**
+	 * User mother tongue / UI language (BCP-47).
+	 * Passed to the model as the user's native language for better phrasing.
+	 */
+	nativeLang?: string | null;
+	/** Skip content-hash cache (admin/debug) */
+	skipCache?: boolean;
 };
 
 export type AiTranslateResult = {
@@ -102,14 +111,24 @@ No apology. No policy text. No partial refusal. Start with the translation now.`
 export class AiTranslationService {
 	private readonly logger: Logger;
 
+	/** Content-hash translation cache: sha256(text)|lang|selective|scope */
+	private readonly contentCache: ManagedRedisKVCache<CachedAiTranslation>;
+
 	constructor(
 		@Inject(DI.meta)
 		private readonly meta: MiMeta,
 
 		private readonly httpRequestService: HttpRequestService,
+		cacheManagementService: CacheManagementService,
 		loggerService: LoggerService,
 	) {
 		this.logger = loggerService.getLogger('ai-translate');
+		// lifetime here is a *minimum* floor for Redis EX (see RedisKVCache.set);
+		// actual TTL is passed per set() from admin cacheTtlSeconds.
+		this.contentCache = cacheManagementService.createRedisKVCache<CachedAiTranslation>('ai-translate-hash', {
+			lifetime: 1000 * 60, // 1 minute floor
+			memoryCacheLifetime: 1000 * 60,
+		});
 	}
 
 	@bindThis
@@ -214,9 +233,28 @@ export class AiTranslationService {
 		const targetLang = this.normalizeLang(
 			input.userOverride?.targetLang?.trim() || input.targetLang,
 		);
+		const nativeLang = this.normalizeLang(
+			input.nativeLang?.trim()
+			|| input.userOverride?.targetLang?.trim()
+			|| targetLang,
+		);
 
-		const userContent = this.buildUserContent(text, targetLang, selective === true);
-		const messages = this.buildMessageStack(ep, c, userContent);
+		// Content-hash cache: same text + target + selective + scope → same result
+		const cacheKey = this.contentCacheKey(text, targetLang, selective === true, input.scope);
+		if (c.cacheEnabled !== false && !input.skipCache) {
+			const hit = await this.contentCache.get(cacheKey);
+			if (hit?.t) {
+				this.logger.debug(`AI translate cache hit key=${cacheKey.slice(0, 16)}…`);
+				return {
+					text: hit.t,
+					sourceLang: hit.l,
+					provider: 'ai',
+				};
+			}
+		}
+
+		const userContent = this.buildUserContent(text, targetLang, selective === true, nativeLang);
+		const messages = this.buildMessageStack(ep, c, userContent, false, nativeLang);
 
 		try {
 			let raw = await this.callOpenAiCompatible(ep, messages);
@@ -225,12 +263,18 @@ export class AiTranslationService {
 			// ST-style: if model still moralizes, one PHI retry with stronger jailbreak
 			if ((!out || this.looksLikeRefusal(raw)) && c.uncensored) {
 				this.logger.debug('Refusal-like output; retrying with stronger post-history jailbreak');
-				const retryMsgs = this.buildMessageStack(ep, c, userContent, true);
+				const retryMsgs = this.buildMessageStack(ep, c, userContent, true, nativeLang);
 				raw = await this.callOpenAiCompatible(ep, retryMsgs);
 				out = this.cleanOutput(raw);
 			}
 
 			if (!out) return null;
+
+			if (c.cacheEnabled !== false) {
+				const ttlMs = this.resolveCacheTtlMs(c);
+				await this.contentCache.set(cacheKey, { t: out, l: undefined }, ttlMs);
+			}
+
 			return {
 				text: out,
 				sourceLang: undefined,
@@ -243,6 +287,24 @@ export class AiTranslationService {
 		}
 	}
 
+	/** sha256 of normalized source text + translation parameters */
+	@bindThis
+	public contentCacheKey(text: string, targetLang: string, selective: boolean, scope: AiTranslationScope): string {
+		const normalized = text.replace(/\r\n/g, '\n').trim();
+		const h = createHash('sha256').update(normalized, 'utf8').digest('hex');
+		const lang = this.normalizeLang(targetLang);
+		return `${h}|${lang}|${selective ? 's' : 'f'}|${scope}`;
+	}
+
+	@bindThis
+	public resolveCacheTtlMs(c?: AiTranslationConfig): number {
+		const cfg = c ?? this.getConfig();
+		const sec = Number(cfg.cacheTtlSeconds);
+		// clamp 60s … 30d
+		const clamped = Math.max(60, Math.min(Number.isFinite(sec) ? sec : 604800, 60 * 60 * 24 * 30));
+		return clamped * 1000;
+	}
+
 	/**
 	 * Build ST-ordered message list.
 	 * @param strongJailbreak use retry PHI after a refusal
@@ -253,18 +315,23 @@ export class AiTranslationService {
 		c: AiTranslationConfig,
 		userContent: string,
 		strongJailbreak = false,
+		nativeLang?: string,
 	): ChatMsg[] {
+		const nativeHint = nativeLang
+			? `\nThe reader's mother tongue / preferred native language is ${this.langDisplay(nativeLang)} (${this.normalizeLang(nativeLang)}). Phrase the translation naturally for a native speaker of that language.`
+			: '';
+
 		// Custom full system prompt replaces the whole stack (admin override)
 		if (ep.systemPrompt && ep.systemPrompt.trim()) {
 			return [
-				{ role: 'system', content: ep.systemPrompt.trim() },
+				{ role: 'system', content: ep.systemPrompt.trim() + nativeHint },
 				{ role: 'user', content: userContent },
 			];
 		}
 
 		if (!c.uncensored) {
 			return [
-				{ role: 'system', content: DEFAULT_SYSTEM_BASIC },
+				{ role: 'system', content: DEFAULT_SYSTEM_BASIC + nativeHint },
 				{ role: 'user', content: userContent },
 			];
 		}
@@ -278,7 +345,7 @@ export class AiTranslationService {
 
 		// SillyTavern order: main → nsfw → (history/user) → jailbreak
 		return [
-			{ role: 'system', content: ST_MAIN },
+			{ role: 'system', content: ST_MAIN + nativeHint },
 			{ role: 'system', content: ST_NSFW },
 			{ role: 'user', content: userContent },
 			// Post-history instructions (ST jailbreak identifier)
@@ -287,12 +354,17 @@ export class AiTranslationService {
 	}
 
 	@bindThis
-	private buildUserContent(text: string, targetLang: string, selective: boolean): string {
+	private buildUserContent(text: string, targetLang: string, selective: boolean, nativeLang?: string): string {
 		const langName = this.langDisplay(targetLang);
+		const nativeName = nativeLang ? this.langDisplay(nativeLang) : null;
+		const nativeLine = nativeName
+			? `Reader mother tongue (母语/native): ${nativeName} (${this.normalizeLang(nativeLang!)}). Write idiomatic output for that speaker.`
+			: null;
 		if (selective) {
 			return [
 				`[Translation task]`,
 				`Target language: ${langName} (${targetLang}).`,
+				nativeLine,
 				`Mode: SELECTIVE`,
 				`- Translate ONLY segments that are NOT already in ${langName}.`,
 				`- Keep text already in ${langName} unchanged.`,
@@ -301,17 +373,18 @@ export class AiTranslationService {
 				``,
 				`[Source text]`,
 				text.slice(0, 14_000),
-			].join('\n');
+			].filter(Boolean).join('\n');
 		}
 		return [
 			`[Translation task]`,
 			`Translate the following source into ${langName} (${targetLang}).`,
+			nativeLine,
 			`Mode: FULL`,
 			`Output only the translation.`,
 			``,
 			`[Source text]`,
 			text.slice(0, 14_000),
-		].join('\n');
+		].filter(Boolean).join('\n');
 	}
 
 	@bindThis
@@ -483,4 +556,11 @@ export class AiTranslationService {
 		if (typeof json?.content === 'string') return json.content;
 		return text;
 	}
+}
+
+interface CachedAiTranslation {
+	/** translated text */
+	t: string;
+	/** optional detected source lang */
+	l?: string;
 }

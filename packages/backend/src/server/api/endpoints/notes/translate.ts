@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { createHash } from 'node:crypto';
 import { URLSearchParams } from 'node:url';
 import { Inject, Injectable } from '@nestjs/common';
 import { Endpoint } from '@/server/api/endpoint-base.js';
@@ -127,44 +128,50 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			let targetLang = ps.targetLang;
 			if (userOverride?.targetLang) targetLang = userOverride.targetLang;
-			if (targetLang.includes('-')) {
-				// keep zh-CN/zh-TW for AI; classic engines often want short codes
-			}
 			const classicLang = targetLang.includes('-') ? targetLang.split('-')[0] : targetLang;
+			// User mother tongue: profile.lang → UI target → request
+			const nativeLang = (profile?.lang?.trim() || userOverride?.targetLang?.trim() || targetLang) as string;
 
-			const selective = ps.selective ?? userOverride?.selective ?? this.aiTranslationService.getConfig().selectiveByDefault;
-			const preferAi = ps.preferAi ?? this.aiTranslationService.getConfig().preferAiOverClassic;
-			// User key forces AI path
-			const forceAi = !!(userOverride?.apiKey && userOverride.apiKey.trim());
+			const aiCfg = this.aiTranslationService.getConfig();
+			const selective = ps.selective ?? userOverride?.selective ?? aiCfg.selectiveByDefault;
+			const preferAi = ps.preferAi ?? aiCfg.preferAiOverClassic;
+			const useAi = canAi && (preferAi || !canDeepl && !canLibre);
 
-			const cacheSuffix = canAi && (preferAi || forceAi || !canDeepl && !canLibre)
-				? `ai:${selective ? 's' : 'f'}`
-				: 'classic';
-			const cacheLang = canAi && (preferAi || forceAi || !canDeepl && !canLibre) ? targetLang : classicLang;
+			// Content-hash cache: same text → same translation (admin TTL)
+			const textHash = createHash('sha256').update(note.text.replace(/\r\n/g, '\n').trim(), 'utf8').digest('hex');
+			const cacheKey = useAi
+				? `${textHash}|${targetLang}|${selective ? 's' : 'f'}|notes|ai`
+				: `${textHash}|${classicLang}|classic`;
+			const cacheTtlMs = this.aiTranslationService.resolveCacheTtlMs(aiCfg);
+			const cacheOn = aiCfg.cacheEnabled !== false;
 
-			let response = await this.getCachedTranslation(note, `${cacheLang}@${cacheSuffix}`);
+			let response = cacheOn ? await this.getCachedByKey(cacheKey) : null;
 			if (!response) {
-				this.loggerService.logger.debug(`Fetching new translation for note=${note.id} lang=${targetLang}`);
+				this.loggerService.logger.debug(`Fetching new translation for note=${note.id} lang=${targetLang} hash=${textHash.slice(0, 12)}`);
 				response = await this.fetchTranslation(note, targetLang, classicLang, {
 					canAi,
-					preferAi: preferAi || forceAi,
+					preferAi: useAi,
 					canDeepl,
 					canLibre,
 					userOverride,
 					selective: selective === true,
+					nativeLang,
 				});
 				if (!response) {
 					throw new ApiError(meta.errors.translationFailed);
 				}
 
-				await this.setCachedTranslation(note, `${cacheLang}@${cacheSuffix}`, response);
+				if (cacheOn) {
+					await this.setCachedByKey(cacheKey, response, cacheTtlMs);
+				}
 			}
 			return response;
 		});
 
+		// Floor 1m; per-entry TTL from admin cacheTtlSeconds
 		this.translationsCache = cacheManagementService.createRedisKVCache<CachedTranslationEntity>('translations', {
-			lifetime: 1000 * 60 * 60 * 24 * 7, // 1 week,
-			memoryCacheLifetime: 1000 * 60, // 1 minute
+			lifetime: 1000 * 60,
+			memoryCacheLifetime: 1000 * 60,
 		});
 	}
 
@@ -178,6 +185,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			canDeepl: boolean;
 			canLibre: boolean;
 			userOverride: ReturnType<AiTranslationService['profileToOverride']>;
+			nativeLang?: string;
 			selective: boolean;
 		},
 	) {
@@ -189,6 +197,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				scope: 'notes',
 				selective: opts.selective,
 				userOverride: opts.userOverride,
+				nativeLang: opts.nativeLang,
 			});
 			if (!r?.text) return null;
 			return {
@@ -318,31 +327,23 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 	}
 
 	@bindThis
-	private async getCachedTranslation(note: MiNote, targetLang: string): Promise<CachedTranslation | null> {
-		const cacheKey = `${note.id}@${targetLang}`;
-
-		// Use cached translation, if present and up-to-date
+	private async getCachedByKey(cacheKey: string): Promise<CachedTranslation | null> {
 		const cached = await this.translationsCache.get(cacheKey);
-		if (cached && cached.u === note.updatedAt?.valueOf()) {
+		if (cached?.t) {
 			return {
 				sourceLang: cached.l,
 				text: cached.t,
 			};
 		}
-
-		// No cache entry :(
 		return null;
 	}
 
 	@bindThis
-	private async setCachedTranslation(note: MiNote, targetLang: string, translation: CachedTranslation): Promise<void> {
-		const cacheKey = `${note.id}@${targetLang}`;
-
+	private async setCachedByKey(cacheKey: string, translation: CachedTranslation, ttlMs: number): Promise<void> {
 		await this.translationsCache.set(cacheKey, {
 			l: translation.sourceLang,
 			t: translation.text,
-			u: note.updatedAt?.valueOf(),
-		});
+		}, ttlMs);
 	}
 }
 

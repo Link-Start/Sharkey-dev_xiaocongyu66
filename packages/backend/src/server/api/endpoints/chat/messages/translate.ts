@@ -138,12 +138,22 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			let targetLang = ps.targetLang;
 			if (userOverride?.targetLang) targetLang = userOverride.targetLang;
-			const selective = ps.selective ?? userOverride?.selective ?? this.aiTranslationService.getConfig().selectiveByDefault;
+			const aiCfg = this.aiTranslationService.getConfig();
+			const selective = ps.selective ?? userOverride?.selective ?? aiCfg.selectiveByDefault;
+			// Mother tongue: profile.lang for natural phrasing
+			const nativeLang = profile?.lang?.trim() || userOverride?.targetLang?.trim() || targetLang;
 
-			const cacheKey = `${message.id}@${targetLang}@${selective ? 's' : 'f'}`;
-			const cached = await this.translationsCache.get(cacheKey);
-			if (cached?.t) {
-				return { sourceLang: cached.l, text: cached.t };
+			// Content-hash cache (same text → same result); AI service also caches internally
+			const textHash = createHash('sha256').update(plain.replace(/\r\n/g, '\n').trim(), 'utf8').digest('hex');
+			const cacheKey = `${textHash}|${targetLang}|${selective ? 's' : 'f'}|chat`;
+			const cacheOn = aiCfg.cacheEnabled !== false;
+			const cacheTtlMs = this.aiTranslationService.resolveCacheTtlMs(aiCfg);
+
+			if (cacheOn) {
+				const cached = await this.translationsCache.get(cacheKey);
+				if (cached?.t) {
+					return { sourceLang: cached.l, text: cached.t };
+				}
 			}
 
 			const result = await this.aiTranslationService.translate({
@@ -152,16 +162,19 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				scope: 'chat',
 				selective: selective === true,
 				userOverride,
+				nativeLang,
 			});
 
 			if (!result?.text) {
 				throw new ApiError(meta.errors.translationFailed);
 			}
 
-			await this.translationsCache.set(cacheKey, {
-				l: result.sourceLang,
-				t: result.text,
-			});
+			if (cacheOn) {
+				await this.translationsCache.set(cacheKey, {
+					l: result.sourceLang,
+					t: result.text,
+				}, cacheTtlMs);
+			}
 
 			return {
 				sourceLang: result.sourceLang,
@@ -170,7 +183,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		});
 
 		this.translationsCache = cacheManagementService.createRedisKVCache<CachedTranslationEntity>('chat-translations', {
-			lifetime: 1000 * 60 * 60 * 24, // 1 day
+			lifetime: 1000 * 60, // floor; per-entry TTL from admin
 			memoryCacheLifetime: 1000 * 60,
 		});
 	}

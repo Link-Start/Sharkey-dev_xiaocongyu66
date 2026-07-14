@@ -203,6 +203,16 @@ export type AiTranslationConfig = {
 	 * in the target language (e.g. EN→ZH in mixed CN+EN text).
 	 */
 	selectiveByDefault: boolean;
+	/**
+	 * Cache AI (and shared classic) translation results by content hash.
+	 * Same source text + target lang + selective mode → reuse result.
+	 */
+	cacheEnabled: boolean;
+	/**
+	 * Cache TTL in seconds. Expired entries are deleted automatically (Redis TTL).
+	 * Min 60, max 30 days. Default 7 days.
+	 */
+	cacheTtlSeconds: number;
 };
 
 export const defaultAiTranslationEndpointConfig: AiTranslationEndpointConfig = {
@@ -227,6 +237,8 @@ export const defaultAiTranslationConfig: AiTranslationConfig = {
 	uncensored: false,
 	jailbreakPrompt: null,
 	selectiveByDefault: true,
+	cacheEnabled: true,
+	cacheTtlSeconds: 60 * 60 * 24 * 7, // 7 days
 };
 
 @Entity('meta')

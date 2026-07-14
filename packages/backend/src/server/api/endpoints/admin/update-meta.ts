@@ -338,6 +338,8 @@ export const paramDef = {
 				uncensored: { type: 'boolean' },
 				jailbreakPrompt: { type: 'string', nullable: true },
 				selectiveByDefault: { type: 'boolean' },
+				cacheEnabled: { type: 'boolean' },
+				cacheTtlSeconds: { type: 'integer', minimum: 60, maximum: 2592000 },
 			},
 		},
 	},
