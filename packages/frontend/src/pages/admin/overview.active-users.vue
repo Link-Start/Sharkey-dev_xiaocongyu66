@@ -21,6 +21,7 @@ import { store } from '@/store.js';
 import { useChartTooltip } from '@/use/use-chart-tooltip.js';
 import { chartVLine } from '@/utility/chart-vline.js';
 import { initChart } from '@/utility/init-chart.js';
+import { tCommon } from '@/utility/ui-fb-i18n.js';
 
 initChart();
 
@@ -66,7 +67,7 @@ async function renderChart() {
 		data: {
 			datasets: [{
 				parsing: false,
-				label: 'Read',
+				label: tCommon('read'),
 				data: format(raw.read).slice().reverse(),
 				pointRadius: 0,
 				borderWidth: 0,
@@ -78,7 +79,7 @@ async function renderChart() {
 				fill: true,
 			}, {
 				parsing: false,
-				label: 'Write',
+				label: tCommon('write'),
 				data: format(raw.write).slice().reverse(),
 				pointRadius: 0,
 				borderWidth: 0,

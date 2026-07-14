@@ -9,22 +9,22 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<div class="_gaps_m">
 			<div class="_gaps_m">
 				<MkInput v-model="endpoint" :datalist="endpoints" debounce @update:modelValue="onEndpointChange()">
-					<template #label>Endpoint</template>
+					<template #label>{{ tCommon('endpoint') }}</template>
 				</MkInput>
 				<MkTextarea v-model="body" code>
-					<template #label>Params (JSON or JSON5)</template>
+					<template #label>{{ tCommon('paramsJson') }}</template>
 				</MkTextarea>
 				<MkSwitch v-model="withCredential">
-					With credential
+					{{ tCommon('withCredential') }}
 				</MkSwitch>
 				<MkButton primary :disabled="sending" @click="send">
 					<template v-if="sending"><MkEllipsis/></template>
-					<template v-else><i class="ti ti-send"></i> Send</template>
+					<template v-else><i class="ti ti-send"></i> {{ tCommon('send') }}</template>
 				</MkButton>
 			</div>
 			<div v-if="res">
 				<MkTextarea v-model="res" code readonly tall>
-					<template #label>Response</template>
+					<template #label>{{ tCommon('response') }}</template>
 				</MkTextarea>
 			</div>
 		</div>
@@ -42,6 +42,7 @@ import MkTextarea from '@/components/MkTextarea.vue';
 import MkSwitch from '@/components/MkSwitch.vue';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import { definePage } from '@/page.js';
+import { tCommon } from '@/utility/ui-fb-i18n.js';
 
 const body = ref('{}');
 const endpoint = ref('');
@@ -87,7 +88,7 @@ const headerActions = computed(() => []);
 const headerTabs = computed(() => []);
 
 definePage(() => ({
-	title: 'API console',
+	title: tCommon('apiConsole'),
 	icon: 'ti ti-terminal-2',
 }));
 </script>

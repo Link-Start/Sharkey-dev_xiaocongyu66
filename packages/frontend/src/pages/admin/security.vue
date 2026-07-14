@@ -26,9 +26,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<XBotProtection/>
 
 			<MkFolder>
-				<template #label>Active Email Validation</template>
-				<template v-if="emailValidationForm.savedState.enableActiveEmailValidation" #suffix>Enabled</template>
-				<template v-else #suffix>Disabled</template>
+				<template #label>{{ tCommon('activeEmailValidation') }}</template>
+				<template v-if="emailValidationForm.savedState.enableActiveEmailValidation" #suffix>{{ tCommon('enabled') }}</template>
+				<template v-else #suffix>{{ tCommon('disabled') }}</template>
 				<template v-if="emailValidationForm.modified.value" #footer>
 					<MkFormFooter :form="emailValidationForm"/>
 				</template>
@@ -36,53 +36,53 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<div class="_gaps_m">
 					<span>{{ i18n.ts.activeEmailValidationDescription }}</span>
 					<MkSwitch v-model="emailValidationForm.state.enableActiveEmailValidation">
-						<template #label>Enable</template>
+						<template #label>{{ tCommon('enable') }}</template>
 					</MkSwitch>
 					<MkSwitch v-model="emailValidationForm.state.enableVerifymailApi">
-						<template #label>Use Verifymail.io API</template>
+						<template #label>{{ tCommon('useVerifymail') }}</template>
 					</MkSwitch>
 					<MkInput v-model="emailValidationForm.state.verifymailAuthKey">
 						<template #prefix><i class="ti ti-key"></i></template>
-						<template #label>Verifymail.io API Auth Key</template>
+						<template #label>{{ tCommon('verifymailKey') }}</template>
 					</MkInput>
 					<MkSwitch v-model="emailValidationForm.state.enableTruemailApi">
-						<template #label>Use TrueMail API</template>
+						<template #label>{{ tCommon('useTruemail') }}</template>
 					</MkSwitch>
 					<MkInput v-model="emailValidationForm.state.truemailInstance">
 						<template #prefix><i class="ti ti-key"></i></template>
-						<template #label>TrueMail API Instance</template>
+						<template #label>{{ tCommon('truemailInstance') }}</template>
 					</MkInput>
 					<MkInput v-model="emailValidationForm.state.truemailAuthKey">
 						<template #prefix><i class="ti ti-key"></i></template>
-						<template #label>TrueMail API Auth Key</template>
+						<template #label>{{ tCommon('truemailKey') }}</template>
 					</MkInput>
 				</div>
 			</MkFolder>
 
 			<MkFolder>
-				<template #label>Banned Email Domains</template>
+				<template #label>{{ tCommon('bannedEmailDomains') }}</template>
 				<template v-if="bannedEmailDomainsForm.modified.value" #footer>
 					<MkFormFooter :form="bannedEmailDomainsForm"/>
 				</template>
 
 				<div class="_gaps_m">
 					<MkTextarea v-model="bannedEmailDomainsForm.state.bannedEmailDomains">
-						<template #label>Banned Email Domains List</template>
+						<template #label>{{ tCommon('bannedEmailDomainsList') }}</template>
 					</MkTextarea>
 				</div>
 			</MkFolder>
 
 			<MkFolder>
-				<template #label>Log IP address</template>
-				<template v-if="ipLoggingForm.savedState.enableIpLogging" #suffix>Enabled</template>
-				<template v-else #suffix>Disabled</template>
+				<template #label>{{ tCommon('logIpAddress') }}</template>
+				<template v-if="ipLoggingForm.savedState.enableIpLogging" #suffix>{{ tCommon('enabled') }}</template>
+				<template v-else #suffix>{{ tCommon('disabled') }}</template>
 				<template v-if="ipLoggingForm.modified.value" #footer>
 					<MkFormFooter :form="ipLoggingForm"/>
 				</template>
 
 				<div class="_gaps_m">
 					<MkSwitch v-model="ipLoggingForm.state.enableIpLogging">
-						<template #label>Enable</template>
+						<template #label>{{ tCommon('enable') }}</template>
 					</MkSwitch>
 				</div>
 			</MkFolder>
@@ -105,6 +105,7 @@ import { misskeyApi } from '@/utility/misskey-api.js';
 import { fetchInstance } from '@/instance.js';
 import { i18n } from '@/i18n.js';
 import { definePage } from '@/page.js';
+import { tCommon } from '@/utility/ui-fb-i18n.js';
 import { useForm } from '@/use/use-form.js';
 import MkFormFooter from '@/components/MkFormFooter.vue';
 

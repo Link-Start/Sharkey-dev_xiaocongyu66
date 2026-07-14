@@ -25,6 +25,7 @@ import * as os from '@/os.js';
 import { i18n } from '@/i18n.js';
 import { definePage } from '@/page.js';
 import MkButton from '@/components/MkButton.vue';
+import { tCommon } from '@/utility/ui-fb-i18n.js';
 
 export type ApQueueDomain = 'deliver' | 'inbox';
 
@@ -58,10 +59,10 @@ const headerActions = computed(() => []);
 
 const headerTabs = computed(() => [{
 	key: 'deliver',
-	title: 'Deliver',
+	title: tCommon('deliver'),
 }, {
 	key: 'inbox',
-	title: 'Inbox',
+	title: tCommon('inbox'),
 }]);
 
 definePage(() => ({

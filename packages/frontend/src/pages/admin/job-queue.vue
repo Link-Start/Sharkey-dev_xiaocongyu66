@@ -12,15 +12,15 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<div style="display: flex; align-items: center; font-weight: bold;"><i class="ti ti-http-que" style="margin-right: 0.5em;"></i>{{ q.name }}<i v-if="!q.isPaused" style="color: var(--MI_THEME-success); margin-left: auto;" class="ti ti-player-play"></i></div>
 					<div :class="$style.queueCounts">
 						<MkKeyValue>
-							<template #key>Active</template>
+							<template #key>{{ tCommon('active') }}</template>
 							<template #value>{{ kmg(q.counts.active, 2) }}</template>
 						</MkKeyValue>
 						<MkKeyValue>
-							<template #key>Delayed</template>
+							<template #key>{{ tCommon('delayed') }}</template>
 							<template #value>{{ kmg(q.counts.delayed, 2) }}</template>
 						</MkKeyValue>
 						<MkKeyValue>
-							<template #key>Waiting</template>
+							<template #key>{{ tCommon('waiting') }}</template>
 							<template #value>{{ kmg(q.counts.waiting, 2) }}</template>
 						</MkKeyValue>
 					</div>
@@ -30,17 +30,17 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</div>
 		<div v-else-if="queueInfo" class="_gaps">
 			<MkFolder :defaultOpen="true">
-				<template #label>Overview: {{ tab }}</template>
+				<template #label>{{ tCommon('overviewOf') }}: {{ tab }}</template>
 				<template #icon><i class="ti ti-http-que"></i></template>
 				<template #suffix>#{{ queueInfo.db.processId }}:{{ queueInfo.db.port }} / {{ queueInfo.db.runId }}</template>
 				<template #caption>{{ queueInfo.qualifiedName }}</template>
 				<template #footer>
 					<div class="_buttons">
-						<MkButton rounded @click="promoteAllJobs"><i class="ti ti-player-track-next"></i> Promote all jobs</MkButton>
+						<MkButton rounded @click="promoteAllJobs"><i class="ti ti-player-track-next"></i> {{ tCommon('promoteAllJobs') }}</MkButton>
 <!--						<MkButton rounded @click="createJob"><i class="ti ti-plus"></i> Add job</MkButton>-->
 <!--						<MkButton v-if="queueInfo.isPaused" rounded @click="resumeQueue"><i class="ti ti-player-play"></i> Resume queue</MkButton>-->
 <!--						<MkButton v-else rounded danger @click="pauseQueue"><i class="ti ti-player-pause"></i> Pause queue</MkButton>-->
-						<MkButton rounded danger @click="clearQueue"><i class="ti ti-trash"></i> Empty queue</MkButton>
+						<MkButton rounded danger @click="clearQueue"><i class="ti ti-trash"></i> {{ tCommon('emptyQueue') }}</MkButton>
 					</div>
 				</template>
 
@@ -48,42 +48,42 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<XChart :dataSet="{ completed: queueInfo.metrics.completed.data, failed: queueInfo.metrics.failed.data }" :aspectRatio="5"/>
 					<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;">
 						<MkKeyValue>
-							<template #key>Active</template>
+							<template #key>{{ tCommon('active') }}</template>
 							<template #value>{{ kmg(queueInfo.counts.active, 2) }}</template>
 						</MkKeyValue>
 						<MkKeyValue>
-							<template #key>Delayed</template>
+							<template #key>{{ tCommon('delayed') }}</template>
 							<template #value>{{ kmg(queueInfo.counts.delayed, 2) }}</template>
 						</MkKeyValue>
 						<MkKeyValue>
-							<template #key>Waiting</template>
+							<template #key>{{ tCommon('waiting') }}</template>
 							<template #value>{{ kmg(queueInfo.counts.waiting, 2) }}</template>
 						</MkKeyValue>
 					</div>
 					<hr>
 					<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;">
 						<MkKeyValue>
-							<template #key>Clients: Connected</template>
+							<template #key>{{ tCommon('clientsConnected') }}</template>
 							<template #value>{{ queueInfo.db.clients.connected }}</template>
 						</MkKeyValue>
 						<MkKeyValue>
-							<template #key>Clients: Blocked</template>
+							<template #key>{{ tCommon('clientsBlocked') }}</template>
 							<template #value>{{ queueInfo.db.clients.blocked }}</template>
 						</MkKeyValue>
 						<MkKeyValue>
-							<template #key>Memory: Peak</template>
+							<template #key>{{ tCommon('memoryPeak') }}</template>
 							<template #value>{{ bytes(queueInfo.db.memory.peak, 1) }}</template>
 						</MkKeyValue>
 						<MkKeyValue>
-							<template #key>Memory: Total</template>
+							<template #key>{{ tCommon('memoryTotal') }}</template>
 							<template #value>{{ bytes(queueInfo.db.memory.total, 1) }}</template>
 						</MkKeyValue>
 						<MkKeyValue>
-							<template #key>Memory: Used</template>
+							<template #key>{{ tCommon('memoryUsed') }}</template>
 							<template #value>{{ bytes(queueInfo.db.memory.used, 1) }}</template>
 						</MkKeyValue>
 						<MkKeyValue>
-							<template #key>Uptime</template>
+							<template #key>{{ tCommon('uptime') }}</template>
 							<template #value>{{ queueInfo.db.uptime }}</template>
 						</MkKeyValue>
 					</div>
@@ -91,7 +91,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 			</MkFolder>
 
 			<MkFolder :defaultOpen="true" :withSpacer="false">
-				<template #label>Jobs: {{ tab }}</template>
+				<template #label>{{ tCommon('jobsOf') }}: {{ tab }}</template>
 				<template #icon><i class="ti ti-list-check"></i></template>
 				<template #suffix>&lt;A:{{ kmg(queueInfo.counts.active, 2) }}&gt; &lt;D:{{ kmg(queueInfo.counts.delayed, 2) }}&gt; &lt;W:{{ kmg(queueInfo.counts.waiting, 2) }}&gt;</template>
 				<template #header>
@@ -99,43 +99,43 @@ SPDX-License-Identifier: AGPL-3.0-only
 						v-model:tab="jobState"
 						:class="$style.jobsTabs" :tabs="[{
 							key: 'all',
-							title: 'All',
+							title: tCommon('all'),
 							icon: 'ti ti-code-asterisk',
 						}, {
 							key: 'latest',
-							title: 'Latest',
+							title: tCommon('latest'),
 							icon: 'ti ti-logs',
 						}, {
 							key: 'completed',
-							title: 'Completed',
+							title: tCommon('completed'),
 							icon: 'ti ti-check',
 						}, {
 							key: 'failed',
-							title: 'Failed',
+							title: tCommon('failed'),
 							icon: 'ti ti-circle-x',
 						}, {
 							key: 'active',
-							title: 'Active',
+							title: tCommon('active'),
 							icon: 'ti ti-player-play',
 						}, {
 							key: 'delayed',
-							title: 'Delayed',
+							title: tCommon('delayed'),
 							icon: 'ti ti-clock',
 						}, {
 							key: 'wait',
-							title: 'Waiting',
+							title: tCommon('waiting'),
 							icon: 'ti ti-hourglass-high',
 						}, {
 							key: 'paused',
-							title: 'Paused',
+							title: tCommon('paused'),
 							icon: 'ti ti-player-pause',
 						}]"
 					/>
 				</template>
 				<template #footer>
 					<div class="_buttons">
-						<MkButton rounded @click="fetchJobs()"><i class="ti ti-reload"></i> Refresh view</MkButton>
-						<MkButton rounded danger style="margin-left: auto;" @click="removeJobs"><i class="ti ti-trash"></i> Remove jobs</MkButton>
+						<MkButton rounded @click="fetchJobs()"><i class="ti ti-reload"></i> {{ tCommon('refreshView') }}</MkButton>
+						<MkButton rounded danger style="margin-left: auto;" @click="removeJobs"><i class="ti ti-trash"></i> {{ tCommon('removeJobs') }}</MkButton>
 					</div>
 				</template>
 
@@ -181,6 +181,7 @@ import type { Ref } from 'vue';
 import * as Misskey from 'misskey-js';
 import * as os from '@/os.js';
 import { i18n } from '@/i18n.js';
+import { tCommon } from '@/utility/ui-fb-i18n.js';
 import { definePage } from '@/page.js';
 import MkButton from '@/components/MkButton.vue';
 import { misskeyApi } from '@/utility/misskey-api.js';

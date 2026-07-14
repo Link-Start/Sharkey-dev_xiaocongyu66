@@ -15,7 +15,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<MkNumber :value="stats.originalUsersCount" style="margin-right: 0.5em;"/>
 						<MkNumberDiff v-tooltip="i18n.ts.dayOverDayChanges" class="diff" :value="usersComparedToThePrevDay"></MkNumberDiff>
 					</div>
-					<div class="label">Users</div>
+					<div class="label">{{ tCommon('users') }}</div>
 				</div>
 			</div>
 			<div class="item _panel notes">
@@ -25,7 +25,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<MkNumber :value="stats.originalNotesCount" style="margin-right: 0.5em;"/>
 						<MkNumberDiff v-tooltip="i18n.ts.dayOverDayChanges" class="diff" :value="notesComparedToThePrevDay"></MkNumberDiff>
 					</div>
-					<div class="label">Notes</div>
+					<div class="label">{{ tCommon('notes') }}</div>
 				</div>
 			</div>
 			<div class="item _panel instances">
@@ -34,7 +34,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<div class="value">
 						<MkNumber :value="stats.instances" style="margin-right: 0.5em;"/>
 					</div>
-					<div class="label">Instances</div>
+					<div class="label">{{ tCommon('instances') }}</div>
 				</div>
 			</div>
 			<div class="item _panel emojis">
@@ -43,7 +43,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<div class="value">
 						<MkNumber :value="customEmojis.length" style="margin-right: 0.5em;"/>
 					</div>
-					<div class="label">Custom emojis</div>
+					<div class="label">{{ tCommon('customEmojis') }}</div>
 				</div>
 			</div>
 			<div class="item _panel online">
@@ -52,7 +52,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<div class="value">
 						<MkNumber :value="onlineUsersCount" style="margin-right: 0.5em;"/>
 					</div>
-					<div class="label">Online</div>
+					<div class="label">{{ tCommon('online') }}</div>
 				</div>
 			</div>
 		</div>
@@ -69,6 +69,7 @@ import MkNumber from '@/components/MkNumber.vue';
 import { i18n } from '@/i18n.js';
 import { customEmojis } from '@/custom-emojis.js';
 import { prefer } from '@/preferences.js';
+import { tCommon } from '@/utility/ui-fb-i18n.js';
 
 const stats = ref<Misskey.entities.StatsResponse | null>(null);
 const usersComparedToThePrevDay = ref<number>(0);

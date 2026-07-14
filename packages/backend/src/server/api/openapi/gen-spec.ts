@@ -8,67 +8,228 @@ import endpoints, { IEndpoint } from '../endpoints.js';
 import { errors as basicErrors } from './errors.js';
 import { getSchemas, convertSchemaToOpenApiSchema } from './schemas.js';
 
-export function genOpenapiSpec(config: Config, includeSelfRef = false) {
+export type OpenApiLang = 'en' | 'zh' | 'zh-TW' | 'ja';
+
+/** Normalize Accept-Language / query lang into a supported OpenAPI pack. */
+export function resolveOpenApiLang(input?: string | null): OpenApiLang {
+	const raw = (input ?? 'en').split(',')[0]?.trim().replace('_', '-') ?? 'en';
+	const lower = raw.toLowerCase();
+	if (lower.startsWith('zh-tw') || lower.startsWith('zh-hk') || lower.startsWith('zh-hant')) return 'zh-TW';
+	if (lower.startsWith('zh')) return 'zh';
+	if (lower.startsWith('ja')) return 'ja';
+	return 'en';
+}
+
+type OpenApiCopy = {
+	title: string;
+	description: string;
+	externalDocs: string;
+	server: string;
+	bearer: string;
+	tags: Record<string, string>;
+};
+
+const OPENAPI_I18N: Record<OpenApiLang, (url: string) => OpenApiCopy> = {
+	en: (url) => ({
+		title: 'Sharkey API',
+		description: [
+			'HTTP API for this Sharkey instance (Misskey fork).',
+			'',
+			'## Authentication',
+			'',
+			'Preferred: `Authorization: Bearer <token>` (RFC 6750).',
+			'',
+			'Legacy (still accepted): JSON body field `i` on POST, or query `i` on **GET** endpoints that set `allowGet`.',
+			'**Do not put long-lived tokens in URLs** when you can avoid it (proxy logs / Referer). Prefer Bearer for HTTP.',
+			'',
+			'WebSocket streaming (`/streaming`): modern clients send the token via `Sec-WebSocket-Protocol`',
+			'(`misskey` + `misskey.i.<token>`). Legacy `?i=` remains accepted for older clients.',
+			'',
+			'## Credentials & permissions',
+			'',
+			'- **Credential required**: needs a user or app access token.',
+			'- **Permission (`kind`)**: app tokens must include this scope (e.g. `write:notes`).',
+			'- **Moderator / Administrator**: role flags; not the same as app scopes alone.',
+			'- **Internal (`secure`)**: intended for the first-party web client only; third-party apps should not call these.',
+			'',
+			'## Interactive docs',
+			'',
+			`Human-readable explorer (public, no login): ${url}/api-doc`,
+			'',
+			'Machine-readable OpenAPI 3.1: `/api.json` (**public**).',
+			'',
+			'## Notes',
+			'',
+			'- Extra JSON properties are generally ignored (handlers pick known fields); do not rely on mass-assignment.',
+			'- Rate limits return HTTP 429 when configured on an endpoint.',
+			'- API catalog (`/api.json`, `/api/endpoints`, `/api/endpoint`, `/api-doc`) is open to everyone; only *calling* protected endpoints needs a token.',
+		].join('\n'),
+		externalDocs: 'Sharkey upstream repository',
+		server: 'This instance API base',
+		bearer: 'User or app access token (preferred). Legacy alternative: JSON body field `i` on POST, or query `i` on allowGet endpoints (avoid putting tokens in URLs).',
+		tags: {
+			account: 'Account / profile',
+			admin: 'Moderator / administrator',
+			chat: 'Direct messages and chat rooms',
+			drive: 'Drive files and folders',
+			notes: 'Notes (posts)',
+			users: 'Users',
+			flashs: 'Play / Flash (AiScript pages)',
+			meta: 'Instance meta',
+		},
+	}),
+	zh: (url) => ({
+		title: 'Sharkey API',
+		description: [
+			'本 Sharkey 实例的 HTTP API（Misskey 分支）。',
+			'',
+			'## 认证',
+			'',
+			'推荐：`Authorization: Bearer <token>`（RFC 6750）。',
+			'',
+			'兼容旧方式：POST 的 JSON 字段 `i`，或设置了 `allowGet` 的 **GET** 查询参数 `i`。',
+			'**尽量不要把长期有效的 token 放进 URL**（代理日志 / Referer）。HTTP 请优先使用 Bearer。',
+			'',
+			'WebSocket（`/streaming`）：现代客户端通过 `Sec-WebSocket-Protocol` 发送 token',
+			'（`misskey` + `misskey.i.<token>`）。旧客户端仍可使用 `?i=`。',
+			'',
+			'## 凭证与权限',
+			'',
+			'- **需要凭证**：需要用户或应用访问令牌。',
+			'- **权限（`kind`）**：应用令牌必须包含对应 scope（如 `write:notes`）。',
+			'- **版主 / 管理员**：角色标志；与应用 scope 不同。',
+			'- **内部（`secure`）**：仅供本站前端使用；第三方应用请勿调用。',
+			'',
+			'## 交互式文档',
+			'',
+			`人类可读浏览器（公开，无需登录）：${url}/api-doc`,
+			'',
+			'机器可读 OpenAPI 3.1：`/api.json`（**公开**）。',
+			'',
+			'## 说明',
+			'',
+			'- 多余的 JSON 字段通常会被忽略；不要依赖批量赋值。',
+			'- 配置了限流的接口会在超限时返回 HTTP 429。',
+			'- API 目录（`/api.json`、`/api/endpoints`、`/api/endpoint`、`/api-doc`）对所有人公开；只有*调用*受保护接口才需要 token。',
+		].join('\n'),
+		externalDocs: 'Sharkey 上游仓库',
+		server: '本实例 API 基址',
+		bearer: '用户或应用访问令牌（推荐）。兼容：POST 的 JSON 字段 `i`，或 allowGet 接口的查询参数 `i`（避免把 token 放进 URL）。',
+		tags: {
+			account: '账号 / 资料',
+			admin: '版主 / 管理员',
+			chat: '私信与群聊',
+			drive: '网盘文件与文件夹',
+			notes: '帖子（笔记）',
+			users: '用户',
+			flashs: 'Play / Flash（AiScript 页面）',
+			meta: '实例元信息',
+		},
+	}),
+	'zh-TW': (url) => ({
+		title: 'Sharkey API',
+		description: [
+			'本 Sharkey 站點的 HTTP API（Misskey 分支）。',
+			'',
+			'## 認證',
+			'',
+			'建議：`Authorization: Bearer <token>`（RFC 6750）。',
+			'',
+			'相容舊方式：POST 的 JSON 欄位 `i`，或設定了 `allowGet` 的 **GET** 查詢參數 `i`。',
+			'**儘量不要把長期有效的 token 放進 URL**。HTTP 請優先使用 Bearer。',
+			'',
+			'WebSocket（`/streaming`）：現代客戶端透過 `Sec-WebSocket-Protocol` 傳送 token。',
+			'',
+			'## 互動式文件',
+			'',
+			`人類可讀瀏覽器（公開，無需登入）：${url}/api-doc`,
+			'',
+			'機器可讀 OpenAPI 3.1：`/api.json`（**公開**）。',
+		].join('\n'),
+		externalDocs: 'Sharkey 上游倉庫',
+		server: '本站點 API 基址',
+		bearer: '使用者或應用存取權杖（建議）。相容：POST 的 JSON 欄位 `i`。',
+		tags: {
+			account: '帳號 / 資料',
+			admin: '版主 / 管理員',
+			chat: '私訊與群聊',
+			drive: '雲端硬碟檔案與資料夾',
+			notes: '貼文（筆記）',
+			users: '使用者',
+			flashs: 'Play / Flash（AiScript 頁面）',
+			meta: '站點中繼資訊',
+		},
+	}),
+	ja: (url) => ({
+		title: 'Sharkey API',
+		description: [
+			'この Sharkey インスタンスの HTTP API（Misskey フォーク）。',
+			'',
+			'## 認証',
+			'',
+			'推奨: `Authorization: Bearer <token>`（RFC 6750）。',
+			'',
+			'従来方式: POST の JSON フィールド `i`、または `allowGet` の **GET** クエリ `i`。',
+			'**長期トークンを URL に載せない**（プロキシログ / Referer）。HTTP は Bearer を優先。',
+			'',
+			'WebSocket（`/streaming`）: 現行クライアントは `Sec-WebSocket-Protocol` でトークンを送ります',
+			'（`misskey` + `misskey.i.<token>`）。古いクライアントは `?i=` も利用可。',
+			'',
+			'## 対話的ドキュメント',
+			'',
+			`人間向けエクスプローラー（公開・ログイン不要）: ${url}/api-doc`,
+			'',
+			'機械可読 OpenAPI 3.1: `/api.json`（**公開**）。',
+		].join('\n'),
+		externalDocs: 'Sharkey 上流リポジトリ',
+		server: 'このインスタンスの API ベース',
+		bearer: 'ユーザーまたはアプリのアクセストークン（推奨）。代替: POST の JSON フィールド `i`。',
+		tags: {
+			account: 'アカウント / プロフィール',
+			admin: 'モデレーター / 管理者',
+			chat: 'ダイレクトメッセージとチャットルーム',
+			drive: 'ドライブのファイルとフォルダ',
+			notes: 'ノート（投稿）',
+			users: 'ユーザー',
+			flashs: 'Play / Flash（AiScript ページ）',
+			meta: 'インスタンスメタ',
+		},
+	}),
+};
+
+export function genOpenapiSpec(config: Config, includeSelfRef = false, langInput?: string | null) {
+	const lang = resolveOpenApiLang(langInput);
+	const copy = OPENAPI_I18N[lang](config.url);
+
 	const spec = {
 		openapi: '3.1',
 
 		info: {
 			version: config.version,
-			title: 'Sharkey API',
-			description: [
-				'HTTP API for this Sharkey instance (Misskey fork).',
-				'',
-				'## Authentication',
-				'',
-				'Preferred: `Authorization: Bearer <token>` (RFC 6750).',
-				'',
-				'Legacy (still accepted): JSON body field `i` on POST, or query `i` on **GET** endpoints that set `allowGet`.',
-				'**Do not put long-lived tokens in URLs** when you can avoid it (proxy logs / Referer). Prefer Bearer for HTTP.',
-				'',
-				'WebSocket streaming (`/streaming`): modern clients send the token via `Sec-WebSocket-Protocol`',
-				'(`misskey` + `misskey.i.<token>`). Legacy `?i=` remains accepted for older clients.',
-				'',
-				'## Credentials & permissions',
-				'',
-				'- **Credential required**: needs a user or app access token.',
-				'- **Permission (`kind`)**: app tokens must include this scope (e.g. `write:notes`).',
-				'- **Moderator / Administrator**: role flags; not the same as app scopes alone.',
-				'- **Internal (`secure`)**: intended for the first-party web client only; third-party apps should not call these.',
-				'',
-				'## Interactive docs',
-				'',
-				`Human-readable explorer (public, no login): ${config.url}/api-doc`,
-				'',
-				'Machine-readable OpenAPI 3.1: `/api.json` (**public**).',
-				'',
-				'## Notes',
-				'',
-				'- Extra JSON properties are generally ignored (handlers pick known fields); do not rely on mass-assignment.',
-				'- Rate limits return HTTP 429 when configured on an endpoint.',
-				'- API catalog (`/api.json`, `/api/endpoints`, `/api/endpoint`, `/api-doc`) is open to everyone; only *calling* protected endpoints needs a token.',
-			].join('\n'),
+			title: copy.title,
+			description: copy.description,
 			// contact omitted — instance-specific
 		},
 
 		externalDocs: {
-			description: 'Sharkey upstream repository',
+			description: copy.externalDocs,
 			url: 'https://activitypub.software/TransFem-org/Sharkey',
 		},
 
 		servers: [{
 			url: config.apiUrl,
-			description: 'This instance API base',
+			description: copy.server,
 		}],
 
 		tags: [
-			{ name: 'account', description: 'Account / profile' },
-			{ name: 'admin', description: 'Moderator / administrator' },
-			{ name: 'chat', description: 'Direct messages and chat rooms' },
-			{ name: 'drive', description: 'Drive files and folders' },
-			{ name: 'notes', description: 'Notes (posts)' },
-			{ name: 'users', description: 'Users' },
-			{ name: 'flashs', description: 'Play / Flash (AiScript pages)' },
-			{ name: 'meta', description: 'Instance meta' },
+			{ name: 'account', description: copy.tags.account },
+			{ name: 'admin', description: copy.tags.admin },
+			{ name: 'chat', description: copy.tags.chat },
+			{ name: 'drive', description: copy.tags.drive },
+			{ name: 'notes', description: copy.tags.notes },
+			{ name: 'users', description: copy.tags.users },
+			{ name: 'flashs', description: copy.tags.flashs },
+			{ name: 'meta', description: copy.tags.meta },
 		],
 
 		paths: {} as any,
@@ -80,10 +241,7 @@ export function genOpenapiSpec(config: Config, includeSelfRef = false) {
 				bearerAuth: {
 					type: 'http',
 					scheme: 'bearer',
-					description: [
-						'User or app access token (preferred).',
-						'Legacy alternative: JSON body field `i` on POST, or query `i` on allowGet endpoints (avoid putting tokens in URLs).',
-					].join(' '),
+					description: copy.bearer,
 				},
 			},
 		},

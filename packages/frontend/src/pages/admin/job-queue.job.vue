@@ -25,44 +25,44 @@ SPDX-License-Identifier: AGPL-3.0-only
 			v-model:tab="tab"
 			:tabs="[{
 					key: 'info',
-					title: 'Info',
+					title: tCommon('info'),
 					icon: 'ti ti-info-circle',
 				}, {
 					key: 'timeline',
-					title: 'Timeline',
+					title: tCommon('timeline'),
 					icon: 'ti ti-timeline-event',
 				}, {
 					key: 'data',
-					title: 'Data',
+					title: tCommon('data'),
 					icon: 'ti ti-package',
 				}, ...(canEdit ? [{
 					key: 'dataEdit',
-					title: 'Data (edit)',
+					title: tCommon('dataEdit'),
 					icon: 'ti ti-package',
 				}] : []),
 				...(job.returnValue != null ? [{
 					key: 'result',
-					title: 'Result',
+					title: tCommon('result'),
 					icon: 'ti ti-check',
 				}] : []),
 				...(job.stacktrace.length > 0 ? [{
 					key: 'error',
-					title: 'Error',
+					title: tCommon('error'),
 					icon: 'ti ti-alert-triangle',
 				}] : []), {
 					key: 'logs',
-					title: 'Logs',
+					title: tCommon('logs'),
 					icon: 'ti ti-logs',
 				}]"
 		/>
 	</template>
 	<template #footer>
 		<div class="_buttons">
-			<MkButton rounded @click="copyRaw()"><i class="ti ti-copy"></i> Copy raw</MkButton>
-			<MkButton rounded @click="refresh()"><i class="ti ti-reload"></i> Refresh view</MkButton>
-			<MkButton rounded @click="promoteJob()"><i class="ti ti-player-track-next"></i> Promote</MkButton>
-			<MkButton rounded @click="moveJob"><i class="ti ti-arrow-right"></i> Move to</MkButton>
-			<MkButton danger rounded style="margin-left: auto;" @click="removeJob()"><i class="ti ti-trash"></i> Remove</MkButton>
+			<MkButton rounded @click="copyRaw()"><i class="ti ti-copy"></i> {{ tCommon('copyRaw') }}</MkButton>
+			<MkButton rounded @click="refresh()"><i class="ti ti-reload"></i> {{ tCommon('refreshView') }}</MkButton>
+			<MkButton rounded @click="promoteJob()"><i class="ti ti-player-track-next"></i> {{ tCommon('promote') }}</MkButton>
+			<MkButton rounded @click="moveJob"><i class="ti ti-arrow-right"></i> {{ tCommon('moveTo') }}</MkButton>
+			<MkButton danger rounded style="margin-left: auto;" @click="removeJob()"><i class="ti ti-trash"></i> {{ tCommon('remove') }}</MkButton>
 		</div>
 	</template>
 
@@ -73,36 +73,36 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<template #value>{{ job.id }}</template>
 			</MkKeyValue>
 			<MkKeyValue>
-				<template #key>Created at</template>
+				<template #key>{{ tCommon('createdAt') }}</template>
 				<template #value><MkTime :time="job.timestamp" mode="detail"/></template>
 			</MkKeyValue>
 			<MkKeyValue v-if="job.processedOn != null">
-				<template #key>Processed at</template>
+				<template #key>{{ tCommon('processedAt') }}</template>
 				<template #value><MkTime :time="job.processedOn" mode="detail"/></template>
 			</MkKeyValue>
 			<MkKeyValue v-if="job.finishedOn != null">
-				<template #key>Finished at</template>
+				<template #key>{{ tCommon('finishedAt') }}</template>
 				<template #value><MkTime :time="job.finishedOn" mode="detail"/></template>
 			</MkKeyValue>
 			<MkKeyValue v-if="job.processedOn != null && job.finishedOn != null">
-				<template #key>Spent</template>
+				<template #key>{{ tCommon('spent') }}</template>
 				<template #value>{{ job.finishedOn - job.processedOn }}ms</template>
 			</MkKeyValue>
 			<MkKeyValue v-if="job.failedReason != null">
-				<template #key>Failed reason</template>
+				<template #key>{{ tCommon('failedReason') }}</template>
 				<template #value><i style="color: var(--MI_THEME-error)" class="ti ti-alert-triangle"></i> {{ job.failedReason }}</template>
 			</MkKeyValue>
 			<MkKeyValue v-if="job.opts.attempts != null && job.opts.attempts > 0">
-				<template #key>Attempts</template>
-				<template #value>{{ job.attempts }} of {{ job.opts.attempts }}</template>
+				<template #key>{{ tCommon('attempts') }}</template>
+				<template #value>{{ job.attempts }} {{ tCommon('attemptsOf') }} {{ job.opts.attempts }}</template>
 			</MkKeyValue>
 			<MkKeyValue v-if="job.progress != null && job.progress > 0">
-				<template #key>Progress</template>
+				<template #key>{{ tCommon('progress') }}</template>
 				<template #value>{{ Math.floor(job.progress * 100) }}%</template>
 			</MkKeyValue>
 		</div>
 		<MkFolder :withSpacer="false">
-			<template #label>Options</template>
+			<template #label>{{ tCommon('options') }}</template>
 			<MkCode :code="JSON5.stringify(job.opts, null, '\t')" lang="js"/>
 		</MkFolder>
 	</div>
@@ -112,30 +112,30 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<div>
 					<template v-if="event.type === 'finished'">
 						<template v-if="job.isFailed">
-							<b>Finished</b> <i class="ti ti-circle-x" style="color: var(--MI_THEME-error);"></i>
+							<b>{{ tCommon('finished') }}</b> <i class="ti ti-circle-x" style="color: var(--MI_THEME-error);"></i>
 						</template>
 						<template v-else>
-							<b>Finished</b> <i class="ti ti-check" style="color: var(--MI_THEME-success);"></i>
+							<b>{{ tCommon('finished') }}</b> <i class="ti ti-check" style="color: var(--MI_THEME-success);"></i>
 						</template>
 					</template>
 					<template v-else-if="event.type === 'processed'">
-						<b>Processed</b> <i class="ti ti-player-play"></i>
+						<b>{{ tCommon('processed') }}</b> <i class="ti ti-player-play"></i>
 					</template>
 					<template v-else-if="event.type === 'attempt'">
-						<b>Attempt #{{ event.attempt }}</b> <i class="ti ti-alert-triangle" style="color: var(--MI_THEME-warn);"></i>
+						<b>{{ tCommon('attemptN') }} #{{ event.attempt }}</b> <i class="ti ti-alert-triangle" style="color: var(--MI_THEME-warn);"></i>
 					</template>
 					<template v-else-if="event.type === 'created'">
-						<b>Created</b> <i class="ti ti-plus"></i>
+						<b>{{ tCommon('created') }}</b> <i class="ti ti-plus"></i>
 					</template>
 				</div>
 			</template>
 			<template #right="{ event, timestamp, delta }">
 				<div style="margin: 8px 0;">
 					<template v-if="event.type === 'attempt'">
-						<div>at ?</div>
+						<div>{{ tCommon('at') }} ?</div>
 					</template>
 					<template v-else>
-						<div>at <MkTime :time="timestamp" mode="detail"/></div>
+						<div>{{ tCommon('at') }} <MkTime :time="timestamp" mode="detail"/></div>
 						<div style="font-size: 90%; opacity: 0.7;">{{ timestamp }} (+{{ msSMH(delta) }})</div>
 					</template>
 				</div>
@@ -147,7 +147,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	</div>
 	<div v-else-if="tab === 'dataEdit'" class="_gaps_s">
 		<MkCodeEditor v-model="editData" lang="json5"></MkCodeEditor>
-		<MkButton><i class="ti ti-device-floppy"></i> Update</MkButton>
+		<MkButton><i class="ti ti-device-floppy"></i> {{ tCommon('update') }}</MkButton>
 	</div>
 	<div v-else-if="tab === 'result'">
 		<MkCode :code="job.returnValue"/>
@@ -164,6 +164,7 @@ import JSON5 from 'json5';
 import type { Ref } from 'vue';
 import * as os from '@/os.js';
 import { i18n } from '@/i18n.js';
+import { tCommon } from '@/utility/ui-fb-i18n.js';
 import MkButton from '@/components/MkButton.vue';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import MkTabs from '@/components/MkTabs.vue';

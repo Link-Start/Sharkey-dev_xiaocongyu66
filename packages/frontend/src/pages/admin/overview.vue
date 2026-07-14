@@ -7,57 +7,57 @@ SPDX-License-Identifier: AGPL-3.0-only
 <div class="_spacer" style="--MI_SPACER-w: 1000px;">
 	<div ref="rootEl" :class="$style.root">
 		<MkFoldableSection class="item">
-			<template #header>Stats</template>
+			<template #header>{{ tCommon('stats') }}</template>
 			<XStats/>
 		</MkFoldableSection>
 
 		<MkFoldableSection class="item">
-			<template #header>Active users</template>
+			<template #header>{{ tCommon('activeUsers') }}</template>
 			<XActiveUsers/>
 		</MkFoldableSection>
 
 		<MkFoldableSection class="item">
-			<template #header>Heatmap</template>
+			<template #header>{{ tCommon('heatmap') }}</template>
 			<XHeatmap/>
 		</MkFoldableSection>
 
 		<MkFoldableSection class="item">
-			<template #header>Retention rate</template>
+			<template #header>{{ tCommon('retentionRate') }}</template>
 			<XRetention/>
 		</MkFoldableSection>
 
 		<MkFoldableSection class="item">
-			<template #header>Moderators</template>
+			<template #header>{{ tCommon('moderators') }}</template>
 			<XModerators/>
 		</MkFoldableSection>
 
 		<MkFoldableSection class="item">
-			<template #header>Federation</template>
+			<template #header>{{ tCommon('federation') }}</template>
 			<XFederation/>
 		</MkFoldableSection>
 
 		<MkFoldableSection class="item">
-			<template #header>Instances</template>
+			<template #header>{{ tCommon('instances') }}</template>
 			<XInstances/>
 		</MkFoldableSection>
 
 		<MkFoldableSection class="item">
-			<template #header>Ap requests</template>
+			<template #header>{{ tCommon('apRequests') }}</template>
 			<XApRequests/>
 		</MkFoldableSection>
 
 		<MkFoldableSection class="item">
-			<template #header>New users</template>
+			<template #header>{{ tCommon('newUsers') }}</template>
 			<XUsers/>
 		</MkFoldableSection>
 
 		<MkFoldableSection class="item">
-			<template #header>Deliver queue</template>
+			<template #header>{{ tCommon('deliverQueue') }}</template>
 			<XQueue domain="deliver"/>
 		</MkFoldableSection>
 
 		<MkFoldableSection class="item">
-			<template #header>Inbox queue</template>
+			<template #header>{{ tCommon('inboxQueue') }}</template>
 			<XQueue domain="inbox"/>
 		</MkFoldableSection>
 
@@ -84,6 +84,7 @@ import XHeatmap from './overview.heatmap.vue';
 import { i18n } from '@/i18n.js';
 import { definePage } from '@/page.js';
 import MkFoldableSection from '@/components/MkFoldableSection.vue';
+import { tCommon } from '@/utility/ui-fb-i18n.js';
 
 const headerActions = computed(() => []);
 

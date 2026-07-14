@@ -9,14 +9,14 @@ SPDX-License-Identifier: AGPL-3.0-only
 	<div v-show="!fetching" :class="$style.root">
 		<div v-if="topSubInstancesForPie && topPubInstancesForPie" class="pies">
 			<div class="pie deliver _panel">
-				<div class="title">Sub</div>
+				<div class="title">{{ tCommon('sub') }}</div>
 				<XPie :data="topSubInstancesForPie" class="chart"/>
-				<div class="subTitle">Top 10</div>
+				<div class="subTitle">{{ tCommon('top10') }}</div>
 			</div>
 			<div class="pie inbox _panel">
-				<div class="title">Pub</div>
+				<div class="title">{{ tCommon('pub') }}</div>
 				<XPie :data="topPubInstancesForPie" class="chart"/>
-				<div class="subTitle">Top 10</div>
+				<div class="subTitle">{{ tCommon('top10') }}</div>
 			</div>
 		</div>
 		<div v-if="!fetching" class="items">
@@ -27,7 +27,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						{{ number(federationSubActive) }}
 						<MkNumberDiff v-tooltip="i18n.ts.dayOverDayChanges" class="diff" :value="federationSubActiveDiff"></MkNumberDiff>
 					</div>
-					<div class="label">Sub</div>
+					<div class="label">{{ tCommon('sub') }}</div>
 				</div>
 			</div>
 			<div class="item _panel pub">
@@ -37,7 +37,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						{{ number(federationPubActive) }}
 						<MkNumberDiff v-tooltip="i18n.ts.dayOverDayChanges" class="diff" :value="federationPubActiveDiff"></MkNumberDiff>
 					</div>
-					<div class="label">Pub</div>
+					<div class="label">{{ tCommon('pub') }}</div>
 				</div>
 			</div>
 		</div>
@@ -54,6 +54,7 @@ import { misskeyApiGet } from '@/utility/misskey-api.js';
 import number from '@/filters/number.js';
 import MkNumberDiff from '@/components/MkNumberDiff.vue';
 import { i18n } from '@/i18n.js';
+import { tCommon } from '@/utility/ui-fb-i18n.js';
 import { useChartTooltip } from '@/use/use-chart-tooltip.js';
 
 const topSubInstancesForPie = ref<InstanceForPie[] | null>(null);

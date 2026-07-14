@@ -22,7 +22,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 	<FormSection>
 		<div class="_gaps_m">
 			<MkKeyValue :copy="version">
-				<!-- TODO translate -->
 				<template #key>Sharkey</template>
 				<template #value>{{ version }}</template>
 			</MkKeyValue>
@@ -114,7 +113,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	</FormSuspense>
 
 	<FormSection v-if="sponsors.length > 0">
-		<template #label>Our lovely Sponsors</template>
+		<template #label>{{ tCommon('sponsors') }}</template>
 		<div :class="$style.contributors">
 			<span
 				v-for="(sponsor, i) of sponsors"
@@ -130,7 +129,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	</FormSection>
 
 	<FormSection>
-		<template #label>Well-known resources</template>
+		<template #label>{{ tCommon('wellKnown') }}</template>
 		<div class="_gaps_s">
 			<FormLink to="/.well-known/host-meta" external>host-meta</FormLink>
 			<FormLink to="/.well-known/host-meta.json" external>host-meta.json</FormLink>
@@ -146,6 +145,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 import { ref } from 'vue';
 import { host, version } from '@@/js/config.js';
 import { i18n } from '@/i18n.js';
+import { tCommon } from '@/utility/ui-fb-i18n.js';
 import { instance } from '@/instance.js';
 import number from '@/filters/number.js';
 import { misskeyApi } from '@/utility/misskey-api.js';

@@ -6,39 +6,39 @@ SPDX-License-Identifier: AGPL-3.0-only
 <template>
 <div class="_gaps">
 	<div :class="$style.status">
-		<div :class="$style.statusItem" class="_panel"><div :class="$style.statusLabel">Process</div>{{ number(activeSincePrevTick) }}</div>
-		<div :class="$style.statusItem" class="_panel"><div :class="$style.statusLabel">Active</div>{{ number(active) }}</div>
-		<div :class="$style.statusItem" class="_panel"><div :class="$style.statusLabel">Waiting</div>{{ number(waiting) }}</div>
-		<div :class="$style.statusItem" class="_panel"><div :class="$style.statusLabel">Delayed</div>{{ number(delayed) }}</div>
+		<div :class="$style.statusItem" class="_panel"><div :class="$style.statusLabel">{{ tCommon('process') }}</div>{{ number(activeSincePrevTick) }}</div>
+		<div :class="$style.statusItem" class="_panel"><div :class="$style.statusLabel">{{ tCommon('active') }}</div>{{ number(active) }}</div>
+		<div :class="$style.statusItem" class="_panel"><div :class="$style.statusLabel">{{ tCommon('waiting') }}</div>{{ number(waiting) }}</div>
+		<div :class="$style.statusItem" class="_panel"><div :class="$style.statusLabel">{{ tCommon('delayed') }}</div>{{ number(delayed) }}</div>
 	</div>
 	<div :class="$style.charts">
 		<div :class="$style.chart">
-			<div :class="$style.chartTitle">Process</div>
+			<div :class="$style.chartTitle">{{ tCommon('process') }}</div>
 			<XChart ref="chartProcess" type="process"/>
 		</div>
 		<div :class="$style.chart">
-			<div :class="$style.chartTitle">Active</div>
+			<div :class="$style.chartTitle">{{ tCommon('active') }}</div>
 			<XChart ref="chartActive" type="active"/>
 		</div>
 		<div :class="$style.chart">
-			<div :class="$style.chartTitle">Delayed</div>
+			<div :class="$style.chartTitle">{{ tCommon('delayed') }}</div>
 			<XChart ref="chartDelayed" type="delayed"/>
 		</div>
 		<div :class="$style.chart">
-			<div :class="$style.chartTitle">Waiting</div>
+			<div :class="$style.chartTitle">{{ tCommon('waiting') }}</div>
 			<XChart ref="chartWaiting" type="waiting"/>
 		</div>
 	</div>
 	<MkFolder :defaultOpen="true" :max-height="250">
 		<template #icon><i class="ti ti-alert-triangle"></i></template>
-		<template #label>Errored instances</template>
-		<template #suffix>({{ number(jobs.reduce((a, b) => a + b[1], 0)) }} jobs)</template>
+		<template #label>{{ tCommon('erroredInstances') }}</template>
+		<template #suffix>({{ number(jobs.reduce((a, b) => a + b[1], 0)) }} {{ tCommon('jobsCount') }})</template>
 
 		<div>
 			<div v-if="jobs.length > 0">
 				<div v-for="job in jobs" :key="job[0]">
 					<MkA :to="`/instance-info/${job[0]}`" behavior="window">{{ job[0] }}</MkA>
-					<span style="margin-left: 8px; opacity: 0.7;">({{ number(job[1]) }} jobs)</span>
+					<span style="margin-left: 8px; opacity: 0.7;">({{ number(job[1]) }} {{ tCommon('jobsCount') }})</span>
 				</div>
 			</div>
 			<span v-else style="opacity: 0.5;">{{ i18n.ts.noJobs }}</span>
@@ -56,6 +56,7 @@ import number from '@/filters/number.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import { useStream } from '@/stream.js';
 import { i18n } from '@/i18n.js';
+import { tCommon } from '@/utility/ui-fb-i18n.js';
 import MkFolder from '@/components/MkFolder.vue';
 
 const connection = markRaw(useStream().useChannel('queueStats'));

@@ -31,9 +31,15 @@ export class OpenApiServerService {
 			reply.header('Cache-Control', 'public, max-age=86400');
 			return await reply.sendFile('/api-doc.html', staticAssets);
 		});
-		fastify.get('/api.json', (_request, reply) => {
-			reply.header('Cache-Control', 'public, max-age=600');
-			reply.send(genOpenapiSpec(this.config));
+		fastify.get('/api.json', (request, reply) => {
+			const q = (request.query as { lang?: string } | undefined)?.lang;
+			const accept = typeof request.headers['accept-language'] === 'string'
+				? request.headers['accept-language']
+				: null;
+			// Short cache: language varies by Accept-Language / ?lang=
+			reply.header('Cache-Control', 'public, max-age=120, stale-while-revalidate=600');
+			reply.header('Vary', 'Accept-Language');
+			reply.send(genOpenapiSpec(this.config, false, q ?? accept));
 		});
 		done();
 	}

@@ -17,7 +17,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<div class="_gaps_m">
 					<MkButton primary @click="generateToken">{{ i18n.ts.generateAccessToken }}</MkButton>
 					<FormLink to="/settings/apps">{{ i18n.ts.manageAccessTokens }}</FormLink>
-					<FormLink to="/api-console" :behavior="isDesktop ? 'window' : null">API console</FormLink>
+					<FormLink to="/api-console" :behavior="isDesktop ? 'window' : null">{{ tCommon('apiConsole') }}</FormLink>
 				</div>
 			</FormSection>
 		</SearchMarker>
@@ -67,6 +67,7 @@ import FormSection from '@/components/form/section.vue';
 import FormLink from '@/components/form/link.vue';
 import { definePage } from '@/page.js';
 import { i18n } from '@/i18n.js';
+import { tCommon } from '@/utility/ui-fb-i18n.js';
 import MkFeatureBanner from '@/components/MkFeatureBanner.vue';
 import * as os from '@/os.js';
 import { misskeyApi } from '@/utility/misskey-api.js';

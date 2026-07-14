@@ -1,39 +1,97 @@
 <!DOCTYPE html>
 <html lang="en">
-	<head>
-		<title>Sharkey API</title>
-		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<meta name="description" content="OpenAPI reference for this Sharkey instance (public)">
-		<style>
-			body {
-				margin: 0;
-				padding: 0;
-			}
-		</style>
-	</head>
-	<body>
-		<!--
-			Public OpenAPI 3.1 from this instance (/api.json). No login required.
-			Auth for calling protected endpoints: Authorize → Bearer token.
-			Prefer Authorization: Bearer over legacy body field "i".
-			WS streaming auth (modern clients): Sec-WebSocket-Protocol misskey.i.<token>
-		-->
-		<script
-			id="api-reference"
-			data-url="/api.json"
-			data-configuration='{
-				"theme": "purple",
-				"layout": "modern",
-				"hideModels": false,
-				"defaultOpenAllTags": false,
-				"authentication": {
-					"preferredSecurityScheme": "bearerAuth"
-				},
-				"metaData": {
-					"title": "Sharkey API"
-				}
-			}'></script>
-		<script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
-	</body>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Sharkey API</title>
+	<meta name="description" content="OpenAPI reference for this Sharkey instance (public)">
+	<style>
+		body { margin: 0; padding: 0; }
+	</style>
+</head>
+<body>
+<!--
+Public OpenAPI 3.1 from this instance (/api.json). No login required.
+Auth for calling protected endpoints: Authorize → Bearer token.
+Prefer Authorization: Bearer over legacy body field "i".
+WS streaming auth (modern clients): Sec-WebSocket-Protocol misskey.i.<token>
+-->
+<script>
+(function () {
+	var packs = {
+		en: {
+			title: 'Sharkey API',
+			description: 'OpenAPI reference for this Sharkey instance (public). No login required.',
+			htmlLang: 'en',
+		},
+		zh: {
+			title: 'Sharkey API 文档',
+			description: '本实例的 OpenAPI 参考（公开，无需登录）。调用受保护接口请使用 Authorize → Bearer token。',
+			htmlLang: 'zh-CN',
+		},
+		'zh-TW': {
+			title: 'Sharkey API 文件',
+			description: '本站點的 OpenAPI 參考（公開，無需登入）。呼叫受保護端點請使用 Authorize → Bearer token。',
+			htmlLang: 'zh-TW',
+		},
+		ja: {
+			title: 'Sharkey API ドキュメント',
+			description: 'このインスタンスの OpenAPI リファレンス（公開・ログイン不要）。保護されたエンドポイントは Authorize → Bearer token を使用。',
+			htmlLang: 'ja',
+		},
+	};
+
+	function pick() {
+		var lang = (navigator.language || 'en').replace('_', '-').toLowerCase();
+		if (lang.indexOf('zh-tw') === 0 || lang.indexOf('zh-hk') === 0 || lang.indexOf('zh-hant') === 0) return packs['zh-TW'];
+		if (lang.indexOf('zh') === 0) return packs.zh;
+		if (lang.indexOf('ja') === 0) return packs.ja;
+		return packs.en;
+	}
+
+	var t = pick();
+	document.documentElement.lang = t.htmlLang;
+	document.title = t.title;
+	var meta = document.querySelector('meta[name="description"]');
+	if (meta) meta.setAttribute('content', t.description);
+
+	// Pass browser language so /api.json description/tags match UI language
+	var langParam = 'en';
+	var nav = (navigator.language || 'en').replace('_', '-').toLowerCase();
+	if (nav.indexOf('zh-tw') === 0 || nav.indexOf('zh-hk') === 0 || nav.indexOf('zh-hant') === 0) langParam = 'zh-TW';
+	else if (nav.indexOf('zh') === 0) langParam = 'zh';
+	else if (nav.indexOf('ja') === 0) langParam = 'ja';
+
+	// Scalar configuration (set before the api-reference script loads)
+	window.__sharkeyApiDocConfig = {
+		theme: 'purple',
+		layout: 'modern',
+		hideModels: false,
+		defaultOpenAllTags: false,
+		authentication: {
+			preferredSecurityScheme: 'bearerAuth',
+		},
+		metaData: {
+			title: t.title,
+			description: t.description,
+		},
+	};
+	window.__sharkeyApiDocUrl = '/api.json?lang=' + encodeURIComponent(langParam);
+})();
+</script>
+<script
+	id="api-reference"
+	data-url="/api.json"
+></script>
+<script>
+(function () {
+	var el = document.getElementById('api-reference');
+	if (el && window.__sharkeyApiDocConfig) {
+		if (window.__sharkeyApiDocUrl) el.setAttribute('data-url', window.__sharkeyApiDocUrl);
+		el.setAttribute('data-configuration', JSON.stringify(window.__sharkeyApiDocConfig));
+	}
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+</body>
 </html>
