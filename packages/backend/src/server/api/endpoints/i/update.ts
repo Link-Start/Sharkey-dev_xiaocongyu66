@@ -366,27 +366,20 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			if (ps.followedMessage !== undefined) profileUpdates.followedMessage = ps.followedMessage;
 			if (ps.lang !== undefined) profileUpdates.lang = ps.lang;
 			if (ps.aiTranslationConfig !== undefined) {
-				const current = (await this.userProfilesRepository.findOneBy({ userId: me.id }))?.aiTranslationConfig ?? {};
+				// Server stores prefs only (targetLang/selective). API key/baseUrl/model are client-local.
 				const incoming = ps.aiTranslationConfig;
 				if (incoming === null) {
 					profileUpdates.aiTranslationConfig = null;
 				} else {
 					const next: NonNullable<MiUserProfile['aiTranslationConfig']> = {
-						...current,
-						...incoming,
+						targetLang: (incoming as any).targetLang === '' || (incoming as any).targetLang == null
+							? null
+							: ((incoming as any).targetLang ?? null),
+						selective: typeof (incoming as any).selective === 'boolean' ? (incoming as any).selective : null,
+						baseUrl: null,
+						apiKey: null,
+						model: null,
 					};
-					const k = (incoming as any)?.apiKey;
-					if (k === '__clear__') {
-						next.apiKey = null;
-					} else if (k === '' || k === '<redacted>' || k == null) {
-						next.apiKey = current.apiKey ?? null;
-					}
-					// empty strings → null for optional fields
-					if (next.baseUrl === '') next.baseUrl = null;
-					if (next.model === '') next.model = null;
-					if (next.targetLang === '') next.targetLang = null;
-					// SK-2026-061: users may store API key/model only — never custom baseUrl
-					next.baseUrl = null;
 					profileUpdates.aiTranslationConfig = next;
 				}
 			}

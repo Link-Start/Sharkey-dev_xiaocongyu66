@@ -573,11 +573,11 @@ export class UserEntityService implements OnModuleInit {
 				aiTranslationConfig: profile!.aiTranslationConfig == null ? null : {
 					targetLang: profile!.aiTranslationConfig.targetLang ?? null,
 					selective: profile!.aiTranslationConfig.selective ?? null,
-					baseUrl: profile!.aiTranslationConfig.baseUrl ?? null,
-					// never expose raw key to client pack; only presence flag + redacted
-					apiKey: profile!.aiTranslationConfig.apiKey ? '<redacted>' : null,
-					model: profile!.aiTranslationConfig.model ?? null,
-					hasApiKey: !!(profile!.aiTranslationConfig.apiKey && profile!.aiTranslationConfig.apiKey.trim()),
+					// Credentials are client-local only — never stored/returned by server
+					baseUrl: null,
+					apiKey: null,
+					model: null,
+					hasApiKey: false,
 				},
 				allowUnsignedFetch: user.allowUnsignedFetch,
 				// alsoKnownAs moved from packedUserDetailedNotMeOnly for privacy

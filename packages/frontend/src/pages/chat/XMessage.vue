@@ -161,12 +161,21 @@ const e2eeFailLabel = chatT('e2eeDecryptFailed', chatFb.e2eeDecryptFailed);
 const translation = ref<string | null>(null);
 const translating = ref(false);
 const canTranslateChat = computed(() => {
-	// Backend sets chatTranslatorAvailable when chat AI is enabled and instance
-	// or user-key path can work; also allow if user already saved a personal key.
-	const inst = (instance as any).chatTranslatorAvailable === true;
-	const userKey = !!($i as any)?.aiTranslationConfig?.hasApiKey;
 	const enabled = (instance as any).aiTranslationPublic?.enableChat === true;
-	return enabled && (inst || userKey);
+	if (!enabled) return false;
+	const inst = (instance as any).chatTranslatorAvailable === true;
+	// Local credentials live only in browser storage (never on server profile)
+	let localOk = false;
+	if ((instance as any).aiTranslationPublic?.allowUserApiKey === true) {
+		try {
+			const raw = miLocalStorage.getItem('aiTranslationClient');
+			if (raw) {
+				const o = JSON.parse(raw);
+				localOk = !!(o?.baseUrl?.trim() && o?.apiKey?.trim());
+			}
+		} catch { /* ignore */ }
+	}
+	return inst || localOk;
 });
 
 /** Server-revealed plaintext (escrow) or plain message */
@@ -370,6 +379,26 @@ async function translateMessage() {
 			|| miLocalStorage.getItem('lang')
 			|| navigator.language;
 		const selective = ($i as any)?.aiTranslationConfig?.selective;
+		const allowLocal = (instance as any).aiTranslationPublic?.allowUserApiKey === true;
+
+		if (allowLocal && displayText.value) {
+			const { loadAiTranslationLocal, hasLocalAiCredentials, translateTextLocal } = await import('@/utility/ai-translation-local.js');
+			const local = loadAiTranslationLocal();
+			if (local.preferLocal && hasLocalAiCredentials(local)) {
+				try {
+					const localRes = await translateTextLocal(displayText.value, targetLang, {
+						selective: typeof selective === 'boolean' ? selective : undefined,
+					});
+					if (localRes?.text) {
+						translation.value = localRes.text;
+						return;
+					}
+				} catch (e) {
+					console.warn('Local AI chat translate failed, falling back:', e);
+				}
+			}
+		}
+
 		const res = await misskeyApi('chat/messages/translate', {
 			messageId: props.message.id,
 			targetLang,

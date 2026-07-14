@@ -144,31 +144,8 @@ export class AiTranslationService {
 			? c.shared
 			: (scope === 'notes' ? c.notes : c.chat);
 
-		// User may supply API key only; baseUrl is ALWAYS instance-controlled (SK-2026-061).
-		// Optional user baseUrl is ignored unless it matches instance host (same origin).
-		if (c.allowUserApiKey && userOverride?.apiKey && userOverride.apiKey.trim()) {
-			const instBase = inst.baseUrl?.trim() || null;
-			if (!instBase) {
-				// Without instance baseUrl, user key alone cannot aim arbitrary hosts
-				return null;
-			}
-			try {
-				assertSafeAiEndpointUrl(instBase);
-			} catch {
-				return null;
-			}
-			return {
-				baseUrl: instBase,
-				apiKey: userOverride.apiKey.trim(),
-				model: (userOverride.model && userOverride.model.trim())
-					? userOverride.model.trim()
-					: (inst.model || 'gpt-4o-mini'),
-				apiStyle: inst.apiStyle || 'auto',
-				systemPrompt: inst.systemPrompt,
-				requestTimeoutMs: inst.requestTimeoutMs || 20000,
-			};
-		}
-
+		// User credentials are client-local only (never stored/used server-side).
+		// Server always uses instance endpoint credentials.
 		if (inst.baseUrl && inst.baseUrl.trim() && inst.apiKey && inst.apiKey.trim() && inst.model) {
 			try {
 				assertSafeAiEndpointUrl(inst.baseUrl.trim());
@@ -205,7 +182,16 @@ export class AiTranslationService {
 
 	@bindThis
 	public profileToOverride(profile: MiUserProfile | null | undefined): AiTranslationUserOverride {
-		return profile?.aiTranslationConfig ?? null;
+		const c = profile?.aiTranslationConfig;
+		if (!c) return null;
+		// Never surface/use stored secrets server-side (client-local only)
+		return {
+			targetLang: c.targetLang ?? null,
+			selective: c.selective ?? null,
+			baseUrl: null,
+			apiKey: null,
+			model: null,
+		};
 	}
 
 	@bindThis

@@ -765,6 +765,32 @@ export async function translateNote(noteId: string, translation: Ref<Misskey.ent
 			|| miLocalStorage.getItem('lang')
 			|| navigator.language;
 		const selective = ($i as any)?.aiTranslationConfig?.selective;
+		const allowLocal = (instance as any).aiTranslationPublic?.allowUserApiKey === true;
+
+		// Client-local AI first (credentials never leave the device except to user's API host)
+		if (allowLocal) {
+			const { loadAiTranslationLocal, hasLocalAiCredentials, translateTextLocal } = await import('@/utility/ai-translation-local.js');
+			const local = loadAiTranslationLocal();
+			if (local.preferLocal && hasLocalAiCredentials(local)) {
+				try {
+					// Need note text — fetch via notes/show if not in scope; prefer server only for visibility
+					const note = await misskeyApi('notes/show', { noteId }) as { text?: string | null };
+					const src = note?.text?.trim();
+					if (src) {
+						const localRes = await translateTextLocal(src, targetLang, {
+							selective: typeof selective === 'boolean' ? selective : undefined,
+						});
+						if (localRes?.text) {
+							translation.value = { text: localRes.text, sourceLang: localRes.sourceLang } as any;
+							return;
+						}
+					}
+				} catch (e) {
+					console.warn('Local AI translate failed, falling back to instance:', e);
+				}
+			}
+		}
+
 		translation.value = await misskeyApi('notes/translate', {
 			noteId,
 			targetLang,

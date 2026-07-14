@@ -195,12 +195,12 @@ const FB: Record<string, LangPack> = {
 		'zh-TW': '關閉後可分別設定。',
 		ja: 'オフでノート/チャットを個別設定。',
 	},
-	allowUserKey: { en: 'Allow user custom API key', zh: '允许用户自定义 API Key', 'zh-TW': '允許使用者自訂 API Key', ja: 'ユーザー独自APIキーを許可' },
+	allowUserKey: { en: 'Allow local user AI endpoint', zh: '允许用户本机 AI 端点', 'zh-TW': '允許使用者本機 AI 端點', ja: 'ユーザーのローカルAIを許可' },
 	allowUserKeyCaption: {
-		en: 'Users can set their own base URL / key / model in settings and use their translation AI.',
-		zh: '用户可在设置中填写自己的基址/密钥/模型，使用自己的翻译 AI。',
-		'zh-TW': '使用者可在設定中填寫自己的金鑰。',
-		ja: 'ユーザーが設定で独自キーを使えます。',
+		en: 'Users may configure base URL / key / model in the browser only. Credentials are never stored or used by the server (browser → user API).',
+		zh: '用户可在浏览器本机配置基址/密钥/模型。凭据不会上传到服务器，也不会被服务端使用（浏览器直连用户 API）。',
+		'zh-TW': '使用者可在瀏覽器本機設定。憑證不會上傳伺服器，也不會被服務端使用。',
+		ja: 'ブラウザのみにキー/URLを保存。サーバーは保存・使用しません。',
 	},
 	preferAi: { en: 'Prefer AI over DeepL/Libre for notes', zh: '帖子优先用 AI（而非 DeepL/Libre）', 'zh-TW': '貼文優先 AI', ja: 'ノートはAIを優先' },
 	preferAiCaption: {

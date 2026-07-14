@@ -205,9 +205,10 @@ export class MetaEntityService {
 		const c = instance.aiTranslationConfig;
 		if (!c?.enableNotes) return false;
 		const ep = c.useSharedCredentials !== false ? c.shared : c.notes;
+		// Server path requires instance credentials. Client-local keys do not affect this flag.
+		// UI still shows translate if classic DeepL/Libre OR instance AI OR allowUserApiKey (client).
 		const hasInstance = !!(ep?.baseUrl?.trim() && ep?.apiKey?.trim() && ep?.model?.trim());
-		// Show UI when instance is ready OR users may bring their own key
-		return hasInstance || c.allowUserApiKey !== false;
+		return hasInstance || c.allowUserApiKey === true;
 	}
 
 	@bindThis
@@ -216,7 +217,7 @@ export class MetaEntityService {
 		if (!c?.enableChat) return false;
 		const ep = c.useSharedCredentials !== false ? c.shared : c.chat;
 		const hasInstance = !!(ep?.baseUrl?.trim() && ep?.apiKey?.trim() && ep?.model?.trim());
-		return hasInstance || c.allowUserApiKey !== false;
+		return hasInstance || c.allowUserApiKey === true;
 	}
 }
 
