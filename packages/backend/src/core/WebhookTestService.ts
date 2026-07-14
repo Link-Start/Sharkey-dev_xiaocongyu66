@@ -4,6 +4,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
+import { UtilityService } from '@/core/UtilityService.js';
 import { MiAbuseUserReport, MiNote, MiUser, MiWebhook } from '@/models/_.js';
 import { bindThis } from '@/decorators.js';
 import { MiSystemWebhook, type SystemWebhookEventType } from '@/models/SystemWebhook.js';
@@ -175,6 +176,7 @@ export class WebhookTestService {
 		private queueService: QueueService,
 		private readonly idService: IdService,
 		private readonly timeService: TimeService,
+		private readonly utilityService: UtilityService,
 	) {
 	}
 
@@ -207,6 +209,11 @@ export class WebhookTestService {
 				...webhook,
 				...params.override,
 			};
+
+			// SK-2026-070: re-validate URL if override changed it
+			if (params.override?.url != null) {
+				this.assertSafeWebhookUrl(merged.url);
+			}
 
 			// テスト目的なのでUserWebhookServiceの機能を経由せず直接キューに追加する（チェック処理などをスキップする意図）.
 			// また、Jobの試行回数も1回だけ.
@@ -313,6 +320,11 @@ export class WebhookTestService {
 				...webhook,
 				...params.override,
 			};
+
+			// SK-2026-070: re-validate URL if override changed it
+			if (params.override?.url != null) {
+				this.assertSafeWebhookUrl(merged.url);
+			}
 
 			// テスト目的なのでSystemWebhookServiceの機能を経由せず直接キューに追加する（チェック処理などをスキップする意図）.
 			// また、Jobの試行回数も1回だけ.

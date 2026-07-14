@@ -12,6 +12,7 @@ import { TimeService } from '@/global/TimeService.js';
 import { InternalEventService } from '@/global/InternalEventService.js';
 import { UserAuthService } from '@/core/UserAuthService.js';
 import { ApiError } from '@/server/api/error.js';
+import { SessionRevocationService } from '@/core/SessionRevocationService.js';
 
 export const meta = {
 	tags: ['reset password'],
@@ -57,6 +58,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private readonly timeService: TimeService,
 		private readonly internalEventService: InternalEventService,
 		private readonly userAuthService: UserAuthService,
+		private readonly sessionRevocationService: SessionRevocationService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
 			const req = await this.passwordResetRequestsRepository.findOneByOrFail({
@@ -76,7 +78,10 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			});
 			await this.internalEventService.emit('updateUserProfile', { userId: req.userId, keys: ['password'] });
 
+			// Delete this reset token first, then revoke all sessions (also clears remaining reset rows)
 			await this.passwordResetRequestsRepository.delete(req.id);
+			// SK-2026-068
+			await this.sessionRevocationService.revokeAllSessionsForUser(req.userId);
 		});
 	}
 }

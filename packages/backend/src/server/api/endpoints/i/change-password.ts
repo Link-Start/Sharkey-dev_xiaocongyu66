@@ -11,6 +11,7 @@ import { DI } from '@/di-symbols.js';
 import { UserAuthService } from '@/core/UserAuthService.js';
 import { InternalEventService } from '@/global/InternalEventService.js';
 import { ApiError } from '@/server/api/error.js';
+import { SessionRevocationService } from '@/core/SessionRevocationService.js';
 
 export const meta = {
 	requireCredential: true,
@@ -56,6 +57,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 		private userAuthService: UserAuthService,
 		private readonly internalEventService: InternalEventService,
+		private readonly sessionRevocationService: SessionRevocationService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
 			const profile = await this.userProfilesRepository.findOneByOrFail({ userId: me.id });
@@ -75,6 +77,9 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				password: hash,
 			});
 			await this.internalEventService.emit('updateUserProfile', { userId: me.id, keys: ['password'] });
+
+			// SK-2026-068: kill surviving API sessions after password change
+			await this.sessionRevocationService.revokeAllSessionsForUser(me.id);
 		});
 	}
 }

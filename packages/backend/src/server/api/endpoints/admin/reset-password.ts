@@ -12,6 +12,7 @@ import { isSystemAccount } from '@/misc/is-system-account.js';
 import { ModerationLogService } from '@/core/ModerationLogService.js';
 import { InternalEventService } from '@/global/InternalEventService.js';
 import { UserAuthService } from '@/core/UserAuthService.js';
+import { SessionRevocationService } from '@/core/SessionRevocationService.js';
 
 export const meta = {
 	tags: ['admin'],
@@ -57,6 +58,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private moderationLogService: ModerationLogService,
 		private readonly internalEventService: InternalEventService,
 		private readonly userAuthService: UserAuthService,
+		private readonly sessionRevocationService: SessionRevocationService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
 			const user = await this.usersRepository.findOneBy({ id: ps.userId });
@@ -84,6 +86,9 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				password: hash,
 			});
 			await this.internalEventService.emit('updateUserProfile', { userId: user.id, keys: ['password'] });
+
+			// SK-2026-068: admin password reset also kills API sessions
+			await this.sessionRevocationService.revokeAllSessionsForUser(user.id);
 
 			await this.moderationLogService.log(me, 'resetPassword', {
 				userId: user.id,

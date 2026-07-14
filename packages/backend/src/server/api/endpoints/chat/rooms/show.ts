@@ -54,6 +54,14 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				throw new ApiError(meta.errors.noSuchRoom);
 			}
 
+			// SK-2026-069: membership / moderate / public joinPolicy only
+			const isMember = await this.chatService.isRoomMember(room, me.id);
+			const canMod = await this.chatService.canModerateRoom(room, me.id);
+			const publicJoin = room.joinPolicy === 'public' || room.joinPolicy === 'link';
+			if (!isMember && !canMod && !publicJoin) {
+				throw new ApiError(meta.errors.noSuchRoom);
+			}
+
 			return await this.chatEntityService.packRoom(room, me);
 		});
 	}

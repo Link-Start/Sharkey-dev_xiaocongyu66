@@ -16,6 +16,12 @@ export const meta = {
 
 	kind: 'write:chat',
 
+	// SK-2026-072: tighter than default 10/s for invite-code guessing
+	limit: {
+		duration: 1000 * 60,
+		max: 5,
+	},
+
 	res: {
 		type: 'object',
 		optional: false, nullable: false,

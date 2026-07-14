@@ -87,6 +87,7 @@ import { XAlgorithmService } from './XAlgorithmService.js';
 import { AiNoteModerationService } from './AiNoteModerationService.js';
 import { AiAbuseControlService } from './AiAbuseControlService.js';
 import { AiTranslationService } from './AiTranslationService.js';
+import { SessionRevocationService } from './SessionRevocationService.js';
 import { ChannelFollowingService } from './ChannelFollowingService.js';
 import { ChatService } from './ChatService.js';
 import { ChatCryptoService } from './ChatCryptoService.js';
@@ -406,6 +407,7 @@ const $Imports = [
 		AiNoteModerationService,
 		AiAbuseControlService,
 		AiTranslationService,
+		SessionRevocationService,
 		FanoutTimelineEndpointService,
 		ChannelFollowingService,
 		ChatService,
@@ -729,6 +731,7 @@ const $Imports = [
 		AiNoteModerationService,
 		AiAbuseControlService,
 		AiTranslationService,
+		SessionRevocationService,
 		FanoutTimelineEndpointService,
 		ChannelFollowingService,
 		ChatService,

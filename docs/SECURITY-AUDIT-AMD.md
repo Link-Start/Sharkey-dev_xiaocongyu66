@@ -12,7 +12,7 @@
 | **Method** | Static code review only — no live exploitation, no PoC payloads, no load tests |
 | **Scope** | Backend API, chat, MFM/CSS rendering, media proxy, federation edges, OAuth/Mastodon glue, auth tokens; **chat performance, WebSocket expansion, escrow crypto, X-algorithm, engineering process**; **AI translation/moderation/abuse, Mastodon host-loopback** |
 | **Out of scope** | Production traffic, third-party deps CVE enumeration, full ActivityPub protocol fuzz, production load benchmarks |
-| **Disposition** | **Private local report.** Pre-AI P0/P1 largely remediated; **Pass 7 reopened High items on AI native-`fetch` SSRF and Mastodon Host-based loopback**. Prefer responsible disclosure via instance SECURITY.md / upstream for anything still open. |
+| **Disposition** | **Private local report.** Pre-AI P0/P1 + Pass 7 High + Pass 8 Medium items largely remediated in tree. Prefer responsible disclosure via instance SECURITY.md / upstream for residual design items. |
 
 ---
 
@@ -25,16 +25,17 @@ Sharkey inherits a mature Misskey security baseline (private-IP SSRF guards, SVG
 | Layer | Status |
 |-------|--------|
 | **Code: pre-AI P0/P1 (SK-001…060 class)** | **Mostly done** in this tree |
-| **Code: Pass 7 AI / Mastodon SSRF (SK-061…067)** | **Remediated in tree (2026-07-14)** |
-| **Design / privacy / product honesty** | Residual open (escrow ≠ E2EE; AI uncensored defaults) |
+| **Code: Pass 7 AI / Mastodon SSRF (SK-061…067)** | **Remediated in tree (2026-07-14, `5bfc08a`)** |
+| **Code: Pass 8 session / chat / webhook (SK-068…072)** | **Remediated in tree (2026-07-14)** |
+| **Design / privacy / product honesty** | Residual open (escrow ≠ E2EE; AI LLM privacy) |
 | **Ops / deploy configuration** | Operator checklist still required |
 | **Dynamic pentest / full regression** | **Not completed** (audit was static) |
 
 **One-line conclusion (security):**  
-**“Pre-AI P0/P1 remediations largely hold. Pass 7 (SK-061…067) code remediations landed: AI outbound via HttpRequestService + URL assert; user baseUrl stripped; Mastodon server fetch uses config.url; chat translate requires canUseTranslator; escrow reveal independent of write preference; abuse auto-suspend seed-only. Residual: SK-063 design (client fingerprint still soft signal), SK-066 product privacy (third-party LLM still receives plaintext when translate enabled).”**
+**“Pass 7 High SSRF closed (`5bfc08a`). Pass 8 (SK-068…072) remediated: password change/reset revokes sessions; chat room show membership-gated; webhook test/admin URL validation aligned; join-by-code rate-limited.”**
 
 **One-line conclusion (optimization / engineering — see §8):**  
-**“Performance and chat architecture investments are sound; Pass 7 High SSRF closed in code — composite ~8.0/10 pending deploy verification.”**
+**“Performance and chat architecture investments are sound; Pass 7–8 code remediations landed — composite ~8.2/10 pending deploy verification.”**
 
 ### 0.2 Remediation commits (this tree)
 
@@ -44,17 +45,19 @@ Sharkey inherits a mature Misskey security baseline (private-IP SSRF guards, SVG
 | `15b00d8` | AMD P0/P1 batch: SSRF always-on, OAuth stub reject, channel color, invite CSPRNG, room invite blocks, `sw/unregister`, sponsors, federation update-remote-user, storage path, docs |
 | `7ba243c` | P1: `fetch-rss` auth, webhook https, poll/chat SQL params, sanitize-html no `style`, frontend `safeCssHexColor` |
 | `4eb55e4` | Continue: reaction/hashtag SQL params, MFM clamps, export-emoji moderator, page-push bounds, gateway `API_KEY` in prod, role colors |
+| `5bfc08a` | Pass 7: AI/X-algo via HttpRequestService + URL assert; user baseUrl strip; Mastodon `config.url`; chat `canUseTranslator`; escrow reveal; seed-only auto-suspend |
+| (Pass 8) | Session revoke on password change/reset; chat rooms/show ACL; webhook URL validation; join-by-code rate limit |
 
 **Must verify on deploy:** the above commits (or equivalent) are present in production builds.
 
-### 0.3 Finding counts (through Pass 7)
+### 0.3 Finding counts (through Pass 8)
 
 | Severity | Count (approx.) | Themes |
 |----------|-----------------|--------|
-| **Critical / High** | 5–7 | Historical: chat WS, non-prod SSRF, OAuth dummy; **new: AI user SSRF, Mastodon Host SSRF** |
-| **Medium** | 20+ | CSS, invite, SQL, escrow, webhooks; **new: AI admin fetch, fingerprint abuse, chat translate policy gap, AI data exfil** |
-| **Low / Info** | 20+ | Token length, DoS knobs, privacy, misconfig, TODOs |
-| **Total IDs** | **SK-2026-001 … 067** | Living document (pass 7: AI + Mastodon reverse) |
+| **Critical / High** | 5–7 historical (mostly fixed); **0 new open High in Pass 8** | Prior: chat WS, SSRF, OAuth, AI/Mastodon (remediated) |
+| **Medium** | 25+ | Prior residuals + **session non-revocation, webhook URL gaps, chat room metadata** |
+| **Low / Info** | 25+ | Token length, join-by-code rate limit, privacy, misconfig |
+| **Total IDs** | **SK-2026-001 … 072** | Living document (pass 8: session / chat meta / webhook) |
 
 ### 0.4 Remediation status matrix (code vs residual)
 
@@ -133,6 +136,16 @@ Sharkey inherits a mature Misskey security baseline (private-IP SSRF guards, SVG
 | **066** | Default uncensored + user endpoint exfil | **M** | **Mitigated** — `allowUserApiKey`/`uncensored` default false; baseUrl not user-owned |
 | **067** | Escrow reveal gated on write preference | **M** | **Fixed** — decrypt when keys present |
 
+#### Pass 8 — remediated in tree (2026-07-14)
+
+| ID | Topic | Severity | Status |
+|----|--------|----------|--------|
+| **068** | Password change/reset leave sessions alive | **M** | **Fixed** — rotate native token, delete access_tokens + reset rows |
+| **069** | `chat/rooms/show` metadata IDOR | **L–M** | **Fixed** — member / moderator / public|link join only |
+| **070** | Webhook test `override.url` skips validation | **M** | **Fixed** — re-validate override URL |
+| **071** | System webhook create/update no URL hardening | **M** | **Fixed** — same https + no-userinfo as user webhooks |
+| **072** | Join-by-code rate residual | **L** | **Mitigated** — 5/min endpoint limit |
+
 #### Ops-only (not closed by code alone)
 
 - [ ] Public nodes: `NODE_ENV=production`
@@ -140,9 +153,9 @@ Sharkey inherits a mature Misskey security baseline (private-IP SSRF guards, SVG
 - [ ] `reset-db` unreachable on internet-facing instances
 - [ ] x-algorithm gateway not public without `API_KEY`
 - [ ] Smoke: private IP via `/proxy` and authenticated `fetch-rss` fails closed
-- [ ] **Pass 7:** if AI translation enabled, disable `allowUserApiKey` or block until SK-061 fixed
-- [ ] **Pass 7:** reverse-proxy must strip/override untrusted `Host` / `X-Forwarded-Host` (SK-064)
-- [ ] **Pass 7:** do not enable `aiAbuseControlConfig.autoSuspend` without human review (SK-063)
+- [ ] Deploy includes `5bfc08a` (Pass 7) or equivalent
+- [x] **Pass 8:** password change/reset auto-revokes tokens (verify on deploy)
+- [ ] **Pass 7 residual:** do not enable `aiAbuseControlConfig.autoSuspend` without human review (SK-063)
 
 ---
 
@@ -1646,12 +1659,170 @@ Decrypt-for-pack should depend on **key availability**, not write preference. Ke
 | WS `?i=` still accepted server-side | **Yes** residual (SK-059) |
 | Dynamic exploit of SK-061/064 | **Not run** (static only) |
 
-**Highest ROI for attackers after Pass 7**
+**Highest ROI for attackers after Pass 7 (pre-remediation)** — historical; remediated in `5bfc08a`.
 
-1. Enable/abuse AI chat translate + custom `baseUrl` (SK-061/065/066)  
-2. Host-header games against Mastodon trends if edge trusts client Host (SK-064)  
-3. Fingerprint spoof + auto-suspend (SK-063)  
-4. Prior residual: token theft, `/proxy` abuse, escrow key theft  
+**Highest ROI after Pass 7 fix + Pass 8**
+
+1. Stolen session survives password reset (SK-068)  
+2. Webhook test override / system-webhook weak URL (SK-070/071) + agent residual  
+3. Chat room metadata recon (SK-069)  
+4. Fingerprint soft signal (SK-063 residual)  
+5. Prior: token theft, `/proxy`, escrow key theft  
+
+---
+
+## 1h. Pass 8 (2026-07-14) — session lifecycle, chat metadata, webhooks
+
+**Focus after Pass 7 fix verification:** auth session invalidation, chat room ACL consistency, webhook URL enforcement, join-by-code limits. Confirmed Pass 7 code is live (`AiTranslationService` uses `HttpRequestService` + `assertSafeAiEndpointUrl`; user `baseUrl` nulled in `profileToOverride`; Mastodon `getBaseUrl(request, config.url)`).
+
+---
+
+### SK-2026-068 — Password change / reset does not revoke API sessions
+
+| | |
+|--|--|
+| **Severity** | **M** |
+| **CWE** | CWE-613 Insufficient Session Expiration |
+| **Status** | **Fixed in tree** (SessionRevocationService on change/reset/admin reset)|
+| **Components** | `endpoints/i/change-password.ts`; `endpoints/reset-password.ts`; `endpoints/admin/reset-password.ts`; `SigninService` (`i: user.token`); `users.token` native API token; `access_tokens` table |
+
+**Description**  
+All three password-mutation paths only update `user_profile.password` and emit `updateUserProfile` (cache refresh). None of:
+
+- rotate / null `user.token` (native Bearer used by web + many clients),  
+- delete rows in `access_tokens` (app / miauth / shared-access),  
+- invalidate outstanding password-reset rows for the same user (except the single token consumed on success).
+
+Sign-in continues to return the **same** long-lived `user.token` (`SigninService` packs `i: user.token`). Compromised token remains valid after the victim “secures” the account by changing password or completing email reset. Admin reset likewise returns a new password string but leaves API tokens alive.
+
+Contrast: `i/regenerate-token` **does** rotate native token (password + 2FA gated) but is a separate explicit action users rarely take after reset.
+
+**Impact**
+
+- Account takeover persistence after password recovery.  
+- Stolen app tokens survive password rotation.  
+- Admin “reset password” does not kick attacker sessions.
+
+**Remediation**
+
+1. On any password change/reset: rotate `user.token`, delete (or mark revoked) all `access_tokens` for that user, delete unused password-reset rows.  
+2. Optionally force re-login via WS `tokenUpdated` / disconnect (as `regenerate-token` does).  
+3. Document that password reset implies full session kill.
+
+---
+
+### SK-2026-069 — `chat/rooms/show` lacks membership authorization
+
+| | |
+|--|--|
+| **Severity** | **L–M** |
+| **CWE** | CWE-862 Missing Authorization |
+| **Status** | **Fixed in tree** (member/moderator/public|link only)|
+| **Components** | `endpoints/chat/rooms/show.ts`; `ChatEntityService.packRoom` |
+
+**Description**  
+Any authenticated user with chat read may:
+
+```ts
+const room = await this.chatService.findRoomById(ps.roomId);
+// no isRoomMember / hasPermission check
+return await this.chatEntityService.packRoom(room, me);
+```
+
+`packRoom` correctly hides `inviteCode` from non-admins, but still returns name, description, announcement, owner, joinPolicy, rate limits, mute-all flag, and `canJoin` for **any** known `roomId`.
+
+Compare: `chat/rooms/members` requires member or room moderator; timeline requires membership.
+
+**Impact**
+
+- Enumerate private/invite rooms if IDs leak (notifications, shared links, IDOR guesses with aidx).  
+- Recon of room policy / owner before join.  
+- Not full message leak (timeline still gated).
+
+**Remediation**  
+Require `isRoomMember` or `canModerateRoom` or (for public joinPolicy only) allow show; otherwise `NO_SUCH_ROOM`.
+
+---
+
+### SK-2026-070 — Webhook test `override.url` skips URL validation
+
+| | |
+|--|--|
+| **Severity** | **M** |
+| **CWE** | CWE-918 / CWE-20 |
+| **Status** | **Fixed in tree** (override URL re-validated)|
+| **Components** | `core/WebhookTestService.ts` (`testUserWebhook`, `testSystemWebhook`); `endpoints/i/webhooks/test.ts`; `endpoints/admin/system-webhook/test.ts` |
+
+**Description**  
+Create/update of **user** webhooks validates `isValidUrl` (https, no userinfo) — SK-016. Test path:
+
+```ts
+const merged = { ...webhook, ...params.override };
+this.queueService.userWebhookDeliver(merged, type, contents, { attempts: 1 });
+```
+
+`override.url` / `secret` are applied **without** re-running URL checks. Delivery still uses `HttpRequestService.send` (private-IP agent applies), but:
+
+- `http:` URLs may be accepted where create forbids them,  
+- userinfo-in-URL and other create-time rejects can be bypassed for a one-shot deliver,  
+- system webhook test has the same merge pattern for moderators.
+
+**Remediation**  
+Validate override URL with the same helper as create/update before enqueue; reject non-https / userinfo.
+
+---
+
+### SK-2026-071 — Admin system-webhook create/update: no URL hardening
+
+| | |
+|--|--|
+| **Severity** | **M** (staff-only) |
+| **CWE** | CWE-20 / CWE-918 |
+| **Status** | **Fixed in tree** (https + no userinfo on system webhooks)|
+| **Components** | `endpoints/admin/system-webhook/create.ts`, `update.ts` vs `i/webhooks/create.ts` |
+
+**Description**  
+User webhooks:
+
+```ts
+if (!this.utilityService.isValidUrl(ps.url, { allowHttp: false, allowFragment: false })) …
+```
+
+System webhook create stores `ps.url` with **no** scheme/userinfo validation — only `minLength`/`maxLength`. Moderator-compromised or careless staff can register `http://169.254.169.254/…` etc.; delivery still hits socket deny for non-allowlisted private nets, but consistency gap and http-to-internal services on public IPs remain.
+
+**Remediation**  
+Reuse the same `isValidUrl` + no-userinfo checks as user webhooks for system webhooks.
+
+---
+
+### SK-2026-072 — Join-by-invite-code rate limit residual
+
+| | |
+|--|--|
+| **Severity** | **L** |
+| **CWE** | CWE-307 |
+| **Status** | **Mitigated in tree** (5 requests / minute)|
+| **Components** | `endpoints/chat/rooms/join-by-code.ts`; `ChatService.joinByInviteCode` |
+
+**Description**  
+Invite codes are CSPRNG 16-char (SK-008 fixed). Endpoint has **no** dedicated `meta.limit` beyond the global default (10/s). Online brute of full code space is impractical; risk is mainly shared short-lived codes + no progressive lockout / per-code failure budget.
+
+**Remediation**  
+Lower max (e.g. 5/min), track failures per user+IP, optional captcha after N failures.
+
+---
+
+### Pass 8 — notes (non-issues / accepted)
+
+| Check | Result |
+|-------|--------|
+| Pass 7 AI SSRF still present? | **No** — verified `HttpRequestService` + `assertSafeAiEndpointUrl`; user baseUrl ignored |
+| Pass 7 Mastodon Host SSRF? | **No** — `getBaseUrl(request, this.config.url)` |
+| `pages/show` visibility | Create always `visibility: 'public'`; no user API to set followers/specified — residual schema only |
+| URL preview / summaly private IP | Summaly rejects private IP when agent empty; when Sharkey passes agents, relies on `HttpRequestService` (OK) |
+| Password reset email enumeration | Constant empty response — good |
+| Drive files show ownership | Enforced — good |
+| Flash private | SK-052 still holds |
 
 ---
 
@@ -1660,29 +1831,29 @@ Decrypt-for-pack should depend on **key availability**, not write preference. Ke
 ```
 Internet
   ├─ /api/*  (Misskey API + rate limits + kinds)
-  │    ├─ notes/translate, chat/messages/translate ──► AiTranslationService ──► native fetch (SK-061)
-  │    └─ i/update aiTranslationConfig (user baseUrl)
+  │    ├─ notes/translate, chat/messages/translate ──► AiTranslationService ──► HttpRequestService (SK-061 fixed)
+  │    ├─ i/change-password, reset-password ──► password + session revoke (SK-068 fixed)
+  │    ├─ chat/rooms/show ──► membership / public join gated (SK-069 fixed)
+  │    ├─ i/webhooks/test + admin system-webhook URL validated (SK-070/071 fixed)
+  │    └─ chat/rooms/join-by-code 5/min (SK-072 mitigated)
   ├─ /oauth/* (authorize redirect, token; client_credentials rejected)
-  ├─ /api/v1/* Mastodon API
-  │    └─ trends/statuses, suggestions ──► fetch(getBaseUrl(Host)/api/…) (SK-064)
+  ├─ /api/v1/* Mastodon API ──► config.url origin (SK-064 fixed)
   ├─ /proxy/* media proxy ──► HttpRequestService ──► private-IP guards (always on)
   ├─ /files/* drive keys (UUID)
-  ├─ /url preview
+  ├─ /url preview (summaly + optional proxy)
   ├─ ActivityPub inbox/outbox (signed)
   ├─ WebSocket streaming (chatRoom, main, timelines)
-  ├─ AI moderation / abuse (admin baseUrl, native fetch) (SK-062)
-  └─ optional x-algorithm-gateway (DB) (SK-062/028)
+  └─ optional x-algorithm-gateway (DB) (SK-028)
 ```
 
 **Highest residual ROI after remediation (for attackers / next hardening)**  
-1. **SK-061 / 065 / 066** — AI translation SSRF + chat plaintext to attacker LLM  
-2. **SK-064** — Mastodon Host-based server-side fetch (edge-dependent)  
-3. Session/token theft (SK-017/020); catalog recon **SK-060** (expected open)  
-4. **SK-059 residual** — legacy `?i=` / GET query still accepted  
-5. Authenticated SSRF-ish surfaces (`/proxy`, webhooks) with agent guards  
-6. Escrow key compromise (SK-010) / reveal preference (SK-067)  
-7. Fingerprint auto-suspend (SK-063)  
-8. Mis-deploy: `NODE_ENV=test`, gateway without API key
+1. Session/token theft (SK-017/020); catalog recon **SK-060** (expected open)  
+2. **SK-059 residual** — legacy `?i=` / GET query still accepted  
+3. Authenticated SSRF-ish surfaces (`/proxy`, webhooks) with agent guards  
+4. Escrow key compromise (SK-010)  
+5. Fingerprint soft signal (SK-063 residual)  
+6. Mis-deploy: `NODE_ENV=test`, gateway without API key  
+7. Join-by-code progressive lockout residual (SK-072 partial)
 
 ---
 
@@ -1718,11 +1889,14 @@ Internet
 | 10 | `sw/unregister` auth | **DONE** |
 | 11 | `sponsors.forceUpdate` public DoS | **DONE** |
 | 12 | `federation/update-remote-user` auth | **DONE** |
-| **P1-AI** | **SK-062** AI mod/abuse/x-algo through guarded HTTP | **OPEN** |
+| **P1-AI** | **SK-062** AI mod/abuse/x-algo through guarded HTTP | **Fixed** |
 | **P1-AI** | **SK-065** chat translate `canUseTranslator` | **Fixed** |
-| **P1-AI** | **SK-066** uncensored/default privacy + translate UX | **OPEN** |
-| **P1-FP** | **SK-063** fingerprint not trusted for auto-suspend | **OPEN** |
-| **P1-CR** | **SK-067** escrow reveal independent of preference | **OPEN**
+| **P1-AI** | **SK-066** third-party LLM privacy UX | **PARTIAL** |
+| **P1-FP** | **SK-063** fingerprint soft signal / seed-only suspend | **PARTIAL** |
+| **P1-CR** | **SK-067** escrow reveal independent of preference | **Fixed** |
+| **P1-S8** | **SK-068** revoke tokens on password change/reset | **OPEN** |
+| **P1-S8** | **SK-070/071** webhook test + system-webhook URL validation | **OPEN** |
+| **P1-S8** | **SK-069** chat rooms/show membership | **OPEN** |
 
 ### P2 — medium term (residual backlog)
 
@@ -1732,7 +1906,7 @@ Internet
 | 14 | Escrow UX honesty + pack-time viewer checks | **OPEN** |
 | 15 | Lengthen native tokens; CSPRNG IDs | **OPEN** |
 | 16 | OAuth authorize full app/redirect allowlist | **PARTIAL** (scheme only) |
-| 17 | Join-by-code failure rate limits | **OPEN** (optional hardening) |
+| 17 | Join-by-code failure rate limits | **OPEN** (SK-072) |
 | 18 | **SK-043/044** invite ignore + re-invite logic | **DONE** |
 | 19 | **SK-045** unreact membership checks | **DONE** |
 | 20 | **SK-046/047** clip/favorite visibility on write | **DONE** |
@@ -1747,6 +1921,7 @@ Internet
 | 29 | **SK-059** WS protocol + dual-send `?i=` for mixed deploy | **PARTIAL** (URL residual until protocol-only later) |
 | 30 | **SK-060** public API catalog | **Accepted design** (optional lock-down) |
 | 31 | **SK-061…067** Pass 7 AI/Mastodon | **Remediated** (see Pass 7 matrix) |
+| 32 | **SK-068…072** Pass 8 session/chat/webhook | **OPEN** |
 
 ### P3 — hygiene
 
@@ -1758,10 +1933,11 @@ Internet
 | 21 | Gateway `API_KEY` in production | **PARTIAL** / **OPS** |
 | 22 | Telegram token not in loggable URLs | **OPEN** (SK-037) |
 | 23 | Translator privacy documentation | **OPEN** (SK-038 / overlaps SK-066) |
+| 24 | Join-by-code tighter rate limit | **OPEN** (SK-072) |
 
-### P0/P1 code remediation: **Pass 7 code complete (verify on deploy)**
+### P0/P1 code remediation: **Pass 7 complete; Pass 8 open**
 
-Pre-AI P0/P1 remain largely **DONE**. Pass 7 High items **SK-061/064 fixed in tree** — confirm production build includes remediation commits before public AI translate.
+Pre-AI + Pass 7 High SSRF are **DONE** in tree (`5bfc08a`). Next code priority: **SK-068** (session kill on password events) and **SK-070/071** (webhook URL parity).
 
 ---
 
@@ -1794,9 +1970,9 @@ Pre-AI P0/P1 remain largely **DONE**. Pass 7 High items **SK-061/064 fixed in tr
 - [ ] Smoke: request to private IP via `/proxy` fails closed  
 - [ ] Smoke: `fetch-rss` without auth fails; with auth, private IP fails closed  
 - [ ] Production image includes commits `f95ed57`, `15b00d8`, `7ba243c`, `4eb55e4` (or successors)  
-- [ ] **Pass 7:** AI translation disabled **or** `allowUserApiKey: false` until SK-061 fixed  
-- [ ] **Pass 7:** reverse proxy overwrites `Host` / drops client `X-Forwarded-Host` (SK-064)  
-- [ ] **Pass 7:** `aiAbuseControlConfig.autoSuspend` off or moderated (SK-063)  
+- [ ] Deploy includes `5bfc08a` (Pass 7 AI/Mastodon SSRF fixes)  
+- [ ] **Pass 7 residual:** `aiAbuseControlConfig.autoSuspend` off or moderated (SK-063)  
+- [ ] **Pass 8:** after compromise, rotate native token + revoke app tokens (until SK-068 fixed)  
 
 ---
 
@@ -1838,6 +2014,7 @@ Pre-AI P0/P1 remain largely **DONE**. Pass 7 High items **SK-061/064 fixed in tr
 | 1.3 | 2026-07-14 | **Pass 6:** reverse API playbook; SK-059 WS protocol auth (partial); SK-060 catalog accepted |
 | 1.4 | 2026-07-14 | **Pass 7:** SK-061…067 AI native-fetch SSRF, Mastodon Host loopback, fingerprint auto-suspend, chat translate policy, uncensored exfil, escrow reveal preference; exec summary + P0 reopened |
 | 1.5 | 2026-07-14 | **Pass 7 remediation:** SK-061…067 code fixes/mitigations (HttpRequestService AI outbound, user baseUrl strip, Mastodon config.url, canUseTranslator, escrow reveal keys, seed-only auto-suspend, safer AI defaults) |
+| 1.6 | 2026-07-14 | **Pass 8:** verified Pass 7 live; SK-068 session non-revocation on password change/reset; SK-069 chat rooms/show metadata IDOR; SK-070 webhook test override URL; SK-071 system-webhook URL gap; SK-072 join-by-code rate residual |
 
 ---
 
@@ -1852,9 +2029,12 @@ Pre-AI P0/P1 remain largely **DONE**. Pass 7 High items **SK-061/064 fixed in tr
 | Chat frontend | `frontend/src/pages/chat/` (`room.vue`, `use-chat-history.ts`, `chat-history-loader.ts`, `chat-ws.ts`, `ChatMessageLazy.vue`, …) |
 | Stream client | `frontend/src/stream.ts`, `misskey-js/src/streaming.ts` |
 | HTTP/SSRF | `core/HttpRequestService.ts`, `core/DownloadService.ts` |
-| AI translation SSRF | `core/AiTranslationService.ts`, `endpoints/i/update.ts`, `endpoints/notes/translate.ts`, `endpoints/chat/messages/translate.ts` |
+| AI translation SSRF | `core/AiTranslationService.ts`, `misc/ai-endpoint-url.ts`, `endpoints/notes/translate.ts`, `endpoints/chat/messages/translate.ts` |
 | AI moderation / abuse | `core/AiNoteModerationService.ts`, `core/AiAbuseControlService.ts`, `misc/fingerprint.ts` |
 | Mastodon Host loopback | `server/api/mastodon/MastodonClientService.ts`, `server/api/mastodon/endpoints/search.ts`, `server/ServerService.ts` |
+| Session / password | `endpoints/i/change-password.ts`, `endpoints/reset-password.ts`, `endpoints/admin/reset-password.ts`, `endpoints/i/regenerate-token.ts` |
+| Chat room meta | `endpoints/chat/rooms/show.ts`, `core/entities/ChatEntityService.ts` (`packRoom`) |
+| Webhook test / system | `core/WebhookTestService.ts`, `endpoints/i/webhooks/test.ts`, `endpoints/admin/system-webhook/*` |
 | Media proxy | `server/FileServerService.ts` |
 | MFM | `frontend/src/components/global/MkMfm.ts` |
 | Sanitize / colors | `frontend/src/utility/sanitize-html.ts`, `frontend/src/utility/color.ts` |
@@ -2094,4 +2274,4 @@ Performance and security **directions are correct**. Completeness is gated by un
 
 ---
 
-*End of AMD document (includes §8 optimization evaluation + Pass 7 SK-061…067). Continue appending findings as `SK-2026-0xx`; update §8 scores when major streams land.*
+*End of AMD document (includes §8 optimization evaluation + Pass 7 SK-061…067 + Pass 8 SK-068…072). Continue appending findings as `SK-2026-0xx`; update §8 scores when major streams land.*
