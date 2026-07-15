@@ -9,7 +9,11 @@
 | **Remediation status date** | 2026-07-14 |
 | **Optimization review date** | 2026-07-14 (multi-pass static code review) |
 | **Pass 7 (AI / Mastodon SSRF) date** | 2026-07-14 |
-| **Pass 13 (latency + residual) date** | 2026-07-16 — detail in `docs/SECURITY-AUDIT-PASS13.md` |
+| **Pass 13 (latency + residual) date** | 2026-07-16 — detail in `docs/SECURITY-AUDIT-PASS13.md` (remediated `6514330`) |
+| **Pass 14 (pack/poll + TL perf) date** | 2026-07-16 — detail in `docs/API-PERF-AND-BUGS-PASS14.md` (SK-097/100 remediated) |
+| **Optimization decisions (Why/How/Benefit/Risk)** | 2026-07-16 — **`docs/API-OPTIMIZATION-DECISIONS.md`** |
+| **Pause remote fetch + X-algo removal** | 2026-07-16 — `aed7412` (`pauseRemoteNoteFetch`; X algorithm deleted) |
+| **X-algorithm leftovers after full remove** | 2026-07-16 — **`docs/X-ALGORITHM-LEFTOVERS.md`** (`aed7412`) |
 | **Method** | Static code review only — no live exploitation, no PoC payloads, no load tests |
 | **Scope** | Backend API, chat, MFM/CSS rendering, media proxy, federation edges, OAuth/Mastodon glue, auth tokens; **chat performance, WebSocket expansion, escrow crypto, X-algorithm, engineering process**; **AI translation/moderation/abuse, Mastodon host-loopback**; **Pass 13: home/fanout latency, reaction oracle residual, broadcast, gateway body** |
 | **Out of scope** | Production traffic, third-party deps CVE enumeration, full ActivityPub protocol fuzz, production load benchmarks |
@@ -33,15 +37,16 @@ Sharkey inherits a mature Misskey security baseline (private-IP SSRF guards, SVG
 | **Code: Pass 11 schedule/edit reply oracle (SK-081…083)** | **REMEDIATED in tree** |
 | **Code: Pass 12 bulk residual oracles (SK-084…090)** | **REMEDIATED in tree** (081–089) |
 | **Code: Pass 13 residual + latency (SK-091…096, PERF-01…05)** | **Remediated in tree (2026-07-16)** — see [`SECURITY-AUDIT-PASS13.md`](./SECURITY-AUDIT-PASS13.md); PERF-03/06–08 residual engineering |
+| **Code: Pass 14 pack/poll + TL perf (SK-097…101, PERF-09…16)** | **SK-097/097b/100 + PERF-09/10 remediated**; residual PERF-03/11–16 — see [`API-PERF-AND-BUGS-PASS14.md`](./API-PERF-AND-BUGS-PASS14.md) |
 | **Design / privacy / product honesty** | Residual open (escrow ≠ E2EE; AI LLM privacy) |
 | **Ops / deploy configuration** | Operator checklist still required |
 | **Dynamic pentest / full regression** | **Not completed** (audit was static) |
 
 **One-line conclusion (security):**  
-**“Pass 7–13 closed in tree for actionable code items. Residual design: SK-010 escrow, SK-017 tokens, SK-014 proxy surface. Pass 13: reaction oracle mapping, slim broadcast, gateway body cap, timeline 503 on timeout, Mastodon in-process, Telegram scrub.”**
+**“Pass 7–13 closed; Pass 14 SK-097 poll isVoted fixed. Residual design: SK-010 escrow, SK-017 tokens, SK-014 proxy. X-algorithm removed (`aed7412`).”**
 
-**One-line conclusion (optimization / engineering — see §8 + Pass 13):**  
-**“Fanout LRANGE bounded + always LTRIM (PERF-01); home DB timeout fails loud 503 (SK-096). packMany (PERF-03) and observability (PERF-08) still open engineering.”**
+**One-line conclusion (optimization / engineering — see §8 + Pass 13/14):**  
+**“Fanout LRANGE bounded (PERF-01); home/hybrid IN-list fallback; poll pack correct (SK-097). Residual: packMany weight (PERF-03), ILIKE search (PERF-12).”**
 
 ### 0.2 Remediation commits (this tree)
 
@@ -2648,6 +2653,8 @@ Next: **shared note ACL helper** closing SK-081…087 oracle family; then SW URL
 | 1.11 | 2026-07-14 | **Pass 12 bulk:** SK-084…090 residual note-id oracles (renotes/unrenote/fav-del/thread-mute-del); SW URL; negative SSRF/SQLi/XSS re-scan |
 | 1.12 | 2026-07-14 | **Pass 11–12 remediations:** SK-081…088 note visibility gates; SK-089 SW/login relative URL allowlist |
 | 1.13 | 2026-07-16 | **Pass 13:** SK-091…096 + PERF-01…08; timeline latency root cause (fanout LRANGE / packMany / DB timeout→[]); detail doc `SECURITY-AUDIT-PASS13.md`; §0 matrix + §1m summary |
+| 1.14 | 2026-07-16 | **Pass 13 remediation** `6514330`; **Pass 14:** SK-097 poll isVoted wrong user in packMany; hybrid EXISTS; ILIKE search; fanout window hole; PERF-09…16 — `docs/API-PERF-AND-BUGS-PASS14.md` |
+| 1.15 | 2026-07-16 | **`docs/API-OPTIMIZATION-DECISIONS.md`**: full Why/How/Benefit/Risk for Pass 13 landed + Pass 14 proposed optimizations |
 
 ---
 
@@ -2681,6 +2688,9 @@ Next: **shared note ACL helper** closing SK-081…087 oracle family; then SW URL
 | Reaction oracle residual (Pass 13) | `core/ReactionService.ts`, `endpoints/notes/reactions/create.ts`, `endpoints/notes/like.ts` |
 | Live profile broadcast (Pass 13) | `endpoints/i/update.ts`, `frontend/src/utility/live-user-cache.ts` |
 | Pass 13 full report | `docs/SECURITY-AUDIT-PASS13.md` |
+| Pass 14 perf + bugs | `docs/API-PERF-AND-BUGS-PASS14.md` |
+| **Why/How/Benefit/Risk 决策全文** | **`docs/API-OPTIMIZATION-DECISIONS.md`** |
+| Poll pack bug (Pass 14) | `core/entities/NoteEntityService.ts` (`myVotes` ← `note.userId`) |
 
 ---
 

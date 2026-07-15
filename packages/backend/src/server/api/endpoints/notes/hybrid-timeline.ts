@@ -5,7 +5,7 @@
 
 import { Brackets } from 'typeorm';
 import { Inject, Injectable } from '@nestjs/common';
-import type { NotesRepository, ChannelFollowingsRepository, MiMeta } from '@/models/_.js';
+import type { NotesRepository, MiMeta } from '@/models/_.js';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import ActiveUsersChart from '@/core/chart/charts/active-users.js';
 import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
@@ -18,6 +18,7 @@ import { UserFollowingService } from '@/core/UserFollowingService.js';
 import { UserService } from '@/core/UserService.js';
 import { MiLocalUser } from '@/models/User.js';
 import { FanoutTimelineEndpointService } from '@/core/FanoutTimelineEndpointService.js';
+import { CacheService } from '@/core/CacheService.js';
 import { ApiError } from '../../error.js';
 
 export const meta = {
@@ -83,9 +84,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		@Inject(DI.notesRepository)
 		private notesRepository: NotesRepository,
 
-		@Inject(DI.channelFollowingsRepository)
-		private channelFollowingsRepository: ChannelFollowingsRepository,
-
 		private noteEntityService: NoteEntityService,
 		private roleService: RoleService,
 		private activeUsersChart: ActiveUsersChart,
@@ -94,6 +92,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private userFollowingService: UserFollowingService,
 		private fanoutTimelineEndpointService: FanoutTimelineEndpointService,
 		private readonly userService: UserService,
+		private readonly cacheService: CacheService,
 	) {
 		super(meta, paramDef, async (ps, me) => {
 			const untilId = ps.untilId ?? (ps.untilDate ? this.idService.gen(ps.untilDate!) : null);
@@ -169,6 +168,10 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		});
 	}
 
+	/**
+	 * SK-100 / PERF-10: same result as EXISTS following, but IN-lists from cache
+	 * (aligned with home timeline DB fallback).
+	 */
 	private async getFromDb(ps: {
 		untilId: string | null,
 		sinceId: string | null,
@@ -178,19 +181,27 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		withBots: boolean,
 		withRenotes: boolean,
 	}, me: MiLocalUser) {
+		const followings = await this.cacheService.userFollowingsCache.fetch(me.id);
+		const followeeIds = Array.from(new Set([...followings.keys(), me.id]));
+		const channelIds = Array.from(await this.cacheService.userFollowingChannelsCache.fetch(me.id));
+
 		const query = this.queryService.makePaginationQuery(this.notesRepository.createQueryBuilder('note'), ps.sinceId, ps.untilId)
 			// by a user I follow OR a public local post OR my own post
-			.andWhere(new Brackets(qb => this.queryService
-				.orFollowingUser(qb, ':meId', 'note.userId')
-				.orWhere(new Brackets(qbb => qbb
-					.andWhere('note.visibility = \'public\'')
-					.andWhere('note.userHost IS NULL')))
-				.orWhere(':meId = note.userId')))
+			.andWhere(new Brackets(qb => {
+				qb.where('note.userId IN (:...followeeIds)', { followeeIds })
+					.orWhere(new Brackets(qbb => qbb
+						.andWhere('note.visibility = \'public\'')
+						.andWhere('note.userHost IS NULL')));
+			}))
 			// in a channel I follow OR not in a channel
-			.andWhere(new Brackets(qb => this.queryService
-				.orFollowingChannel(qb, ':meId', 'note.channelId')
-				.orWhere('note.channelId IS NULL')))
-			.setParameters({ meId: me.id })
+			.andWhere(new Brackets(qb => {
+				if (channelIds.length > 0) {
+					qb.where('note.channelId IN (:...channelIds)', { channelIds })
+						.orWhere('note.channelId IS NULL');
+				} else {
+					qb.where('note.channelId IS NULL');
+				}
+			}))
 			.innerJoinAndSelect('note.user', 'user')
 			.leftJoinAndSelect('note.reply', 'reply')
 			.leftJoinAndSelect('note.renote', 'renote')
@@ -221,7 +232,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		} else {
 			this.queryService.generateMutedUserRenotesQueryForNotes(query, me);
 		}
-		//#endregion
 
 		return await query.getMany();
 	}

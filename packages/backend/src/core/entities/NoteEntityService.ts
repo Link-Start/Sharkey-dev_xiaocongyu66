@@ -205,13 +205,15 @@ export class NoteEntityService implements OnModuleInit {
 		myVotes?: MiPollVote[],
 	}) {
 		const poll = hint?.poll ?? await this.pollsRepository.findOneByOrFail({ noteId: note.id });
-		const choices = poll.choices.map(c => ({
+		// SK-097b: O(1) index; avoid indexOf per choice
+		const choices = poll.choices.map((c, i) => ({
 			text: c,
-			votes: poll.votes[poll.choices.indexOf(c)],
+			votes: poll.votes[i] ?? 0,
 			isVoted: false,
 		}));
 
 		if (meId) {
+			// SK-097: myVotes must be the *viewer's* votes, never the note author's
 			if (poll.multiple) {
 				const votes = hint?.myVotes ?? await this.pollVotesRepository.findBy({
 					userId: meId,
@@ -220,7 +222,7 @@ export class NoteEntityService implements OnModuleInit {
 
 				const myChoices = votes.map(v => v.choice);
 				for (const myChoice of myChoices) {
-					choices[myChoice].isVoted = true;
+					if (choices[myChoice]) choices[myChoice].isVoted = true;
 				}
 			} else {
 				const vote = hint?.myVotes ? hint.myVotes[0] : await this.pollVotesRepository.findOneBy({
@@ -228,7 +230,7 @@ export class NoteEntityService implements OnModuleInit {
 					noteId: note.id,
 				});
 
-				if (vote) {
+				if (vote && choices[vote.choice]) {
 					choices[vote.choice].isVoted = true;
 				}
 			}
@@ -567,7 +569,8 @@ export class NoteEntityService implements OnModuleInit {
 				packedFiles?: Map<MiNote['fileIds'][number], Packed<'DriveFile'> | null>;
 				packedUsers?: Map<MiUser['id'], Packed<'UserLite'>>;
 				polls?: Map<string, MiPoll>;
-				pollVotes?: Map<string, Map<string, MiPollVote[]>>;
+				/** noteId → viewer's (me) votes only — SK-097 */
+				pollVotes?: Map<string, MiPollVote[]>;
 				channels?: Map<string, MiChannel>;
 				notes?: Map<string, MiNote>;
 				mutedThreads?: Set<string>;
@@ -700,7 +703,8 @@ export class NoteEntityService implements OnModuleInit {
 			url: note.url ?? undefined,
 			poll: note.hasPoll ? this.populatePoll(note, meId, {
 				poll: opts._hint_?.polls?.get(note.id),
-				myVotes: opts._hint_?.pollVotes?.get(note.id)?.get(note.userId),
+				// SK-097: look up by note id only — map already scoped to viewer
+				myVotes: meId ? opts._hint_?.pollVotes?.get(note.id) : undefined,
 			}) : undefined,
 			isMutingThread: mutedThreads.has(threadId),
 			isMutingNote: mutedNotes.has(note.id),
@@ -835,22 +839,22 @@ export class NoteEntityService implements OnModuleInit {
 			// polls
 			this.pollsRepository.findBy({ noteId: IsOne(noteIds) })
 				.then(polls => new Map(polls.map(p => [p.noteId, p]))),
-			// pollVotes
-			this.pollVotesRepository.findBy({ noteId: IsOne(noteIds), userId: IsOne(userIds) })
-				.then(votes => votes.reduce((noteMap, vote) => {
-					let userMap = noteMap.get(vote.noteId);
-					if (!userMap) {
-						userMap = new Map<string, MiPollVote[]>();
-						noteMap.set(vote.noteId, userMap);
-					}
-					let voteList = userMap.get(vote.userId);
-					if (!voteList) {
-						voteList = [];
-						userMap.set(vote.userId, voteList);
-					}
-					voteList.push(vote);
-					return noteMap;
-				}, new Map<string, Map<string, MiPollVote[]>>)),
+			// pollVotes — SK-097 / PERF-09: only the viewer's votes (not all packed users)
+			me
+				? this.pollVotesRepository.findBy({ noteId: IsOne(noteIds), userId: me.id })
+					.then(votes => {
+						const noteMap = new Map<string, MiPollVote[]>();
+						for (const vote of votes) {
+							let list = noteMap.get(vote.noteId);
+							if (!list) {
+								list = [];
+								noteMap.set(vote.noteId, list);
+							}
+							list.push(vote);
+						}
+						return noteMap;
+					})
+				: Promise.resolve(new Map<string, MiPollVote[]>()),
 			// channels
 			this.getChannels(targetNotes.values()),
 			// mutedThreads

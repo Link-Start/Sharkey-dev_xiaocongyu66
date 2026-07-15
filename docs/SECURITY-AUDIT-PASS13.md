@@ -9,7 +9,7 @@
 | **Method** | Static code review only — no live exploitation, no PoC payloads, no load tests |
 | **Baseline** | `docs/SECURITY-AUDIT-AMD.md` (SK-2026-001 … 090; Pass 1–12) |
 | **New IDs** | **SK-2026-091 … 096** (+ performance backlog **PERF-01 … PERF-08**) |
-| **Related docs** | `docs/SECURITY-AUDIT-AMD.md` §0 / §1 / §8; `docs/x-algorithm-integration.md` |
+| **Related docs** | `docs/SECURITY-AUDIT-AMD.md` §0 / §1 / §8; X-algorithm **removed** in `aed7412` |
 | **Disposition** | Private local report. Prefer responsible disclosure for residual design items. |
 
 ---
@@ -55,10 +55,10 @@ Pass 13 re-audited the tree after Pass 7–12 remediations and recent timeline /
 |------|----------------------------|
 | Home timeline | `endpoints/notes/timeline.ts` — fanout-first, DB timeout → `[]` |
 | Fanout | `core/FanoutTimelineService.ts`, `core/FanoutTimelineEndpointService.ts` |
-| X-algorithm | `core/XAlgorithmService.ts` — `isEnabled() === false`; admin `test` still calls gateway |
+| X-algorithm | **Removed** (`aed7412`) — no service/gateway/admin page |
 | AI abuse | `core/AiAbuseControlService.ts` — seed-only suspend; bounded cooldown Map |
 | Live profile WS | `endpoints/i/update.ts`, `GlobalEventService` `userUpdated`, `frontend/.../live-user-cache.ts` |
-| Gateway | `services/x-algorithm-gateway/server.mjs` |
+| Pause remote notes | `meta.pauseRemoteNoteFetch` + `ApNoteService` (`aed7412`) |
 
 ---
 
