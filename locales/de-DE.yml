@@ -3106,6 +3106,11 @@ _adminNotes:
   failed: "Fehlgeschlagen"
   activityIp: "Aktivitäts-IPs"
   activityIpTip: "IPs aus Anfrageprotokollen und Login-Verlauf (nur Admins)."
+  filterFingerprint: "Fingerprint"
+  filterIp: "IP"
+  noIpYet: "No IP records yet (recorded after user activity; login IPs are under Login history)."
+  ipHistory: "IP history"
+  latestIp: "Latest IP"
 
 _xAlgorithm:
   title: "Algorithmus"
@@ -3284,3 +3289,26 @@ _chatEscrow:
   newSecretHint: "Copy and back up offline immediately. The full secret cannot be shown again; the server only keeps derived material."
   rotateConfirm: "Generate a new random master key and make it active? Old keys are kept so historical messages can still be decrypted. Continue?"
   retireConfirm: "Retire this key? Messages encrypted with it may become permanently unreadable."
+
+_abuseReportChat:
+  roomReport: "Group chat report"
+  dmReport: "Direct message report"
+  chatReport: "Chat message report"
+  loadingPreview: "Loading message preview…"
+  openRoomMessage: "Open group message"
+  openChatMessage: "Open chat message"
+  encryptedMessage: "[Encrypted message]"
+  video: "[Video]"
+  image: "[Image]"
+  file: "[File]"
+
+_performanceAdmin:
+  fttTitle: "Fan-out Timeline (FTT)"
+  rbtTitle: "Reactions Buffering (RBT)"
+  enabled: "Enabled"
+  disabled: "Disabled"
+  perLocalUserUserTimelineCacheMax: "Local user timeline cache size"
+  perRemoteUserUserTimelineCacheMax: "Remote user timeline cache size"
+  perUserHomeTimelineCacheMax: "Home timeline cache size"
+  perUserListTimelineCacheMax: "List timeline cache size"
+  cacheMaxCaption: "Maximum number of notes kept in Redis per timeline. Higher values use more memory."

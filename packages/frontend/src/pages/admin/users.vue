@@ -109,9 +109,10 @@ const searchEmail = ref(storedQuery.email ?? '');
 const searchIp = ref(storedQuery.ip ?? '');
 const searchFingerprint = ref(storedQuery.fingerprint ?? '');
 
-const filterEmailLabel = '邮箱';
-const filterIpLabel = 'IP';
-const filterFpLabel = '指纹';
+const an = (i18n.ts as any)._adminNotes ?? {};
+const filterEmailLabel = an.filterEmail ?? i18n.ts.email ?? 'Email';
+const filterIpLabel = an.filterIp ?? 'IP';
+const filterFpLabel = an.filterFingerprint ?? an.postFingerprint ?? 'Fingerprint';
 
 const pagination = {
 	endpoint: 'admin/show-users' as const,

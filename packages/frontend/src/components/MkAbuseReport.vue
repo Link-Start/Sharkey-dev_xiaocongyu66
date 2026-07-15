@@ -66,13 +66,13 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<div v-if="chatTarget" class="_panel" style="padding: 12px;">
 					<div style="font-weight: bold; margin-bottom: 6px;">
 						<i class="ti ti-messages"></i>
-						{{ chatTarget.kind === 'room' ? '群聊消息举报' : chatTarget.kind === 'user' ? '私聊消息举报' : '聊天消息举报' }}
+						{{ chatTarget.kind === 'room' ? tArc('roomReport') : chatTarget.kind === 'user' ? tArc('dmReport') : tArc('chatReport') }}
 					</div>
 					<div style="opacity: 0.85; font-size: 0.9em; margin-bottom: 10px; word-break: break-all;">
 						{{ chatTarget.url }}
 					</div>
 					<div v-if="chatPreviewLoading" style="opacity: 0.7; margin-bottom: 8px; font-size: 0.9em;">
-						<i class="ti ti-loader-2"></i> 加载消息预览…
+						<i class="ti ti-loader-2"></i> {{ tArc('loadingPreview') }}
 					</div>
 					<div v-else-if="chatPreview" class="_panel" style="padding: 10px; margin-bottom: 10px; background: color-mix(in srgb, var(--MI_THEME-fg) 6%, transparent);">
 						<div style="font-size: 0.85em; opacity: 0.75; margin-bottom: 4px;">
@@ -89,7 +89,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<div class="_buttons">
 						<MkButton primary @click="openChatTarget">
 							<i class="ti ti-arrow-right"></i>
-							{{ chatTarget.kind === 'room' ? '跳转到群聊消息' : '跳转到聊天消息' }}
+							{{ chatTarget.kind === 'room' ? tArc('openRoomMessage') : tArc('openChatMessage') }}
 						</MkButton>
 						<MkButton @click="copyChatUrl">
 							<i class="ti ti-copy"></i>
@@ -245,6 +245,10 @@ function parseChatTarget(comment: string): ChatTarget | null {
 	return null;
 }
 
+
+const arc = (i18n.ts as any)._abuseReportChat ?? {};
+const tArc = (k: string, fb = k) => (typeof arc[k] === 'string' && arc[k].length ? arc[k] : fb);
+
 const chatTarget = computed(() => parseChatTarget(props.report.comment ?? ''));
 
 const chatPreview = ref<Misskey.entities.ChatMessage | null>(null);
@@ -253,10 +257,10 @@ const chatPreviewText = computed(() => {
 	const m = chatPreview.value;
 	if (!m) return '';
 	if (m.text && m.text.trim()) return m.text;
-	if ((m as any).isE2ee) return '[加密消息]';
-	if (m.file?.type?.startsWith('video/')) return '[视频]';
-	if (m.file?.type?.startsWith('image/')) return '[图片]';
-	if (m.file) return `[文件] ${m.file.name || ''}`;
+	if ((m as any).isE2ee) return tArc('encryptedMessage', '[Encrypted message]');
+	if (m.file?.type?.startsWith('video/')) return tArc('video', '[Video]');
+	if (m.file?.type?.startsWith('image/')) return tArc('image', '[Image]');
+	if (m.file) return `${tArc('file', '[File]')} ${m.file.name || ''}`;
 	return '…';
 });
 
@@ -369,7 +373,7 @@ function showMenu(ev: MouseEvent) {
 	if (chatTarget.value) {
 		items.unshift({
 			icon: 'ti ti-messages',
-			text: chatTarget.value.kind === 'room' ? '跳转到群聊消息' : '跳转到聊天消息',
+			text: chatTarget.value.kind === 'room' ? tArc('openRoomMessage') : tArc('openChatMessage'),
 			action: () => openChatTarget(),
 		});
 	}

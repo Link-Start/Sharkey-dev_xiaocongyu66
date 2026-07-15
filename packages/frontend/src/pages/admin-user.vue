@@ -441,18 +441,19 @@ const canSeeAudit = computed(() => {
 	return false;
 });
 
+// Prefer locale pack (_adminNotes); English fallbacks only if pack is stale.
 const adminNotesI18nFb = {
-	loginHistory: '登录历史',
-	loginIp: '登录 IP',
-	browserFingerprint: '浏览器指纹',
-	userAgent: '浏览器 UA',
-	success: '成功',
-	failed: '失败',
-	activityIp: '用户 IP',
-	activityIpTip: '来自请求日志与登录记录的 IP（仅管理员可见）',
-	latestIp: '最近 IP',
-	ipHistory: 'IP 历史',
-	noIpYet: '暂无 IP 记录（用户产生请求后会记录；登录 IP 见下方登录历史）',
+	loginHistory: 'Login history',
+	loginIp: 'Login IP',
+	browserFingerprint: 'Browser fingerprint',
+	userAgent: 'Browser',
+	success: 'Success',
+	failed: 'Failed',
+	activityIp: 'Activity IPs',
+	activityIpTip: 'IPs from request logs and login history (admins only).',
+	latestIp: 'Latest IP',
+	ipHistory: 'IP history',
+	noIpYet: 'No IP records yet (recorded after user activity; login IPs are under Login history).',
 } as const;
 const adminNotesI18n = new Proxy(adminNotesI18nFb, {
 	get(target, prop: string) {

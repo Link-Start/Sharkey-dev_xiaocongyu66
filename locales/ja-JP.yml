@@ -3326,6 +3326,11 @@ _adminNotes:
   failed: "失敗"
   activityIp: "アクティビティ IP"
   activityIpTip: "リクエストログとログイン履歴の IP（管理者のみ）。"
+  filterFingerprint: "指紋"
+  filterIp: "IP"
+  noIpYet: "IP 記録がありません（アクティビティ後に記録。ログイン IP はログイン履歴を参照）。"
+  ipHistory: "IP 履歴"
+  latestIp: "最新 IP"
 
 _ai:
   pageTitle: "AI"
@@ -3476,3 +3481,26 @@ _chatEscrow:
   newSecretHint: "すぐにコピーしてオフライン保管してください。ページを閉じると完全なシークレットは再表示できず、サーバーは派生材料のみ保持します。"
   rotateConfirm: "新しいランダムなマスターキーを生成して有効にします。履歴復号のため旧キーは残ります。続行しますか？"
   retireConfirm: "このキーを退役させますか？このキーで暗号化したメッセージは二度と読めなくなる可能性があります。"
+
+_abuseReportChat:
+  roomReport: "グループチャットの通報"
+  dmReport: "DM の通報"
+  chatReport: "チャットメッセージの通報"
+  loadingPreview: "メッセージプレビューを読み込み中…"
+  openRoomMessage: "グループメッセージを開く"
+  openChatMessage: "チャットメッセージを開く"
+  encryptedMessage: "[暗号化メッセージ]"
+  video: "[動画]"
+  image: "[画像]"
+  file: "[ファイル]"
+
+_performanceAdmin:
+  fttTitle: "ファンアウトタイムライン (FTT)"
+  rbtTitle: "リアクションバッファリング (RBT)"
+  enabled: "有効"
+  disabled: "無効"
+  perLocalUserUserTimelineCacheMax: "ローカルユーザーのタイムラインキャッシュ上限"
+  perRemoteUserUserTimelineCacheMax: "リモートユーザーのタイムラインキャッシュ上限"
+  perUserHomeTimelineCacheMax: "ホームタイムラインキャッシュ上限"
+  perUserListTimelineCacheMax: "リストタイムラインキャッシュ上限"
+  cacheMaxCaption: "タイムラインごとに Redis に保持するノート数の上限。大きいほどメモリを使います。"

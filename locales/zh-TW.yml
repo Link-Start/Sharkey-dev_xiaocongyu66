@@ -3142,6 +3142,11 @@ _adminNotes:
   failed: "失敗"
   activityIp: "活動 IP"
   activityIpTip: "來自請求日誌與登入紀錄的 IP（僅管理員可見）。"
+  filterFingerprint: "指紋"
+  filterIp: "IP"
+  noIpYet: "尚無 IP 紀錄（使用者產生請求後會記錄；登入 IP 見下方登入歷史）"
+  ipHistory: "IP 歷史"
+  latestIp: "最近 IP"
 
 _ai:
   pageTitle: "AI"
@@ -3292,3 +3297,26 @@ _chatEscrow:
   newSecretHint: "請立即複製並離線備份。頁面關閉後無法再查看完整金鑰，伺服器只保留雜湊派生材料。"
   rotateConfirm: "將產生新的隨機主金鑰並設為目前金鑰。舊金鑰會保留以便解密歷史訊息。繼續？"
   retireConfirm: "退役此金鑰？用它加密的訊息可能永久無法解密。"
+
+_abuseReportChat:
+  roomReport: "群聊訊息檢舉"
+  dmReport: "私訊檢舉"
+  chatReport: "聊天訊息檢舉"
+  loadingPreview: "載入訊息預覽…"
+  openRoomMessage: "跳轉到群聊訊息"
+  openChatMessage: "跳轉到聊天訊息"
+  encryptedMessage: "[加密訊息]"
+  video: "[影片]"
+  image: "[圖片]"
+  file: "[檔案]"
+
+_performanceAdmin:
+  fttTitle: "扇出時間軸快取 (FTT)"
+  rbtTitle: "回應緩衝 (RBT)"
+  enabled: "已啟用"
+  disabled: "已停用"
+  perLocalUserUserTimelineCacheMax: "本機使用者時間軸快取上限"
+  perRemoteUserUserTimelineCacheMax: "遠端使用者時間軸快取上限"
+  perUserHomeTimelineCacheMax: "首頁時間軸快取上限"
+  perUserListTimelineCacheMax: "列表時間軸快取上限"
+  cacheMaxCaption: "每條時間軸在 Redis 中保留的筆記上限。數值越大占用記憶體越多。"

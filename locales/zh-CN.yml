@@ -3228,6 +3228,11 @@ _adminNotes:
   failed: "失败"
   activityIp: "活动 IP"
   activityIpTip: "来自请求日志与登录记录的 IP（仅管理员可见）。"
+  filterFingerprint: "指纹"
+  filterIp: "IP"
+  noIpYet: "暂无 IP 记录（用户产生请求后会记录；登录 IP 见下方登录历史）"
+  ipHistory: "IP 历史"
+  latestIp: "最近 IP"
 
 _ai:
   pageTitle: "AI"
@@ -3378,3 +3383,26 @@ _chatEscrow:
   newSecretHint: "请立即复制并离线备份。页面关闭后无法再查看完整密钥，服务端只保留哈希派生材料。"
   rotateConfirm: "将生成新的随机主密钥并设为当前密钥。旧密钥会保留以便解密历史消息。继续？"
   retireConfirm: "退役此密钥？用它加密的消息可能永久无法解密。"
+
+_abuseReportChat:
+  roomReport: "群聊消息举报"
+  dmReport: "私聊消息举报"
+  chatReport: "聊天消息举报"
+  loadingPreview: "加载消息预览…"
+  openRoomMessage: "跳转到群聊消息"
+  openChatMessage: "跳转到聊天消息"
+  encryptedMessage: "[加密消息]"
+  video: "[视频]"
+  image: "[图片]"
+  file: "[文件]"
+
+_performanceAdmin:
+  fttTitle: "扇出时间线缓存 (FTT)"
+  rbtTitle: "回应缓冲 (RBT)"
+  enabled: "已启用"
+  disabled: "已禁用"
+  perLocalUserUserTimelineCacheMax: "本地用户时间线缓存上限"
+  perRemoteUserUserTimelineCacheMax: "远程用户时间线缓存上限"
+  perUserHomeTimelineCacheMax: "首页时间线缓存上限"
+  perUserListTimelineCacheMax: "列表时间线缓存上限"
+  cacheMaxCaption: "每条时间线在 Redis 中保留的笔记上限。数值越大占用内存越多。"

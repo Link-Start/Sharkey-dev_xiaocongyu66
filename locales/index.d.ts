@@ -12917,6 +12917,26 @@ export interface Locale extends ILocale {
          * リクエストログとログイン履歴の IP（管理者のみ）。
          */
         "activityIpTip": string;
+        /**
+         * 指紋
+         */
+        "filterFingerprint": string;
+        /**
+         * IP
+         */
+        "filterIp": string;
+        /**
+         * IP 記録がありません（アクティビティ後に記録。ログイン IP はログイン履歴を参照）。
+         */
+        "noIpYet": string;
+        /**
+         * IP 履歴
+         */
+        "ipHistory": string;
+        /**
+         * 最新 IP
+         */
+        "latestIp": string;
     };
     "_ai": {
         /**
@@ -13481,6 +13501,86 @@ export interface Locale extends ILocale {
          * このキーを退役させますか？このキーで暗号化したメッセージは二度と読めなくなる可能性があります。
          */
         "retireConfirm": string;
+    };
+    "_abuseReportChat": {
+        /**
+         * グループチャットの通報
+         */
+        "roomReport": string;
+        /**
+         * DM の通報
+         */
+        "dmReport": string;
+        /**
+         * チャットメッセージの通報
+         */
+        "chatReport": string;
+        /**
+         * メッセージプレビューを読み込み中…
+         */
+        "loadingPreview": string;
+        /**
+         * グループメッセージを開く
+         */
+        "openRoomMessage": string;
+        /**
+         * チャットメッセージを開く
+         */
+        "openChatMessage": string;
+        /**
+         * [暗号化メッセージ]
+         */
+        "encryptedMessage": string;
+        /**
+         * [動画]
+         */
+        "video": string;
+        /**
+         * [画像]
+         */
+        "image": string;
+        /**
+         * [ファイル]
+         */
+        "file": string;
+    };
+    "_performanceAdmin": {
+        /**
+         * ファンアウトタイムライン (FTT)
+         */
+        "fttTitle": string;
+        /**
+         * リアクションバッファリング (RBT)
+         */
+        "rbtTitle": string;
+        /**
+         * 有効
+         */
+        "enabled": string;
+        /**
+         * 無効
+         */
+        "disabled": string;
+        /**
+         * ローカルユーザーのタイムラインキャッシュ上限
+         */
+        "perLocalUserUserTimelineCacheMax": string;
+        /**
+         * リモートユーザーのタイムラインキャッシュ上限
+         */
+        "perRemoteUserUserTimelineCacheMax": string;
+        /**
+         * ホームタイムラインキャッシュ上限
+         */
+        "perUserHomeTimelineCacheMax": string;
+        /**
+         * リストタイムラインキャッシュ上限
+         */
+        "perUserListTimelineCacheMax": string;
+        /**
+         * タイムラインごとに Redis に保持するノート数の上限。大きいほどメモリを使います。
+         */
+        "cacheMaxCaption": string;
     };
     /**
      * Approvals
