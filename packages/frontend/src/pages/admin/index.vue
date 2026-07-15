@@ -265,17 +265,12 @@ const menuDef = computed<SuperMenuDef[]>(() => [{
 		active: currentPage.value?.route.name === 'performance',
 	}, {
 		icon: 'ti ti-brain',
-		text: (() => {
-			const lang = (typeof navigator !== 'undefined' ? navigator.language : 'en').toLowerCase();
-			if (lang.startsWith('zh')) return 'AI';
-			if (lang.startsWith('ja')) return 'AI';
-			return 'AI';
-		})(),
+		text: (i18n.ts as any)._ai?.pageTitle ?? 'AI',
 		to: '/admin/ai',
 		active: ['ai', 'ai-note-moderation', 'ai-abuse-control', 'ai-translation'].includes(currentPage.value?.route.name ?? ''),
 	}, {
 		icon: 'ti ti-message-2-lock',
-		text: '聊天托管加密',
+		text: (i18n.ts as any)._chatEscrow?.title ?? 'Chat escrow',
 		to: '/admin/chat-escrow',
 		active: currentPage.value?.route.name === 'chat-escrow',
 	}],

@@ -130,25 +130,14 @@ import MkFolder from '@/components/MkFolder.vue';
 import MkInfo from '@/components/MkInfo.vue';
 import MkSwitch from '@/components/MkSwitch.vue';
 
-const t = {
-	title: '聊天托管加密',
-	scope: '仅加密私信与群聊消息（落库 AES-GCM）。公开帖子/笔记不加密，搜索引擎仍可抓取。',
-	warn: '持有主密钥的运营方可解密全部托管聊天。轮换会生成新密钥用于新消息；旧密钥保留才能读历史。删除（退役）旧密钥后，对应历史将无法解密。',
-	enable: '启用聊天托管加密',
-	enableCaption: '总开关：关闭后新消息不再加密落库（历史密文仍可解密）。开启后需有密钥才会真正加密。',
-	statusOn: '状态：已开启且正在加密新消息',
-	statusNeedKey: '状态：开关已开，但尚无可用密钥 — 请点击下方「随机生成并轮换密钥」',
-	statusOff: '状态：已关闭，新消息明文落库',
-	configFallback: '当前仍可使用配置文件/环境变量中的回退密钥（id: cfg）。建议在后台「轮换」生成独立密钥并妥善备份。',
-	rotate: '随机生成并轮换密钥',
-	keyRing: '密钥环',
-	noKeys: '暂无密钥。请点击「随机生成并轮换密钥」，或在配置中设置 chatEscrowSecret。',
-	active: '当前使用',
-	fingerprint: '指纹',
-	retire: '退役',
-	newSecretTitle: '新密钥（仅显示一次）',
-	newSecretHint: '请立即复制并离线备份。页面关闭后无法再查看完整密钥，服务端只保留哈希派生材料。',
-};
+const CE = (i18n.ts as any)._chatEscrow ?? {};
+const t = new Proxy(CE as Record<string, string>, {
+	get(target, prop: string) {
+		const v = target[prop];
+		return typeof v === 'string' && v.length ? v : prop;
+	},
+}) as Record<string, string>;
+
 
 type KeyInfo = {
 	id: string;
@@ -215,7 +204,7 @@ async function onToggleEnabled(v: boolean) {
 async function rotate() {
 	const { canceled } = await os.confirm({
 		type: 'warning',
-		text: '将生成新的随机主密钥并设为当前密钥。旧密钥会保留以便解密历史消息。继续？',
+		text: t.rotateConfirm || 'Rotate key?',
 	});
 	if (canceled) return;
 	busy.value = true;
@@ -236,7 +225,7 @@ async function rotate() {
 async function retire(keyId: string) {
 	const { canceled } = await os.confirm({
 		type: 'warning',
-		text: `退役密钥 ${keyId} 后，仅用该密钥加密的历史消息将无法解密。确定？`,
+		text: (t.retireConfirm || 'Retire key?') + (keyId ? ` (${keyId})` : ''),
 	});
 	if (canceled) return;
 	busy.value = true;

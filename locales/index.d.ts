@@ -12918,6 +12918,570 @@ export interface Locale extends ILocale {
          */
         "activityIpTip": string;
     };
+    "_ai": {
+        /**
+         * AI
+         */
+        "pageTitle": string;
+        /**
+         * オン
+         */
+        "on": string;
+        /**
+         * オフ
+         */
+        "off": string;
+        /**
+         * 翻訳
+         */
+        "tabTranslation": string;
+        /**
+         * 審査
+         */
+        "tabModeration": string;
+        /**
+         * 多垢対策
+         */
+        "tabAbuse": string;
+    };
+    "_aiTranslation": {
+        /**
+         * AI翻訳
+         */
+        "title": string;
+        /**
+         * ノートとチャットのOpenAI互換AI翻訳。アンセンサードはST式ジェイルブレイク層。
+         */
+        "info": string;
+        /**
+         * ノート翻訳を有効
+         */
+        "enableNotes": string;
+        /**
+         * 有効にするとノート翻訳でAIを利用できます。
+         */
+        "enableNotesCaption": string;
+        /**
+         * チャット翻訳を有効
+         */
+        "enableChat": string;
+        /**
+         * 有効にするとチャットメッセージをAI翻訳できます。
+         */
+        "enableChatCaption": string;
+        /**
+         * ノートとチャットで認証情報を共有
+         */
+        "useShared": string;
+        /**
+         * オフでノート/チャットを個別設定。
+         */
+        "useSharedCaption": string;
+        /**
+         * ユーザーのローカルAIを許可
+         */
+        "allowUserKey": string;
+        /**
+         * ブラウザのみにキー/URLを保存。サーバーは保存・使用しません。
+         */
+        "allowUserKeyCaption": string;
+        /**
+         * ノートはAIを優先
+         */
+        "preferAi": string;
+        /**
+         * AI失敗時は従来翻訳にフォールバック。
+         */
+        "preferAiCaption": string;
+        /**
+         * SillyTavernジェイルブレイク
+         */
+        "uncensored": string;
+        /**
+         * ST方式: Main + NSFW + Post-History Jailbreak。拒否時は再試行。
+         */
+        "uncensoredCaption": string;
+        /**
+         * カスタムジェイルブレイク / PHI（任意）
+         */
+        "jailbreakPrompt": string;
+        /**
+         * 内蔵の Post-History Instructions を上書き。空なら内蔵を使用。
+         */
+        "jailbreakPromptCaption": string;
+        /**
+         * 選択的翻訳を既定に
+         */
+        "selective": string;
+        /**
+         * 目標言語以外の部分だけ翻訳。
+         */
+        "selectiveCaption": string;
+        /**
+         * テキストハッシュでキャッシュ
+         */
+        "cacheEnabled": string;
+        /**
+         * 同一原文+言語で結果を再利用。期限後に自動削除。
+         */
+        "cacheEnabledCaption": string;
+        /**
+         * キャッシュTTL（秒）
+         */
+        "cacheTtl": string;
+        /**
+         * 秒後に自動削除。最小60・最大30日。既定7日。
+         */
+        "cacheTtlCaption": string;
+        /**
+         * 共有API
+         */
+        "sharedCreds": string;
+        /**
+         * ノート翻訳API
+         */
+        "notesCreds": string;
+        /**
+         * チャット翻訳API
+         */
+        "chatCreds": string;
+        /**
+         * APIベースURL
+         */
+        "baseUrl": string;
+        /**
+         * 例: https://api.openai.com/v1
+         */
+        "baseUrlCaption": string;
+        /**
+         * APIキー
+         */
+        "apiKey": string;
+        /**
+         * 空のまま保存で既存キー維持。
+         */
+        "apiKeyCaption": string;
+        /**
+         * モデル
+         */
+        "model": string;
+        /**
+         * API形式
+         */
+        "apiStyle": string;
+        /**
+         * 自動
+         */
+        "apiStyleAuto": string;
+        /**
+         * タイムアウト (ms)
+         */
+        "timeout": string;
+        /**
+         * システムプロンプト（任意）
+         */
+        "systemPrompt": string;
+        /**
+         * 設定するとST層全体をこの1本に置換。空ならMain+NSFW+Jailbreak。
+         */
+        "systemPromptCaption": string;
+    };
+    "_aiNoteModeration": {
+        /**
+         * ノートAI審査
+         */
+        "title": string;
+        /**
+         * OpenAI互換 /v1。画像がある時のみビジョン送信可。ローカル/リモート個別有効化。
+         */
+        "info": string;
+        /**
+         * ローカルノートを審査
+         */
+        "enableLocal": string;
+        /**
+         * 有効にすると、このインスタンスのユーザーの投稿前にAI審査します。
+         */
+        "enableLocalCaption": string;
+        /**
+         * リモートノートを審査
+         */
+        "enableRemote": string;
+        /**
+         * 有効にすると、連合で受信したノートを取り込み時に審査します。
+         */
+        "enableRemoteCaption": string;
+        /**
+         * 画像がある時は画像も審査
+         */
+        "includeImages": string;
+        /**
+         * 画像添付がある時のみ公開URLをビジョンモデルへ。テキストのみは従来どおり。
+         */
+        "includeImagesCaption": string;
+        /**
+         * ノートあたり最大画像数
+         */
+        "maxImages": string;
+        /**
+         * 1〜8。webpublic/サムネ優先。既定4。
+         */
+        "maxImagesCaption": string;
+        /**
+         * APIベースURL
+         */
+        "baseUrl": string;
+        /**
+         * 例: https://api.openai.com/v1 / https://api.x.ai/v1 （/v1 が無ければ付与）
+         */
+        "baseUrlCaption": string;
+        /**
+         * APIキー
+         */
+        "apiKey": string;
+        /**
+         * 空のまま保存すると既存キーを維持します。
+         */
+        "apiKeyCaption": string;
+        /**
+         * モデル
+         */
+        "model": string;
+        /**
+         * モデルID（ビジョンは対応モデルを指定）
+         */
+        "modelCaption": string;
+        /**
+         * API形式
+         */
+        "apiStyle": string;
+        /**
+         * 自動
+         */
+        "apiStyleAuto": string;
+        /**
+         * フラグ時の動作
+         */
+        "action": string;
+        /**
+         * 投稿拒否
+         */
+        "actionReject": string;
+        /**
+         * CW を付与
+         */
+        "actionCw": string;
+        /**
+         * ソフト非表示
+         */
+        "actionHide": string;
+        /**
+         * public を home に
+         */
+        "actionHome": string;
+        /**
+         * タイムアウト (ms)
+         */
+        "timeout": string;
+        /**
+         * API失敗時は通す
+         */
+        "failOpen": string;
+        /**
+         * オフにするとAI不通時に投稿を拒否します。
+         */
+        "failOpenCaption": string;
+        /**
+         * システムプロンプト（任意）
+         */
+        "systemPrompt": string;
+        /**
+         * 空なら内蔵プロンプトを使用
+         */
+        "systemPromptCaption": string;
+    };
+    "_aiAbuseControl": {
+        /**
+         * AI多垢対策
+         */
+        "title": string;
+        /**
+         * 既定は同一実IPかつ同一指紋のときのみ関連付け。ユーザー身元をAIに渡し判定。
+         */
+        "info": string;
+        /**
+         * 判定時はシード垢のみ自動凍結。関連垢はログで確認。
+         */
+        "autoSuspendCaption": string;
+        /**
+         * AI多垢対策を有効化
+         */
+        "enabled": string;
+        /**
+         * マスタースイッチ。オフ時は検査も凍結もしません。
+         */
+        "enabledCaption": string;
+        /**
+         * ログイン時に検査
+         */
+        "checkOnSignin": string;
+        /**
+         * 登録完了時に検査
+         */
+        "checkOnSignup": string;
+        /**
+         * シード垢を自動凍結
+         */
+        "autoSuspend": string;
+        /**
+         * 凍結時にノートを隠す
+         */
+        "hideNotes": string;
+        /**
+         * APIベースURL
+         */
+        "baseUrl": string;
+        /**
+         * OpenAI互換ベースURL
+         */
+        "baseUrlCaption": string;
+        /**
+         * APIキー（専用）
+         */
+        "apiKey": string;
+        /**
+         * ノート審査キーと別。空保存で既存維持。
+         */
+        "apiKeyCaption": string;
+        /**
+         * モデル
+         */
+        "model": string;
+        /**
+         * API形式
+         */
+        "apiStyle": string;
+        /**
+         * 自動
+         */
+        "apiStyleAuto": string;
+        /**
+         * 最小関連垢数
+         */
+        "minLinked": string;
+        /**
+         * 下記の関連付けでこの数以上のローカル垢がある時のみ評価。
+         */
+        "minLinkedCaption": string;
+        /**
+         * IPと指紋の両方が一致必須
+         */
+        "requireBoth": string;
+        /**
+         * 同一実IPかつ同一指紋のときのみ関連付け。どちらか一方では不可。
+         */
+        "requireBothCaption": string;
+        /**
+         * ログイン集計窓（分）
+         */
+        "signinWindow": string;
+        /**
+         * 窓内最大ログイン数
+         */
+        "maxSignins": string;
+        /**
+         * ユーザーごとのクールダウン（秒）
+         */
+        "cooldown": string;
+        /**
+         * タイムアウト（ms）
+         */
+        "timeout": string;
+        /**
+         * AI失敗時は何もしない
+         */
+        "failOpen": string;
+        /**
+         * オフ時はAI不通でもヒューリスティックで凍結し得ます。
+         */
+        "failOpenCaption": string;
+        /**
+         * システムプロンプト
+         */
+        "systemPrompt": string;
+        /**
+         * 空なら内蔵プロンプト。
+         */
+        "systemPromptCaption": string;
+    };
+    "_aiTranslationSettings": {
+        /**
+         * AI翻訳
+         */
+        "title": string;
+        /**
+         * 言語設定はアカウントに同期。APIキー/ベースURLは端末のみ（サーバー非送信）。
+         */
+        "info": string;
+        /**
+         * このサーバーはローカルAI端点を許可していません。
+         */
+        "userKeyDisabled": string;
+        /**
+         * 設定（同期）
+         */
+        "prefs": string;
+        /**
+         * 翻訳先言語
+         */
+        "targetLang": string;
+        /**
+         * 例: ja, en, zh-CN。空ならUI言語。
+         */
+        "targetLangCaption": string;
+        /**
+         * 選択的翻訳
+         */
+        "selective": string;
+        /**
+         * 目標言語以外の部分だけ翻訳。
+         */
+        "selectiveCaption": string;
+        /**
+         * ローカルAI（この端末のみ）
+         */
+        "ownKey": string;
+        /**
+         * ブラウザのlocalStorageのみ。サーバーは受信・使用しません。
+         */
+        "ownKeyInfo": string;
+        /**
+         * APIベースURL
+         */
+        "baseUrl": string;
+        /**
+         * 例: https://api.openai.com/v1
+         */
+        "baseUrlCaption": string;
+        /**
+         * APIキー
+         */
+        "apiKey": string;
+        /**
+         * 空なら既存のローカルキーを維持。
+         */
+        "apiKeyCaption": string;
+        /**
+         * 端末に保存済み
+         */
+        "keySaved": string;
+        /**
+         * モデル
+         */
+        "model": string;
+        /**
+         * ローカルを優先
+         */
+        "preferLocal": string;
+        /**
+         * オンならローカルAPI優先、失敗時はインスタンスにフォールバック。
+         */
+        "preferLocalCaption": string;
+        /**
+         * この端末に保存
+         */
+        "saveLocal": string;
+        /**
+         * ローカル認証情報を削除
+         */
+        "clearKey": string;
+        /**
+         * この端末のみに保存しました。
+         */
+        "localSaved": string;
+        /**
+         * ローカル認証情報を削除しました。
+         */
+        "localCleared": string;
+    };
+    "_chatEscrow": {
+        /**
+         * チャット託送暗号化
+         */
+        "title": string;
+        /**
+         * DMとルームチャットのみ保管時に暗号化（AES-GCM）。公開ノートは暗号化せず、検索エンジンから取得可能なままです。
+         */
+        "scope": string;
+        /**
+         * マスターキーを持つ運営者は託送チャットを復号できます。ローテーションは新メッセージ用の新キーを作り、履歴には旧キーが必要です。旧キーを退役させると該当履歴は復号できなくなります。
+         */
+        "warn": string;
+        /**
+         * チャット託送暗号化を有効化
+         */
+        "enable": string;
+        /**
+         * マスタースイッチ。オフ時は新規メッセージは平文保存（既存暗号文は復号可）。オン時はキーがある場合のみ暗号化します。
+         */
+        "enableCaption": string;
+        /**
+         * 状態: 有効 — 新規メッセージを暗号化中
+         */
+        "statusOn": string;
+        /**
+         * 状態: 有効ですがキーがありません — 下の「キーを生成してローテート」を実行してください
+         */
+        "statusNeedKey": string;
+        /**
+         * 状態: 無効 — 新規メッセージは平文保存
+         */
+        "statusOff": string;
+        /**
+         * 設定/環境変数のフォールバックキー（id: cfg）が利用可能です。管理画面で専用キーを生成しオフラインで保管することを推奨します。
+         */
+        "configFallback": string;
+        /**
+         * キーを生成してローテート
+         */
+        "rotate": string;
+        /**
+         * キーリング
+         */
+        "keyRing": string;
+        /**
+         * キーがありません。「キーを生成してローテート」を実行するか、設定で chatEscrowSecret を指定してください。
+         */
+        "noKeys": string;
+        /**
+         * 使用中
+         */
+        "active": string;
+        /**
+         * フィンガープリント
+         */
+        "fingerprint": string;
+        /**
+         * 退役
+         */
+        "retire": string;
+        /**
+         * 新しいシークレット（一度だけ表示）
+         */
+        "newSecretTitle": string;
+        /**
+         * すぐにコピーしてオフライン保管してください。ページを閉じると完全なシークレットは再表示できず、サーバーは派生材料のみ保持します。
+         */
+        "newSecretHint": string;
+        /**
+         * 新しいランダムなマスターキーを生成して有効にします。履歴復号のため旧キーは残ります。続行しますか？
+         */
+        "rotateConfirm": string;
+        /**
+         * このキーを退役させますか？このキーで暗号化したメッセージは二度と読めなくなる可能性があります。
+         */
+        "retireConfirm": string;
+    };
     /**
      * Approvals
      */

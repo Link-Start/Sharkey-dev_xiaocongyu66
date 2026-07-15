@@ -161,7 +161,6 @@ import * as os from '@/os.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import { fetchInstance } from '@/instance.js';
 import { i18n } from '@/i18n.js';
-import { miLocalStorage } from '@/local-storage.js';
 import { definePage } from '@/page.js';
 import MkFolder from '@/components/MkFolder.vue';
 import MkSwitch from '@/components/MkSwitch.vue';
@@ -172,137 +171,12 @@ import MkInfo from '@/components/MkInfo.vue';
 import { useForm } from '@/use/use-form.js';
 import MkFormFooter from '@/components/MkFormFooter.vue';
 
-type LangPack = { en: string; zh: string; 'zh-TW'?: string; ja?: string };
-
-const FB: Record<string, LangPack> = {
-	title: { en: 'AI translation', zh: 'AI 翻译', 'zh-TW': 'AI 翻譯', ja: 'AI翻訳' },
-	on: { en: 'On', zh: '开启', 'zh-TW': '開啟', ja: 'オン' },
-	off: { en: 'Off', zh: '关闭', 'zh-TW': '關閉', ja: 'オフ' },
-	info: {
-		en: 'OpenAI-compatible translation for notes and chat. Shared or separate API keys; optional user keys. Uncensored mode uses a SillyTavern jailbreak stack (main + nsfw + post-history), not a polite translate request.',
-		zh: '帖子与群聊/私信的 OpenAI 兼容 AI 翻译。可共用或分别配置密钥；可允许用户自带 Key。破甲模式用 SillyTavern 多层 jailbreak（main + nsfw + 历史后指令），不是普通“请翻译”。',
-		'zh-TW': '貼文與聊天的 OpenAI 相容 AI 翻譯。破甲模式採 SillyTavern 分層 jailbreak。',
-		ja: 'ノートとチャットのOpenAI互換AI翻訳。アンセンサードはST式ジェイルブレイク層。',
-	},
-	enableNotes: { en: 'Enable note translation', zh: '启用帖子翻译', 'zh-TW': '啟用貼文翻譯', ja: 'ノート翻訳を有効' },
-	enableNotesCaption: {
-		en: 'When on, notes/translate can use AI (alongside DeepL/Libre if configured).',
-		zh: '开启后，帖子翻译可走 AI（若已配置 DeepL/Libre 仍可回退）。',
-		'zh-TW': '開啟後貼文翻譯可使用 AI。',
-		ja: '有効にするとノート翻訳でAIを利用できます。',
-	},
-	enableChat: { en: 'Enable chat translation', zh: '启用群聊/私信翻译', 'zh-TW': '啟用聊天翻譯', ja: 'チャット翻訳を有効' },
-	enableChatCaption: {
-		en: 'When on, users can translate chat/room messages via AI.',
-		zh: '开启后，用户可翻译群聊/私信消息。',
-		'zh-TW': '開啟後可翻譯聊天訊息。',
-		ja: '有効にするとチャットメッセージをAI翻訳できます。',
-	},
-	useShared: { en: 'Share credentials for notes + chat', zh: '帖子与聊天共用一套 API', 'zh-TW': '貼文與聊天共用 API', ja: 'ノートとチャットで認証情報を共有' },
-	useSharedCaption: {
-		en: 'Off = configure notes and chat endpoints separately.',
-		zh: '关闭后可分别配置帖子翻译与聊天翻译的接口。',
-		'zh-TW': '關閉後可分別設定。',
-		ja: 'オフでノート/チャットを個別設定。',
-	},
-	allowUserKey: { en: 'Allow local user AI endpoint', zh: '允许用户本机 AI 端点', 'zh-TW': '允許使用者本機 AI 端點', ja: 'ユーザーのローカルAIを許可' },
-	allowUserKeyCaption: {
-		en: 'Users may configure base URL / key / model in the browser only. Credentials are never stored or used by the server (browser → user API).',
-		zh: '用户可在浏览器本机配置基址/密钥/模型。凭据不会上传到服务器，也不会被服务端使用（浏览器直连用户 API）。',
-		'zh-TW': '使用者可在瀏覽器本機設定。憑證不會上傳伺服器，也不會被服務端使用。',
-		ja: 'ブラウザのみにキー/URLを保存。サーバーは保存・使用しません。',
-	},
-	preferAi: { en: 'Prefer AI over DeepL/Libre for notes', zh: '帖子优先用 AI（而非 DeepL/Libre）', 'zh-TW': '貼文優先 AI', ja: 'ノートはAIを優先' },
-	preferAiCaption: {
-		en: 'If AI fails, falls back to classic translators when available.',
-		zh: 'AI 失败时会回退到已配置的传统翻译。',
-		'zh-TW': 'AI 失敗時回退傳統翻譯。',
-		ja: 'AI失敗時は従来翻訳にフォールバック。',
-	},
-	uncensored: { en: 'SillyTavern jailbreak stack', zh: 'SillyTavern 破甲栈', 'zh-TW': 'SillyTavern 破甲堆疊', ja: 'SillyTavernジェイルブレイク' },
-	uncensoredCaption: {
-		en: 'Uses ST-style layers: Main + NSFW/Auxiliary + Post-History Jailbreak (not a polite “please translate”). Retries once if the model still refuses.',
-		zh: '按 SillyTavern 结构叠层：Main 角色 + NSFW/辅助 + 历史后 Jailbreak（PHI），不是客气地“请翻译”。若仍拒译会再破甲重试一次。',
-		'zh-TW': '採用 ST 分層：Main + NSFW + Post-History Jailbreak；拒譯時再試一次。',
-		ja: 'ST方式: Main + NSFW + Post-History Jailbreak。拒否時は再試行。',
-	},
-	jailbreakPrompt: {
-		en: 'Custom jailbreak / PHI (optional)',
-		zh: '自定义破甲 / 历史后指令（可选）',
-		'zh-TW': '自訂破甲 / 歷史後指令（可選）',
-		ja: 'カスタムジェイルブレイク / PHI（任意）',
-	},
-	jailbreakPromptCaption: {
-		en: 'Overrides the built-in Post-History Instructions slot (SillyTavern “jailbreak”). Leave empty for the built-in PHI.',
-		zh: '覆盖内置的 Post-History Instructions（SillyTavern 的 jailbreak 槽）。留空使用内置破甲词。',
-		'zh-TW': '覆寫內建 PHI（ST jailbreak）。留空使用內建。',
-		ja: '内蔵の Post-History Instructions を上書き。空なら内蔵を使用。',
-	},
-	selective: { en: 'Selective translation by default', zh: '默认选择性翻译', 'zh-TW': '預設選擇性翻譯', ja: '選択的翻訳を既定に' },
-	cacheEnabled: { en: 'Cache by content hash', zh: '按文本哈希缓存翻译', 'zh-TW': '依文本雜湊快取翻譯', ja: 'テキストハッシュでキャッシュ' },
-	cacheEnabledCaption: {
-		en: 'Same source text + target language reuses the previous AI result (saves cost). Expired entries auto-delete.',
-		zh: '相同原文 + 目标语言复用上次 AI 结果（省费用）。过期后自动删除。',
-		'zh-TW': '相同原文 + 目標語言重用結果。過期自動刪除。',
-		ja: '同一原文+言語で結果を再利用。期限後に自動削除。',
-	},
-	cacheTtl: { en: 'Cache TTL (seconds)', zh: '缓存有效期（秒）', 'zh-TW': '快取有效期（秒）', ja: 'キャッシュTTL（秒）' },
-	cacheTtlCaption: {
-		en: 'Auto-delete after this many seconds. Min 60, max 2592000 (30 days). Default 604800 (7 days).',
-		zh: '超过该秒数后自动删除。最小 60，最大 2592000（30 天）。默认 604800（7 天）。',
-		'zh-TW': '超過秒數後自動刪除。最小 60，最大 30 天。預設 7 天。',
-		ja: '秒後に自動削除。最小60・最大30日。既定7日。',
-	},
-	selectiveCaption: {
-		en: 'Only translate segments not already in the target language (e.g. EN parts → ZH in mixed text).',
-		zh: '只翻译非目标语言片段（如中英混排时把英文译成中文，中文保留）。',
-		'zh-TW': '只翻譯非目標語言片段。',
-		ja: '目標言語以外の部分だけ翻訳。',
-	},
-	sharedCreds: { en: 'Shared API', zh: '共用 API', 'zh-TW': '共用 API', ja: '共有API' },
-	notesCreds: { en: 'Notes API', zh: '帖子翻译 API', 'zh-TW': '貼文翻譯 API', ja: 'ノート翻訳API' },
-	chatCreds: { en: 'Chat API', zh: '聊天翻译 API', 'zh-TW': '聊天翻譯 API', ja: 'チャット翻訳API' },
-	baseUrl: { en: 'API base URL', zh: 'API 基址', 'zh-TW': 'API 基址', ja: 'APIベースURL' },
-	baseUrlCaption: {
-		en: 'e.g. https://api.openai.com/v1 or https://api.x.ai/v1',
-		zh: '例如 https://api.openai.com/v1 或 https://api.x.ai/v1',
-		'zh-TW': '例如 https://api.openai.com/v1',
-		ja: '例: https://api.openai.com/v1',
-	},
-	apiKey: { en: 'API key', zh: 'API 密钥', 'zh-TW': 'API 金鑰', ja: 'APIキー' },
-	apiKeyCaption: {
-		en: 'Leave blank when saving to keep the current key.',
-		zh: '留空保存可保留原密钥。',
-		'zh-TW': '留空儲存可保留原金鑰。',
-		ja: '空のまま保存で既存キー維持。',
-	},
-	model: { en: 'Model', zh: '模型', 'zh-TW': '模型', ja: 'モデル' },
-	apiStyle: { en: 'API style', zh: '接口类型', 'zh-TW': '介面類型', ja: 'API形式' },
-	apiStyleAuto: { en: 'Auto', zh: '自动', 'zh-TW': '自動', ja: '自動' },
-	timeout: { en: 'Timeout (ms)', zh: '超时 (毫秒)', 'zh-TW': '逾時 (毫秒)', ja: 'タイムアウト (ms)' },
-	systemPrompt: { en: 'Custom system prompt (optional)', zh: '自定义系统提示（可选）', 'zh-TW': '自訂系統提示', ja: 'システムプロンプト（任意）' },
-	systemPromptCaption: {
-		en: 'If set, replaces the entire ST stack with this single system prompt. Leave empty to use Main+NSFW+Jailbreak layers.',
-		zh: '若填写，将用这一条 system 提示替换整套 ST 破甲栈。留空则使用 Main+NSFW+Jailbreak 分层。',
-		'zh-TW': '若填寫則覆寫整套 ST 堆疊。留空使用分層破甲。',
-		ja: '設定するとST層全体をこの1本に置換。空ならMain+NSFW+Jailbreak。',
-	},
-};
-
-function t(key: keyof typeof FB): string {
-	const fb = FB[key];
-	const lang = (
-		miLocalStorage.getItem('lang')
-		|| (typeof navigator !== 'undefined' ? navigator.language : 'en-US')
-		|| 'en-US'
-	).replace('_', '-').toLowerCase();
-	if (lang.startsWith('zh-tw') || lang.startsWith('zh-hk') || lang.startsWith('zh-hant')) {
-		return fb['zh-TW'] || fb.zh;
-	}
-	if (lang.startsWith('zh')) return fb.zh;
-	if (lang.startsWith('ja') && fb.ja) return fb.ja;
-	return fb.en;
+const L = (i18n.ts as any)._aiTranslation ?? {};
+function t(key: string): string {
+	const v = L[key];
+	return typeof v === 'string' && v.length ? v : key;
 }
+
 
 const meta = await misskeyApi('admin/meta') as any;
 const cfg = meta.aiTranslationConfig ?? {};

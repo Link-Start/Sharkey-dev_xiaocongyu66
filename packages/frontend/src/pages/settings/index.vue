@@ -151,12 +151,7 @@ const menuDef = computed<SuperMenuDef[]>(() => [{
 		active: currentPage.value?.route.name === 'account-data',
 	}, {
 		icon: 'ti ti-language',
-		text: (() => {
-			const lang = (typeof navigator !== 'undefined' ? navigator.language : 'en').toLowerCase();
-			if (lang.startsWith('zh')) return 'AI 翻译';
-			if (lang.startsWith('ja')) return 'AI翻訳';
-			return 'AI translation';
-		})(),
+		text: (i18n.ts as any)._aiTranslationSettings?.title ?? (i18n.ts as any)._aiTranslation?.title ?? 'AI translation',
 		to: '/settings/ai-translation',
 		active: currentPage.value?.route.name === 'ai-translation',
 	}, {
