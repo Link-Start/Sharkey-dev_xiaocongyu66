@@ -4,7 +4,7 @@
  */
 
 import { Inject, Injectable, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
-import { defaultXAlgorithmConfig, defaultAiNoteModerationConfig, defaultAiAbuseControlConfig, defaultAiTranslationConfig, defaultAiTranslationEndpointConfig, type MiMeta } from '@/models/Meta.js';
+import { defaultAiNoteModerationConfig, defaultAiAbuseControlConfig, defaultAiTranslationConfig, defaultAiTranslationEndpointConfig, type MiMeta } from '@/models/Meta.js';
 import { ModerationLogService } from '@/core/ModerationLogService.js';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import { MetaService } from '@/core/MetaService.js';
@@ -25,6 +25,7 @@ export const paramDef = {
 		disableRegistration: { type: 'boolean', nullable: true },
 		disableLocalNoteCreation: { type: 'boolean', nullable: true },
 		blockRemoteNotes: { type: 'boolean', nullable: true },
+		pauseRemoteNoteFetch: { type: 'boolean', nullable: true },
 		pinnedUsers: {
 			type: 'array', nullable: true, items: {
 				type: 'string',
@@ -230,28 +231,6 @@ export const paramDef = {
 				required: ['software', 'versionRange'],
 			},
 		},
-		xAlgorithmConfig: {
-			type: 'object',
-			nullable: true,
-			properties: {
-				enabled: { type: 'boolean' },
-				strictOriginalExperience: { type: 'boolean' },
-				homeMixerEndpoint: { type: 'string', nullable: true },
-				scoredPostsEndpoint: { type: 'string', nullable: true },
-				phoenixEndpoint: { type: 'string', nullable: true },
-				thunderEndpoint: { type: 'string', nullable: true },
-				groxEndpoint: { type: 'string', nullable: true },
-				apiKey: { type: 'string', nullable: true },
-				requestTimeoutMs: { type: 'integer', minimum: 100 },
-				candidatesPerRequest: { type: 'integer', minimum: 1, maximum: 1000 },
-				includeInNetwork: { type: 'boolean' },
-				includeOutOfNetwork: { type: 'boolean' },
-				enableGroxContentUnderstanding: { type: 'boolean' },
-				enableAdsBlending: { type: 'boolean' },
-				modelArtifactsPath: { type: 'string', nullable: true },
-				fallbackToSharkeyTimeline: { type: 'boolean' },
-			},
-		},
 		aiNoteModerationConfig: {
 			type: 'object',
 			nullable: true,
@@ -371,6 +350,10 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			if (typeof ps.blockRemoteNotes === 'boolean') {
 				set.blockRemoteNotes = ps.blockRemoteNotes;
+			}
+
+			if (typeof ps.pauseRemoteNoteFetch === 'boolean') {
+				set.pauseRemoteNoteFetch = ps.pauseRemoteNoteFetch;
 			}
 
 			if (Array.isArray(ps.pinnedUsers)) {
@@ -908,17 +891,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				set.deliverSuspendedSoftware = ps.deliverSuspendedSoftware;
 			}
 
-			if (ps.xAlgorithmConfig !== undefined) {
-				const current = this.serverSettings.xAlgorithmConfig ?? defaultXAlgorithmConfig;
-				// X/Musk algorithm permanently disabled — ignore enable flag from clients
-				set.xAlgorithmConfig = {
-					...defaultXAlgorithmConfig,
-					...current,
-					...(ps.xAlgorithmConfig ?? {}),
-					enabled: false,
-				};
-			}
-
 			if (ps.aiNoteModerationConfig !== undefined) {
 				const current = this.serverSettings.aiNoteModerationConfig ?? defaultAiNoteModerationConfig;
 				const next = {
@@ -1004,10 +976,6 @@ function sanitize(meta: Partial<MiMeta & OnApplicationShutdown & OnApplicationBo
 		swPrivateKey: '<redacted>',
 		objectStorageAccessKey: '<redacted>',
 		objectStorageSecretKey: '<redacted>',
-		xAlgorithmConfig: meta.xAlgorithmConfig == null ? undefined : {
-			...meta.xAlgorithmConfig,
-			apiKey: meta.xAlgorithmConfig.apiKey == null ? null : '<redacted>',
-		},
 		aiNoteModerationConfig: meta.aiNoteModerationConfig == null ? undefined : {
 			...meta.aiNoteModerationConfig,
 			apiKey: meta.aiNoteModerationConfig.apiKey == null ? null : '<redacted>',

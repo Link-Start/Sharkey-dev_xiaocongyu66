@@ -83,7 +83,6 @@ import { SearchService } from './SearchService.js';
 import { ClipService } from './ClipService.js';
 import { FeaturedService } from './FeaturedService.js';
 import { FanoutTimelineService } from './FanoutTimelineService.js';
-import { XAlgorithmService } from './XAlgorithmService.js';
 import { AiNoteModerationService } from './AiNoteModerationService.js';
 import { AiAbuseControlService } from './AiAbuseControlService.js';
 import { AiTranslationService } from './AiTranslationService.js';
@@ -403,7 +402,6 @@ const $Imports = [
 		ClipService,
 		FeaturedService,
 		FanoutTimelineService,
-		XAlgorithmService,
 		AiNoteModerationService,
 		AiAbuseControlService,
 		AiTranslationService,
@@ -727,7 +725,6 @@ const $Imports = [
 		ClipService,
 		FeaturedService,
 		FanoutTimelineService,
-		XAlgorithmService,
 		AiNoteModerationService,
 		AiAbuseControlService,
 		AiTranslationService,

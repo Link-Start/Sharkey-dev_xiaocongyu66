@@ -8,45 +8,6 @@ import { type InstanceUnsignedFetchOption, instanceUnsignedFetchOptions } from '
 import { id } from './util/id.js';
 import { MiUser } from './User.js';
 
-export type XAlgorithmConfig = {
-	enabled: boolean;
-	strictOriginalExperience: boolean;
-	homeMixerEndpoint: string | null;
-	scoredPostsEndpoint: string | null;
-	phoenixEndpoint: string | null;
-	thunderEndpoint: string | null;
-	groxEndpoint: string | null;
-	apiKey: string | null;
-	requestTimeoutMs: number;
-	candidatesPerRequest: number;
-	includeInNetwork: boolean;
-	includeOutOfNetwork: boolean;
-	enableGroxContentUnderstanding: boolean;
-	enableAdsBlending: boolean;
-	modelArtifactsPath: string | null;
-	fallbackToSharkeyTimeline: boolean;
-};
-
-export const defaultXAlgorithmConfig: XAlgorithmConfig = {
-	// Permanently disabled — X/Musk algorithm integration removed from timelines
-	enabled: false,
-	strictOriginalExperience: true,
-	homeMixerEndpoint: null,
-	scoredPostsEndpoint: null,
-	phoenixEndpoint: null,
-	thunderEndpoint: null,
-	groxEndpoint: null,
-	apiKey: null,
-	requestTimeoutMs: 3000,
-	candidatesPerRequest: 100,
-	includeInNetwork: true,
-	includeOutOfNetwork: true,
-	enableGroxContentUnderstanding: true,
-	enableAdsBlending: false,
-	modelArtifactsPath: null,
-	fallbackToSharkeyTimeline: true,
-};
-
 /**
  * AI note moderation via OpenAI-compatible HTTP APIs
  * (chat/completions, responses, and generic /v1/* style bases).
@@ -337,6 +298,16 @@ export class MiMeta {
 		default: false,
 	})
 	public blockRemoteNotes: boolean;
+
+	/**
+	 * When true, stop ingesting new remote notes (AP Create/Update of Note,
+	 * resolveNote remote fetch). Existing remote notes stay in DB; federation
+	 * for follows/likes/etc. is unchanged.
+	 */
+	@Column('boolean', {
+		default: false,
+	})
+	public pauseRemoteNoteFetch: boolean;
 
 	@Column('varchar', {
 		length: 1024, array: true, default: '{}',
@@ -1048,11 +1019,6 @@ export class MiMeta {
 		default: [],
 	})
 	public deliverSuspendedSoftware: SoftwareSuspension[];
-
-	@Column('jsonb', {
-		default: defaultXAlgorithmConfig,
-	})
-	public xAlgorithmConfig: XAlgorithmConfig;
 
 	@Column('jsonb', {
 		default: defaultAiNoteModerationConfig,

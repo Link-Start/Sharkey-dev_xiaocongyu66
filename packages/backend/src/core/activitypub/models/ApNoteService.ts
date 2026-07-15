@@ -180,6 +180,11 @@ export class ApNoteService implements OnModuleInit {
 	 */
 	@bindThis
 	public async createNote(value: string | IObject, actor?: MiRemoteUser, resolver?: Resolver, silent = false): Promise<MiNote | null> {
+		// Admin: pause ingest of new remote notes (existing DB rows still usable)
+		if (this.meta.pauseRemoteNoteFetch) {
+			throw new UnrecoverableError('skip: remote note fetch is paused by admin');
+		}
+
 		// eslint-disable-next-line no-param-reassign
 		if (resolver == null) resolver = this.apResolverService.createResolver();
 
@@ -366,6 +371,10 @@ export class ApNoteService implements OnModuleInit {
 	 */
 	@bindThis
 	public async updateNote(value: string | IObject, actor?: MiRemoteUser, resolver?: Resolver, silent = false): Promise<MiNote | null> {
+		if (this.meta.pauseRemoteNoteFetch) {
+			throw new UnrecoverableError('skip: remote note fetch is paused by admin');
+		}
+
 		const noteUri = getApId(value);
 
 		// URIがこのサーバーを指しているならスキップ
@@ -563,6 +572,11 @@ export class ApNoteService implements OnModuleInit {
 		// Bail if local URI doesn't exist
 		if (this.utilityService.isUriLocal(uri)) {
 			throw new IdentifiableError('cbac7358-23f2-4c70-833e-cffb4bf77913', `failed to resolve note ${uri}: URL is local and does not exist`);
+		}
+
+		// Pause only blocks *new* remote pulls; local cache hits already returned above
+		if (this.meta.pauseRemoteNoteFetch) {
+			throw new UnrecoverableError(`failed to resolve note ${uri}: remote note fetch is paused by admin`);
 		}
 
 		const unlock = await this.appLockService.getApLock(uri);

@@ -506,6 +506,10 @@ export const meta = {
 				type: 'boolean',
 				optional: false, nullable: false,
 			},
+			pauseRemoteNoteFetch: {
+				type: 'boolean',
+				optional: false, nullable: false,
+			},
 			impressumUrl: {
 				type: 'string',
 				optional: false, nullable: true,
@@ -644,10 +648,6 @@ export const meta = {
 					},
 				},
 			},
-			xAlgorithmConfig: {
-				type: 'object',
-				optional: false, nullable: false,
-			},
 			aiNoteModerationConfig: {
 				type: 'object',
 				optional: false, nullable: false,
@@ -708,6 +708,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				disableRegistration: instance.disableRegistration,
 				disableLocalNoteCreation: instance.disableLocalNoteCreation,
 				blockRemoteNotes: instance.blockRemoteNotes === true,
+				pauseRemoteNoteFetch: instance.pauseRemoteNoteFetch === true,
 				emailRequiredForSignup: instance.emailRequiredForSignup,
 				approvalRequiredForSignup: instance.approvalRequiredForSignup,
 				enableHcaptcha: instance.enableHcaptcha,
@@ -830,7 +831,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				allowUnsignedFetch: instance.allowUnsignedFetch,
 				enableProxyAccount: instance.enableProxyAccount,
 				deliverSuspendedSoftware: instance.deliverSuspendedSoftware,
-				xAlgorithmConfig: instance.xAlgorithmConfig,
 				aiNoteModerationConfig: instance.aiNoteModerationConfig == null ? undefined : {
 					...instance.aiNoteModerationConfig,
 					apiKey: instance.aiNoteModerationConfig.apiKey == null ? null : '<redacted>',

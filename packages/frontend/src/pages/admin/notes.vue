@@ -20,6 +20,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<template #label>{{ an.blockRemoteNotes }}</template>
 						<template #caption>{{ an.blockRemoteNotesCaption }}</template>
 					</MkSwitch>
+					<MkSwitch :modelValue="pauseRemoteNoteFetch" @update:modelValue="onTogglePauseRemoteFetch">
+						<template #label>{{ an.pauseRemoteNoteFetch }}</template>
+						<template #caption>{{ an.pauseRemoteNoteFetchCaption }}</template>
+					</MkSwitch>
 				</div>
 			</MkFolder>
 
@@ -160,6 +164,9 @@ const router = useRouter();
 const anFb: Record<string, string> = {
 	title: '帖子管理',
 	blockRemoteNotes: '屏蔽远程帖子',
+	pauseRemoteNoteFetch: '暂停拉取远程帖子',
+	pauseRemoteNoteFetchCaption: '启用后不再从联邦接收/拉取新的远程帖子；库中已有远程帖子不受影响。关注、点赞等联合活动仍可进行。',
+	pauseRemoteNoteFetchConfirm: '确定暂停拉取远程帖子？新的远程 Note 将不会入库。',
 	tabAll: '本站',
 	tabRemote: '远程',
 	tabHidden: '已隐藏',
@@ -193,6 +200,7 @@ const loadingMore = ref(false);
 const canLoadMore = ref(false);
 const disableLocalNoteCreation = ref(false);
 const blockRemoteNotes = ref(false);
+const pauseRemoteNoteFetch = ref(false);
 const selectedIds = ref(new Set<string>());
 const prohibitedWords = ref('');
 const sensitiveWords = ref('');
@@ -211,11 +219,13 @@ try {
 	const meta = await misskeyApi('admin/meta') as unknown as {
 		disableLocalNoteCreation?: boolean;
 		blockRemoteNotes?: boolean;
+		pauseRemoteNoteFetch?: boolean;
 		prohibitedWords?: string[];
 		sensitiveWords?: string[];
 	};
 	disableLocalNoteCreation.value = !!meta.disableLocalNoteCreation;
 	blockRemoteNotes.value = !!meta.blockRemoteNotes;
+	pauseRemoteNoteFetch.value = !!meta.pauseRemoteNoteFetch;
 	prohibitedWords.value = (meta.prohibitedWords ?? []).join('\n');
 	sensitiveWords.value = (meta.sensitiveWords ?? []).join('\n');
 } catch { /* ignore */ }
@@ -335,6 +345,16 @@ async function onToggleBlockRemote(value: boolean) {
 	}
 	blockRemoteNotes.value = value;
 	await os.apiWithDialog('admin/update-meta', { blockRemoteNotes: value } as never);
+	fetchInstance(true);
+}
+
+async function onTogglePauseRemoteFetch(value: boolean) {
+	if (value) {
+		const { canceled } = await os.confirm({ type: 'warning', text: an.pauseRemoteNoteFetchConfirm });
+		if (canceled) return;
+	}
+	pauseRemoteNoteFetch.value = value;
+	await os.apiWithDialog('admin/update-meta', { pauseRemoteNoteFetch: value } as never);
 	fetchInstance(true);
 }
 
