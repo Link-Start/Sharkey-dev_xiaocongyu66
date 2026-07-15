@@ -169,15 +169,12 @@ export class FanoutTimelineEndpointService {
 			const redisTimeline: MiNote[] = [];
 			let readFromRedis = 0;
 			let lastSuccessfulRate = 1; // rateをキャッシュする？
-			// When most redis IDs are filtered out (e.g. blockRemoteNotes, mutes),
-			// avoid scanning the entire cache — that can hang home TL on small HF hosts.
-			let emptyFilterBatches = 0;
-			const maxEmptyFilterBatches = ps.allowPartial ? 3 : 8;
 
 			while ((redisResultIds.length - readFromRedis) !== 0) {
 				const remainingToRead = ps.limit - redisTimeline.length;
 
 				// DBからの取り直しを減らす初回と同じ割合以上で成功すると仮定するが、クエリの長さを考えて三倍まで
+				// Keep rate > 0 so a fully-filtered batch cannot yield Infinity (upstream divides by rate).
 				const rate = lastSuccessfulRate > 0 ? lastSuccessfulRate : 0.15;
 				const countToGet = Math.ceil(remainingToRead * Math.min(1.1 / rate, 3));
 				noteIds = redisResultIds.slice(readFromRedis, readFromRedis + countToGet);
@@ -186,13 +183,7 @@ export class FanoutTimelineEndpointService {
 
 				const gotFromDb = await this.getAndFilterFromDb(me, noteIds, filter, idCompare);
 				redisTimeline.push(...gotFromDb);
-				if (gotFromDb.length === 0) {
-					emptyFilterBatches++;
-					if (emptyFilterBatches >= maxEmptyFilterBatches) {
-						break;
-					}
-				} else {
-					emptyFilterBatches = 0;
+				if (noteIds.length > 0) {
 					lastSuccessfulRate = gotFromDb.length / noteIds.length;
 				}
 

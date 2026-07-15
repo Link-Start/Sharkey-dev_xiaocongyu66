@@ -5,7 +5,7 @@
 
 import { Brackets } from 'typeorm';
 import { Inject, Injectable } from '@nestjs/common';
-import type { NotesRepository, ChannelFollowingsRepository, MiMeta } from '@/models/_.js';
+import type { NotesRepository, MiMeta } from '@/models/_.js';
 import { Endpoint } from '@/server/api/endpoint-base.js';
 import { QueryService } from '@/core/QueryService.js';
 import ActiveUsersChart from '@/core/chart/charts/active-users.js';
@@ -70,9 +70,6 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		@Inject(DI.notesRepository)
 		private notesRepository: NotesRepository,
 
-		@Inject(DI.channelFollowingsRepository)
-		private channelFollowingsRepository: ChannelFollowingsRepository,
-
 		private noteEntityService: NoteEntityService,
 		private activeUsersChart: ActiveUsersChart,
 		private idService: IdService,
@@ -83,86 +80,98 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		private readonly cacheService: CacheService,
 		loggerService: LoggerService,
 	) {
-		const logger = loggerService.getLogger('notes/timeline');
-
 		super(meta, paramDef, async (ps, me) => {
 			const untilId = ps.untilId ?? (ps.untilDate ? this.idService.gen(ps.untilDate!) : null);
 			const sinceId = ps.sinceId ?? (ps.sinceDate ? this.idService.gen(ps.sinceDate!) : null);
 
 			this.userService.markUserActive(me);
 
-			const loadDb = async (u: string | null, s: string | null, limit: number) => {
-				try {
-					return await this.getFromDb({
-						untilId: u,
-						sinceId: s,
-						limit,
-						withFiles: ps.withFiles,
-						withRenotes: ps.withRenotes,
-						withBots: ps.withBots,
-					}, me);
-				} catch (err) {
-					// HF / small PG: EXISTS-based home queries can hit statement_timeout.
-					// Never surface 500 "请重试" — return empty so the client recovers.
-					const msg = err instanceof Error ? err.message : String(err);
-					if (/statement timeout|canceling statement/i.test(msg)) {
-						logger.warn(`home timeline DB query timed out (limit=${limit}): ${msg}`);
-						return [];
-					}
-					throw err;
-				}
-			};
-
-			// X/Musk algorithm path removed — always use native Sharkey timeline
+			// Same control flow as TransFem-org/Sharkey home timeline:
+			// fanout redis first, DB only when fanout is off or redis is insufficient.
+			// (No X/Musk algorithm diversion.)
 			if (!this.serverSettings.enableFanoutTimeline) {
-				const timeline = await loadDb(untilId, sinceId, ps.limit);
+				const timeline = await this.getFromDbSafe({
+					untilId,
+					sinceId,
+					limit: ps.limit,
+					withFiles: ps.withFiles,
+					withRenotes: ps.withRenotes,
+					withBots: ps.withBots,
+				}, me);
 				return await this.noteEntityService.packMany(timeline, me);
 			}
 
-			// Must await: otherwise reverse-proxy / HF can time out while work still runs.
 			const timeline = await this.fanoutTimelineEndpointService.timeline({
 				untilId,
 				sinceId,
 				limit: ps.limit,
-				// Prefer partial redis results over slow full DB scan on constrained hosts
-				allowPartial: true,
+				allowPartial: ps.allowPartial,
 				me,
 				useDbFallback: this.serverSettings.enableFanoutTimelineDbFallback,
 				redisTimelines: ps.withFiles ? [`homeTimelineWithFiles:${me.id}`] : [`homeTimeline:${me.id}`],
 				excludePureRenotes: !ps.withRenotes,
+				// Same as hybrid/local (upstream home omits this; keep so withBots works on fanout path)
 				excludeBots: !ps.withBots,
-				dbFallback: async (u, s, limit) => await loadDb(u, s, limit),
+				dbFallback: async (untilId, sinceId, limit) => await this.getFromDbSafe({
+					untilId,
+					sinceId,
+					limit,
+					withFiles: ps.withFiles,
+					withRenotes: ps.withRenotes,
+					withBots: ps.withBots,
+				}, me),
 			});
 
 			return timeline;
 		});
 
-		this.logger = logger;
+		this.logger = loggerService.getLogger('notes/timeline');
+	}
+
+	/** DB path with statement_timeout guard — empty list instead of API 500. */
+	private async getFromDbSafe(ps: {
+		untilId: string | null;
+		sinceId: string | null;
+		limit: number;
+		withFiles: boolean;
+		withRenotes: boolean;
+		withBots: boolean;
+	}, me: MiLocalUser) {
+		try {
+			return await this.getFromDb(ps, me);
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err);
+			if (/statement timeout|canceling statement/i.test(msg)) {
+				this.logger.warn(`home timeline DB timed out (limit=${ps.limit}): ${msg}`);
+				return [];
+			}
+			throw err;
+		}
 	}
 
 	/**
-	 * Home timeline from DB using followee IN-list (from cache) instead of per-row EXISTS.
-	 * Much cheaper under statement_timeout on small instances.
+	 * Same result set as upstream (channel I follow OR me OR followee, channelId IS NULL),
+	 * but uses cached ID lists + IN instead of correlated EXISTS for cheaper plans.
 	 */
-	private async getFromDb(ps: { untilId: string | null; sinceId: string | null; limit: number; withFiles: boolean; withRenotes: boolean; withBots: boolean; }, me: MiLocalUser) {
+	private async getFromDb(ps: {
+		untilId: string | null;
+		sinceId: string | null;
+		limit: number;
+		withFiles: boolean;
+		withRenotes: boolean;
+		withBots: boolean;
+	}, me: MiLocalUser) {
 		const followings = await this.cacheService.userFollowingsCache.fetch(me.id);
-		// Include self; IN-list avoids correlated EXISTS on every note row
 		const followeeIds = Array.from(new Set([...followings.keys(), me.id]));
-
-		const channelRows = await this.channelFollowingsRepository.find({
-			where: { followerId: me.id },
-			select: { followeeId: true },
-		});
-		const channelIds = channelRows.map(r => r.followeeId);
+		const channelIds = Array.from(await this.cacheService.userFollowingChannelsCache.fetch(me.id));
 
 		const query = this.queryService.makePaginationQuery(this.notesRepository.createQueryBuilder('note'), ps.sinceId, ps.untilId)
+			// in a channel I follow OR my own post OR by a user I follow
 			.andWhere(new Brackets(qb => {
-				// Posts by me / people I follow (not in a channel)
 				qb.where(new Brackets(q0 => {
 					q0.where('note.userId IN (:...followeeIds)', { followeeIds })
 						.andWhere('note.channelId IS NULL');
 				}));
-				// Or in channels I follow
 				if (channelIds.length > 0) {
 					qb.orWhere('note.channelId IN (:...channelIds)', { channelIds });
 				}
@@ -175,6 +184,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			.limit(ps.limit);
 
 		this.queryService.generateExcludedRepliesQueryForNotes(query, me);
+		// Fork: staff-aware visibility (upstream: generateVisibilityQuery)
 		await this.queryService.generateVisibilityQueryFor(query, me);
 		this.queryService.generateBlockedHostQueryForNote(query);
 		this.queryService.generateSuspendedUserQueryForNote(query);
