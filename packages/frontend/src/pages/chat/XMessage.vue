@@ -73,7 +73,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					:enableEmojiMenuReaction="true"
 				/>
 				<div v-if="translation" :class="$style.translation">
-					<div :class="$style.translationLabel"><i class="ti ti-language"></i> {{ chatT('translated', chatFb.translated) }}</div>
+					<div :class="$style.translationLabel"><i class="ti ti-language"></i> {{ chatT('translated') }}</div>
 					<div class="_selectable">{{ translation }}</div>
 				</div>
 				<ChatAttachment v-if="message.file" :file="message.file" :class="$style.file"/>
@@ -121,7 +121,7 @@ import { ensureSignin } from '@/i.js';
 import { i18n } from '@/i18n.js';
 import MkFukidashi from '@/components/MkFukidashi.vue';
 import { decryptChatText } from './chat-e2ee.js';
-import { chatT, chatFb } from './chat-i18n.js';
+import { chatT } from './chat-i18n.js';
 import { chatWsKey, chatWsOrApi, chatRoomCanModerateKey } from './chat-ws.js';
 import * as os from '@/os.js';
 import { copyToClipboard } from '@/utility/copy-to-clipboard.js';
@@ -157,7 +157,7 @@ const emit = defineEmits<{
 const isMe = computed(() => props.message.fromUserId === $i.id);
 const decryptedText = ref<string | null>(null);
 const decrypting = ref(false);
-const e2eeFailLabel = chatT('e2eeDecryptFailed', chatFb.e2eeDecryptFailed);
+const e2eeFailLabel = chatT('e2eeDecryptFailed');
 const translation = ref<string | null>(null);
 const translating = ref(false);
 const canTranslateChat = computed(() => {
@@ -267,11 +267,11 @@ const replyPreviewLabel = computed(() => {
 	if (!r) return '';
 	if (r.text && r.text.trim().length > 0) return r.text;
 	const type = r.file?.type ?? '';
-	if (type.startsWith('video/')) return chatT('replyVideo', chatFb.replyVideo);
-	if (type.startsWith('image/')) return chatT('replyImage', chatFb.replyImage);
-	if (type.startsWith('audio/')) return chatT('replyAudio', chatFb.replyAudio);
-	if (r.file || r.fileId) return chatT('replyFile', chatFb.replyFile);
-	if (r.isE2ee) return chatT('replyE2ee', chatFb.replyE2ee);
+	if (type.startsWith('video/')) return chatT('replyVideo');
+	if (type.startsWith('image/')) return chatT('replyImage');
+	if (type.startsWith('audio/')) return chatT('replyAudio');
+	if (r.file || r.fileId) return chatT('replyFile');
+	if (r.isE2ee) return chatT('replyE2ee');
 	return '…';
 });
 
@@ -409,7 +409,7 @@ async function translateMessage() {
 		console.error('Chat translation failed', err);
 		os.alert({
 			type: 'error',
-			text: chatT('translateFailed', chatFb.translateFailed),
+			text: chatT('translateFailed'),
 		});
 	} finally {
 		translating.value = false;
@@ -454,7 +454,7 @@ function buildMenu(): MenuItem[] {
 	if (canTranslateChat.value && displayText.value && !translating.value) {
 		menu.push({
 			text: translation.value
-				? chatT('hideTranslation', chatFb.hideTranslation)
+				? chatT('hideTranslation')
 				: (i18n.ts.translate as string),
 			icon: 'ti ti-language',
 			action: () => {
@@ -476,14 +476,14 @@ function buildMenu(): MenuItem[] {
 
 	if ((canDeleteOwn || allowModDelete) && $i.policies.chatAvailability === 'available') {
 		menu.push({
-			text: allowModDelete ? chatT('modDeleteMessage', chatFb.modDeleteMessage) : i18n.ts.delete,
+			text: allowModDelete ? chatT('modDeleteMessage') : i18n.ts.delete,
 			icon: 'ti ti-trash',
 			danger: true,
 			action: async () => {
 				if (allowModDelete) {
 					const { canceled } = await os.confirm({
 						type: 'warning',
-						text: chatT('modDeleteMessageConfirm', chatFb.modDeleteMessageConfirm),
+						text: chatT('modDeleteMessageConfirm'),
 					});
 					if (canceled) return;
 				}

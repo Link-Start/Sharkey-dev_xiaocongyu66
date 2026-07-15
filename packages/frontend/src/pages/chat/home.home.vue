@@ -31,10 +31,10 @@ import { updateCurrentAccountPartial } from '@/accounts.js';
 import MkFoldableSection from '@/components/MkFoldableSection.vue';
 import MkInfo from '@/components/MkInfo.vue';
 import MkChatHistories from '@/components/MkChatHistories.vue';
-import { chatT, chatFb } from './chat-i18n.js';
+import { chatT } from './chat-i18n.js';
 
 const $i = ensureSignin();
-const tChat = (key: keyof typeof chatFb) => chatT(key, chatFb[key]);
+const tChat = (key: string) => chatT(key);
 
 const router = useRouter();
 

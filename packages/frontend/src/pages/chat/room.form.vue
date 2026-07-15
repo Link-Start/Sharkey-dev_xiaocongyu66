@@ -93,7 +93,7 @@ import { Autocomplete } from '@/utility/autocomplete.js';
 import { emojiPicker } from '@/utility/emoji-picker.js';
 import { $i } from '@/i.js';
 import StickerPicker from './StickerPicker.vue';
-import { chatT, chatFb, ensureChatLocaleFresh } from './chat-i18n.js';
+import { chatT, ensureChatLocaleFresh } from './chat-i18n.js';
 
 const props = defineProps<{
 	user?: Misskey.entities.UserDetailed | null;
@@ -141,13 +141,13 @@ const canCompose = computed(() => {
 
 ensureChatLocaleFresh();
 
-const mutedAllTitle = computed(() => chatT('mutedAll', chatFb.mutedAll));
-const mutedAllBody = computed(() => chatT('mutedAllComposerDisabled', chatFb.mutedAllComposerDisabled));
-const stickersLabel = computed(() => chatT('stickers', chatFb.stickers));
+const mutedAllTitle = computed(() => chatT('mutedAll'));
+const mutedAllBody = computed(() => chatT('mutedAllComposerDisabled'));
+const stickersLabel = computed(() => chatT('stickers'));
 
 const canSend = computed(() => canCompose.value && !sending.value && ((text.value != null && text.value !== '') || file.value != null));
-const sendBusyLabel = computed(() => chatT('sending', chatFb.sending));
-const sendBusyTitle = computed(() => chatT('sendingHint', chatFb.sendingHint));
+const sendBusyLabel = computed(() => chatT('sending'));
+const sendBusyTitle = computed(() => chatT('sendingHint'));
 
 const replyAuthorLabel = computed(() => {
 	const r = props.replyTo as any;
@@ -166,11 +166,11 @@ const replyPreviewLabel = computed(() => {
 	if (!r) return '';
 	if (r.text && String(r.text).trim().length > 0) return r.text;
 	const type = r.file?.type ?? '';
-	if (type.startsWith('video/')) return chatT('replyVideo', chatFb.replyVideo);
-	if (type.startsWith('image/')) return chatT('replyImage', chatFb.replyImage);
-	if (type.startsWith('audio/')) return chatT('replyAudio', chatFb.replyAudio);
-	if (r.file || r.fileId) return chatT('replyFile', chatFb.replyFile);
-	if (r.isE2ee) return chatT('replyE2ee', chatFb.replyE2ee);
+	if (type.startsWith('video/')) return chatT('replyVideo');
+	if (type.startsWith('image/')) return chatT('replyImage');
+	if (type.startsWith('audio/')) return chatT('replyAudio');
+	if (r.file || r.fileId) return chatT('replyFile');
+	if (r.isE2ee) return chatT('replyE2ee');
 	return '…';
 });
 

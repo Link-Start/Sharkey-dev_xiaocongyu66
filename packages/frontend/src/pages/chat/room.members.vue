@@ -73,10 +73,10 @@ import { userPage } from '@/filters/user.js';
 import { ensureSignin } from '@/i.js';
 import * as os from '@/os.js';
 import type { MenuItem } from '@/types/menu.js';
-import { chatT, chatFb } from './chat-i18n.js';
+import { chatT } from './chat-i18n.js';
 
 const $i = ensureSignin();
-const tChat = (key: keyof typeof chatFb) => chatT(key, chatFb[key]);
+const tChat = (key: string) => chatT(key);
 
 const props = defineProps<{
 	room: Misskey.entities.ChatRoom;

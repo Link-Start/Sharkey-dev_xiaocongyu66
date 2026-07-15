@@ -103,13 +103,13 @@ import MkSwitch from '@/components/MkSwitch.vue';
 import MkSelect from '@/components/MkSelect.vue';
 import { useRouter } from '@/router.js';
 import { copyToClipboard } from '@/utility/copy-to-clipboard.js';
-import { chatT, chatFb } from './chat-i18n.js';
+import { chatT } from './chat-i18n.js';
 import { chatWsKey } from './chat-ws.js';
 import { inject } from 'vue';
 
 const router = useRouter();
 const $i = ensureSignin();
-const tChat = (key: keyof typeof chatFb) => chatT(key, chatFb[key]);
+const tChat = (key: string) => chatT(key);
 const chatWs = inject(chatWsKey, null);
 /** i18n.ts.announcement may be missing in older locale packs — always show 公告/Announcement */
 const announcementLabel = computed(() => {

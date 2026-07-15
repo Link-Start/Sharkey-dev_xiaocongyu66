@@ -12,10 +12,10 @@ import { computed, ref, type Ref } from 'vue';
 import { $i } from '@/i.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import type { NormalizedChatMessage } from './chat-types.js';
-import { chatT, chatFb } from './chat-i18n.js';
+import { chatT } from './chat-i18n.js';
 
-function tChat(key: keyof typeof chatFb) {
-	return chatT(key, chatFb[key]);
+function tChat(key: string) {
+	return chatT(key);
 }
 
 export function useChatMentions(opts: {

@@ -142,8 +142,6 @@ import MkSwitch from '@/components/MkSwitch.vue';
 import MkButton from '@/components/MkButton.vue';
 import { miLocalStorage } from '@/local-storage.js';
 
-type FallbackTable = { en: string; zh: string; 'zh-TW'?: string; ja: string };
-
 // Drop stale locale so next paint can load _xAlgorithm translations
 try {
 	if ((i18n.ts as any)._xAlgorithm == null) {
@@ -153,69 +151,9 @@ try {
 } catch { /* ignore */ }
 
 /** Multi-lang labels: prefer i18n locale, then language-aware fallbacks (not English-only). */
-const xAlgoFb: Record<string, FallbackTable> = {
-	title: { en: 'Algorithm', zh: '算法', 'zh-TW': '演算法', ja: 'アルゴリズム' },
-	info: {
-		en: 'X Algorithm must run as the original upstream services. Sharkey calls an HTTP gateway for Home Mixer/Scored Posts and does not emulate a reduced algorithm locally.',
-		zh: 'X Algorithm 必须以原始上游服务运行。Sharkey 通过 HTTP 网关调用 Home Mixer/Scored Posts，不会在本地模拟简化算法。',
-		'zh-TW': 'X Algorithm 必須以原始上游服務運行。Sharkey 透過 HTTP 閘道呼叫 Home Mixer/Scored Posts，不會在本機模擬簡化演算法。',
-		ja: 'X Algorithm はオリジナルの上流サービスとして動作する必要があります。Sharkey は Home Mixer/Scored Posts を HTTP ゲートウェイ経由で呼び出し、ローカルで簡易アルゴリズムをエミュレートしません。',
-	},
-	enable: { en: 'Enable X Algorithm', zh: '启用 X Algorithm', 'zh-TW': '啟用 X Algorithm', ja: 'X Algorithm を有効化' },
-	enableCaption: { en: 'Use xai-org/x-algorithm as the recommendation backend.', zh: '使用 xai-org/x-algorithm 作为推荐后端。', 'zh-TW': '使用 xai-org/x-algorithm 作為推薦後端。', ja: '推薦バックエンドとして xai-org/x-algorithm を使用します。' },
-	strictOriginal: { en: 'Strict original experience', zh: '严格原始体验', 'zh-TW': '嚴格原始體驗', ja: '厳格なオリジナル体験' },
-	strictOriginalCaption: { en: 'Do not silently replace missing X Algorithm stages with Sharkey heuristics.', zh: '不要用 Sharkey 启发式静默替代缺失的 X Algorithm 阶段。', 'zh-TW': '不要用 Sharkey 啟發式靜默取代缺失的 X Algorithm 階段。', ja: '欠落した X Algorithm 段階を Sharkey のヒューリスティックで黙って置き換えません。' },
-	fallback: { en: 'Fallback to Sharkey timeline', zh: '回退到 Sharkey 时间线', 'zh-TW': '回退到 Sharkey 時間軸', ja: 'Sharkey タイムラインへフォールバック' },
-	fallbackCaption: { en: 'Only use this while bringing up the upstream service.', zh: '仅在上游服务尚未就绪时使用。', 'zh-TW': '僅在上游服務尚未就緒時使用。', ja: '上流サービスの立ち上げ中のみ使用してください。' },
-	testHome: { en: 'Test Home', zh: '测试 Home', 'zh-TW': '測試 Home', ja: 'Home をテスト' },
-	testHybrid: { en: 'Test Hybrid', zh: '测试 Hybrid', 'zh-TW': '測試 Hybrid', ja: 'Hybrid をテスト' },
-	testResult: { en: 'Returned {n} note ids.', zh: '返回了 {n} 条笔记 ID。', 'zh-TW': '回傳了 {n} 則貼文 ID。', ja: '{n} 件のノート ID を返しました。' },
-	originalServices: { en: 'Original services', zh: '原始服务', 'zh-TW': '原始服務', ja: 'オリジナルサービス' },
-	homeMixer: { en: 'Home Mixer HTTP gateway', zh: 'Home Mixer HTTP 网关', 'zh-TW': 'Home Mixer HTTP 閘道', ja: 'Home Mixer HTTP ゲートウェイ' },
-	scoredPosts: { en: 'Scored Posts HTTP gateway', zh: 'Scored Posts HTTP 网关', 'zh-TW': 'Scored Posts HTTP 閘道', ja: 'Scored Posts HTTP ゲートウェイ' },
-	phoenix: { en: 'Phoenix endpoint', zh: 'Phoenix 端点', 'zh-TW': 'Phoenix 端點', ja: 'Phoenix エンドポイント' },
-	thunder: { en: 'Thunder endpoint', zh: 'Thunder 端点', 'zh-TW': 'Thunder 端點', ja: 'Thunder エンドポイント' },
-	grox: { en: 'Grox endpoint', zh: 'Grox 端点', 'zh-TW': 'Grox 端點', ja: 'Grox エンドポイント' },
-	apiKey: { en: 'API key', zh: 'API 密钥', 'zh-TW': 'API 金鑰', ja: 'API キー' },
-	pipeline: { en: 'Pipeline', zh: '流水线', 'zh-TW': '管線', ja: 'パイプライン' },
-	includeInNetwork: { en: 'Thunder in-network source', zh: 'Thunder 站内来源', 'zh-TW': 'Thunder 站內來源', ja: 'Thunder インネットワークソース' },
-	includeOutOfNetwork: { en: 'Phoenix out-of-network source', zh: 'Phoenix 站外来源', 'zh-TW': 'Phoenix 站外來源', ja: 'Phoenix アウトオブネットワークソース' },
-	enableGrox: { en: 'Grox content understanding', zh: 'Grox 内容理解', 'zh-TW': 'Grox 內容理解', ja: 'Grox コンテンツ理解' },
-	enableAds: { en: 'Ads blending', zh: '广告混合', 'zh-TW': '廣告混合', ja: '広告ブレンディング' },
-	candidates: { en: 'Candidates per request', zh: '每次请求候选数', 'zh-TW': '每次請求候選數', ja: 'リクエストあたりの候補数' },
-	timeout: { en: 'Request timeout ms', zh: '请求超时（毫秒）', 'zh-TW': '請求逾時（毫秒）', ja: 'リクエストタイムアウト (ms)' },
-	modelArtifacts: { en: 'Model artifacts path', zh: '模型产物路径', 'zh-TW': '模型產物路徑', ja: 'モデル成果物パス' },
-};
-
-function resolveLang(fb: FallbackTable): string {
-	const lang = (typeof navigator !== 'undefined' ? navigator.language : 'en-US').replace('_', '-').toLowerCase();
-	if (lang.startsWith('zh-tw') || lang.startsWith('zh-hk') || lang.startsWith('zh-hant')) return fb['zh-TW'] || fb.zh;
-	if (lang.startsWith('zh')) return fb.zh;
-	if (lang.startsWith('ja')) return fb.ja;
-	return fb.en;
-}
-function xAlgoKey(key: keyof typeof xAlgoFb): string {
-	const fromI18n = (i18n.ts as any)?._xAlgorithm?.[key];
-	if (typeof fromI18n === 'string' && fromI18n.length > 0) return fromI18n;
-	// also try localStorage lang if available
-	try {
-		const stored = localStorage.getItem('lang');
-		if (stored) {
-			const l = stored.replace('_', '-').toLowerCase();
-			const fb = xAlgoFb[key];
-			if (l.startsWith('zh-tw') || l.startsWith('zh-hk') || l.startsWith('zh-hant')) return fb['zh-TW'] || fb.zh;
-			if (l.startsWith('zh')) return fb.zh;
-			if (l.startsWith('ja')) return fb.ja;
-			return fb.en;
-		}
-	} catch { /* ignore */ }
-	return resolveLang(xAlgoFb[key]);
-}
-
 const xAlgo = new Proxy({} as Record<string, string>, {
 	get(_t, prop: string) {
-		if (prop in xAlgoFb) return xAlgoKey(prop as keyof typeof xAlgoFb);
-		return prop;
+		return xAlgoKey(prop);
 	},
 });
 

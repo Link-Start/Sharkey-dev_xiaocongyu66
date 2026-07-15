@@ -268,7 +268,7 @@ import { useRouter } from '@/router.js';
 import MkInfo from '@/components/MkInfo.vue';
 import { makeDateSeparatedTimelineComputedRef } from '@/utility/timeline-date-separate.js';
 import { pleaseLogin } from '@/utility/please-login.js';
-import { chatT, chatFb, ensureChatLocaleFresh } from './chat-i18n.js';
+import { chatT, ensureChatLocaleFresh } from './chat-i18n.js';
 import { chatWsKey, chatRoomCanModerateKey } from './chat-ws.js';
 import { formatApiError } from '@/utility/format-api-error.js';
 
@@ -278,8 +278,8 @@ export type { NormalizedChatMessage } from './chat-types.js';
 const router = useRouter();
 const signedIn = computed(() => $i != null);
 ensureChatLocaleFresh();
-function tChat(key: keyof typeof chatFb) {
-	return chatT(key, chatFb[key]);
+function tChat(key: string) {
+	return chatT(key);
 }
 /** Pin strip / manage folder title — works even if locale pack lacks `announcement` key */
 const announcementTitle = computed(() => {

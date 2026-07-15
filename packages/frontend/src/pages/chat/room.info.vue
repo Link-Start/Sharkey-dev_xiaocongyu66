@@ -43,11 +43,11 @@ import * as os from '@/os.js';
 import { ensureSignin } from '@/i.js';
 import MkSwitch from '@/components/MkSwitch.vue';
 import { useRouter } from '@/router.js';
-import { chatT, chatFb } from './chat-i18n.js';
+import { chatT } from './chat-i18n.js';
 
 const router = useRouter();
 const $i = ensureSignin();
-const tChat = (key: keyof typeof chatFb) => chatT(key, chatFb[key]);
+const tChat = (key: string) => chatT(key);
 const announcementTitle = computed(() => {
 	const v = (i18n.ts as any).announcement;
 	if (typeof v === 'string' && v.length > 0 && !String(v).includes('announcement')) return v;

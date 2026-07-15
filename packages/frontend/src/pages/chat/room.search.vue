@@ -83,9 +83,9 @@ import { misskeyApi } from '@/utility/misskey-api.js';
 import MkInput from '@/components/MkInput.vue';
 import MkFoldableSection from '@/components/MkFoldableSection.vue';
 import * as os from '@/os.js';
-import { chatT, chatFb } from './chat-i18n.js';
+import { chatT } from './chat-i18n.js';
 
-const tChat = (key: keyof typeof chatFb) => chatT(key, chatFb[key]);
+const tChat = (key: string) => chatT(key);
 
 const props = defineProps<{
 	userId?: string;

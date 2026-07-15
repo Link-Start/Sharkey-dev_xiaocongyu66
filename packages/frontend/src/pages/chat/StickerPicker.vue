@@ -79,9 +79,9 @@ import MkInput from '@/components/MkInput.vue';
 import { misskeyApi } from '@/utility/misskey-api.js';
 import * as os from '@/os.js';
 import { miLocalStorage } from '@/local-storage.js';
-import { chatT, chatFb } from './chat-i18n.js';
+import { chatT } from './chat-i18n.js';
 
-const tChat = (key: keyof typeof chatFb) => chatT(key, chatFb[key]);
+const tChat = (key: string) => chatT(key);
 
 type Sticker = {
 	id: string;

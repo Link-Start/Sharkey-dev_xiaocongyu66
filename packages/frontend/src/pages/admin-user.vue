@@ -441,25 +441,11 @@ const canSeeAudit = computed(() => {
 	return false;
 });
 
-// Prefer locale pack (_adminNotes); English fallbacks only if pack is stale.
-const adminNotesI18nFb = {
-	loginHistory: 'Login history',
-	loginIp: 'Login IP',
-	browserFingerprint: 'Browser fingerprint',
-	userAgent: 'Browser',
-	success: 'Success',
-	failed: 'Failed',
-	activityIp: 'Activity IPs',
-	activityIpTip: 'IPs from request logs and login history (admins only).',
-	latestIp: 'Latest IP',
-	ipHistory: 'IP history',
-	noIpYet: 'No IP records yet (recorded after user activity; login IPs are under Login history).',
-} as const;
-const adminNotesI18n = new Proxy(adminNotesI18nFb, {
-	get(target, prop: string) {
+const adminNotesI18n = new Proxy({} as Record<string, string>, {
+	get(_target, prop: string) {
 		const block = (i18n.ts as any)._adminNotes;
 		const v = block?.[prop];
-		return typeof v === 'string' && v.length > 0 ? v : (target as any)[prop] ?? prop;
+		return typeof v === 'string' && v.length > 0 ? v : prop;
 	},
 });
 import MkRolePreview from '@/components/MkRolePreview.vue';
