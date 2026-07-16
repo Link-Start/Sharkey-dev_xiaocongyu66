@@ -26,7 +26,7 @@ Pass 14 digs into **what still makes APIs slow** and **logic bugs still in packi
 |-----|-----|----------|
 | **P0 bug** | **SK-097** | poll `isVoted` wrong user — **FIXED** (`2d72032`) |
 | **P0 perf** | **PERF-09** | poll vote overfetch — **FIXED** |
-| **P0 perf** | **PERF-03** | packMany weight — **partial** (skip poll queries when no polls) |
+| **P0 perf** | **PERF-03** | packMany weight — **partial+** (skip poll/channel/file empty work; less renote graph fetch; myReaction map O(1)) |
 | **P1 perf** | **PERF-10** | Hybrid EXISTS — **FIXED** (IN-list) |
 | **P1 perf** | **PERF-11** | `allowPartial` default false — OPEN (MkPagination already sends true) |
 | **P1 perf** | **PERF-12** | sqlLike ILIKE — **mitigated** (min len 2, max 80); still recommend Meili/pgroonga |
@@ -42,7 +42,7 @@ Pass 14 digs into **what still makes APIs slow** and **logic bugs still in packi
 |-----------|-------|------|
 | Fanout Redis read | **8.0** | Bounded LRANGE + window-miss DB fallback |
 | Home DB fallback | **7.5** | IN-list + 503 on timeout |
-| Note packing | **5.5** | SK-097 fixed; skip empty poll queries; still heavy |
+| Note packing | **6.0** | SK-097 + skip empty polls/channels/files; thinner renote graph fetch; still heavy JSON |
 | Hybrid/social DB | **7.0** | IN-list aligned with home |
 | Search (sqlLike) | **5.0** | Length caps; still not index-friendly |
 | Composite API feel | **~7.0** | Main residual packMany + search provider |
@@ -318,14 +318,13 @@ See SK-101. Ops + provider.
 
 ---
 
-#### PERF-14 — Global API `Cache-Control: private, max-age=0` (**P2**)
+#### PERF-14 — Global API `Cache-Control: private, max-age=0` (**P2**, **partial**)
 
-`ApiServerService` sets no-store-ish headers on **all** endpoints including public `meta`.
+`ApiServerService` still defaults private; **GET unauthenticated** endpoints with `cacheSec` can override to public.
 
-**Ideas**
+**Landed:** `meta` endpoint `allowGet: true` + `cacheSec: 60` (anonymous GET only).
 
-- Allow short public cache for `meta` (detail=false), emoji, manifest-like payloads.  
-- Keep private for credentialed routes.
+**Still open:** more public endpoints (emoji, instance charts) as product allows.
 
 ---
 

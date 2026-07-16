@@ -791,9 +791,13 @@ export class NoteEntityService implements OnModuleInit {
 
 		const targetNotes = await this.fetchRequiredNotes(notes, options?.detail ?? false);
 		const noteIds = Array.from(new Set(targetNotes.keys()));
+		const targetNotesList = Array.from(targetNotes.values());
+		// PERF-03: compute once for polls / channels
+		const pollNoteIds = targetNotesList.filter(n => n.hasPoll).map(n => n.id);
+		const channelNoteIds = targetNotesList.filter(n => n.channelId != null);
 
 		const usersMap = new Map<string, MiUser | string>();
-		const allUsers = targetNotes.values().flatMap(note => [
+		const allUsers = targetNotesList.flatMap(note => [
 			note.user ?? note.userId,
 			note.reply?.user ?? note.replyUserId,
 			note.renote?.user ?? note.renoteUserId,
@@ -814,7 +818,7 @@ export class NoteEntityService implements OnModuleInit {
 		const users = Array.from(usersMap.values());
 		const userIds = Array.from(usersMap.keys());
 
-		const fileIds = new Set(targetNotes.values().flatMap(n => n.fileIds));
+		const fileIds = new Set(targetNotesList.flatMap(n => n.fileIds));
 
 		// These are pulled out so we can reference it twice within the same awaitAll() call
 		const userRelationsPromise = Promise.resolve(me
@@ -829,25 +833,24 @@ export class NoteEntityService implements OnModuleInit {
 
 		const [{ bufferedReactions, myReactionsMap }, packedFiles, packedUsers, polls, pollVotes, channels, mutedThreads, mutedNotes, favoriteNotes, renotedNotes, userRelations, iAmAdmin, iAmModerator] = await Promise.all([
 			// bufferedReactions & myReactionsMap
-			this.getReactions(targetNotes.values().toArray(), me),
+			this.getReactions(targetNotesList, me),
 			// packedFiles
-			this.driveFileEntityService.packManyByIdsMap(Array.from(fileIds)),
+			fileIds.size > 0
+				? this.driveFileEntityService.packManyByIdsMap(Array.from(fileIds))
+				: Promise.resolve(new Map()),
 			// packedUsers
 			Promise.all([userRelationsPromise, iAmAdminPromise, iAmModeratorPromise])
 				.then(([userRelations, iAmAdmin, iAmModerator]) => this.userEntityService.packMany(users, me, { hint: { userRelations, iAmAdmin, iAmModerator } }))
 				.then(packedUsers => new Map(packedUsers.map(u => [u.id, u]))),
 			// polls — PERF-03: skip when no note in the set has a poll
-			(() => {
-				const pollNoteIds = Array.from(targetNotes.values()).filter(n => n.hasPoll).map(n => n.id);
-				if (pollNoteIds.length === 0) return Promise.resolve(new Map<string, MiPoll>());
-				return this.pollsRepository.findBy({ noteId: IsOne(pollNoteIds) })
-					.then(polls => new Map(polls.map(p => [p.noteId, p])));
-			})(),
+			pollNoteIds.length === 0
+				? Promise.resolve(new Map<string, MiPoll>())
+				: this.pollsRepository.findBy({ noteId: IsOne(pollNoteIds) })
+					.then(polls => new Map(polls.map(p => [p.noteId, p]))),
 			// pollVotes — SK-097 / PERF-09: only the viewer's votes; PERF-03: only poll notes
-			(() => {
-				const pollNoteIds = Array.from(targetNotes.values()).filter(n => n.hasPoll).map(n => n.id);
-				if (!me || pollNoteIds.length === 0) return Promise.resolve(new Map<string, MiPollVote[]>());
-				return this.pollVotesRepository.findBy({ noteId: IsOne(pollNoteIds), userId: me.id })
+			(!me || pollNoteIds.length === 0)
+				? Promise.resolve(new Map<string, MiPollVote[]>())
+				: this.pollVotesRepository.findBy({ noteId: IsOne(pollNoteIds), userId: me.id })
 					.then(votes => {
 						const noteMap = new Map<string, MiPollVote[]>();
 						for (const vote of votes) {
@@ -859,10 +862,11 @@ export class NoteEntityService implements OnModuleInit {
 							list.push(vote);
 						}
 						return noteMap;
-					});
-			})(),
-			// channels
-			this.getChannels(targetNotes.values()),
+					}),
+			// channels — PERF-03: skip when no channel notes
+			channelNoteIds.length === 0
+				? Promise.resolve(new Map<string, MiChannel>())
+				: this.getChannels(channelNoteIds),
 			// mutedThreads
 			me ? this.cacheService.threadMutingsCache.fetch(me.id) : new Set<string>(),
 			// mutedNotes
@@ -945,8 +949,12 @@ export class NoteEntityService implements OnModuleInit {
 			if (note.renoteId) {
 				if (note.renote) {
 					addNote(note.renote);
+					// Renote pack uses detail=false + recurseReply only — always need renote.reply
 					addNote(note.renote.reply ?? note.renote.replyId);
-					addNote(note.renote.renote ?? note.renote.renoteId);
+					// PERF-03: renote.renote is only packed for pure-renote chains (2nd tier)
+					if (isPureRenote(note)) {
+						addNote(note.renote.renote ?? note.renote.renoteId);
+					}
 				} else {
 					addNote(note.renoteId);
 				}
@@ -1064,7 +1072,12 @@ export class NoteEntityService implements OnModuleInit {
 	}
 
 	private async getReactions(notes: MiNote[], me: { id: string } | null | undefined) {
-		const bufferedReactions = this.meta.enableReactionsBuffering ? await this.reactionsBufferingService.getMany([...getAppearNoteIds(notes)]) : null;
+		const appearIds = [...getAppearNoteIds(notes)];
+		// PERF-15: when buffering is on, still need all appear ids (0-count notes can get buffered deltas).
+		// When buffering is off, skip Redis entirely.
+		const bufferedReactions = this.meta.enableReactionsBuffering && appearIds.length > 0
+			? await this.reactionsBufferingService.getMany(appearIds)
+			: null;
 
 		const meId = me ? me.id : null;
 		const myReactionsMap = new Map<MiNote['id'], string | null>();
@@ -1093,8 +1106,10 @@ export class NoteEntityService implements OnModuleInit {
 				noteId: IsOne(Array.from(idsNeedFetchMyReaction)),
 			}) : [];
 
+			// PERF-03: O(1) lookup instead of find per note
+			const byNoteId = new Map(myReactions.map(r => [r.noteId, r.reaction]));
 			for (const id of idsNeedFetchMyReaction) {
-				myReactionsMap.set(id, myReactions.find(reaction => reaction.noteId === id)?.reaction ?? null);
+				myReactionsMap.set(id, byNoteId.get(id) ?? null);
 			}
 		}
 

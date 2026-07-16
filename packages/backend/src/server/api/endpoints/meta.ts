@@ -11,6 +11,9 @@ export const meta = {
 	tags: ['meta'],
 
 	requireCredential: false,
+	// PERF-14: allow anonymous GET + short public cache (boot / guest)
+	allowGet: true,
+	cacheSec: 60,
 
 	res: {
 		type: 'object',
