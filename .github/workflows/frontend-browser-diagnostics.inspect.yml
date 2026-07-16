@@ -127,13 +127,13 @@ jobs:
         run: |
           REPORT_DIR="$RUNNER_TEMP/frontend-browser-diagnostics"
           mkdir -p "$REPORT_DIR"
-          node after/.github/scripts/frontend-browser-diagnostics.inspect.mts before after "$REPORT_DIR/before-browser.json" "$REPORT_DIR/after-browser.json" "$REPORT_DIR/base-heap-snapshot.heapsnapshot" "$REPORT_DIR/head-heap-snapshot.heapsnapshot"
+          node after/.github/scripts/frontend-browser-diagnostics.inspect.mts before after "$REPORT_DIR/before-browser.json" "$REPORT_DIR/after-browser.json"
 
       - name: Upload browser base heap snapshot
         id: upload-browser-base-heap-snapshot
         uses: actions/upload-artifact@v7
         with:
-          path: ${{ runner.temp }}/frontend-browser-diagnostics/base-heap-snapshot.heapsnapshot
+          path: base-heap-snapshot.heapsnapshot
           archive: false
           if-no-files-found: error
           retention-days: 7
@@ -142,7 +142,7 @@ jobs:
         id: upload-browser-head-heap-snapshot
         uses: actions/upload-artifact@v7
         with:
-          path: ${{ runner.temp }}/frontend-browser-diagnostics/head-heap-snapshot.heapsnapshot
+          path: head-heap-snapshot.heapsnapshot
           archive: false
           if-no-files-found: error
           retention-days: 7
