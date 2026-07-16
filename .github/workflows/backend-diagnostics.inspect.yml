@@ -1,5 +1,5 @@
-# this name is used in report-backend-memory.yml so be careful when change name
-name: Get backend memory usage
+# this name is used in backend-diagnostics.report.yml so be careful when change name
+name: Backend diagnostics (inspect)
 
 on:
   pull_request:
@@ -10,14 +10,14 @@ on:
       - packages/backend/**
       - packages/misskey-js/**
       - .github/scripts/utility.mts
-      - .github/scripts/backend-memory-report.mts
+      - .github/scripts/backend-diagnostics.render-md.mts
       - .github/scripts/measure-backend-memory-comparison.mts
       - .github/scripts/memory-stability-util*.mts
       - .github/scripts/backend-js-footprint.mjs
       - .github/scripts/backend-js-footprint-loader.mjs
       - .github/scripts/backend-js-footprint-require.cjs
-      - .github/workflows/get-backend-memory.yml
-      - .github/workflows/report-backend-memory.yml
+      - .github/workflows/backend-diagnostics.inspect.yml
+      - .github/workflows/backend-diagnostics.report.yml
 
 jobs:
   get-memory-usage:
