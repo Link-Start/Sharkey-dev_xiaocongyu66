@@ -1,4 +1,4 @@
-name: Backend diagnostics (report)
+name: Backend diagnostics (comment)
 
 on:
   workflow_run:

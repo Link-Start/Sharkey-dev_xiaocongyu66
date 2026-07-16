@@ -29,7 +29,7 @@ on:
       - .github/scripts/frontend-browser-diagnostics.render-md.mts
       - .github/scripts/frontend-browser-diagnostics.inspect.mts
       - .github/workflows/frontend-browser-diagnostics.inspect.yml
-      - .github/workflows/frontend-browser-diagnostics.report.yml
+      - .github/workflows/frontend-browser-diagnostics.comment.yml
 
 permissions:
   contents: read

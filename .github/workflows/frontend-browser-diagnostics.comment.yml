@@ -1,4 +1,4 @@
-name: Frontend browser diagnostics (report)
+name: Frontend browser diagnostics (comment)
 
 on:
   workflow_run:

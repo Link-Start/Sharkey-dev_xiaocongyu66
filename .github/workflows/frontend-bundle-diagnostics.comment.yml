@@ -1,4 +1,4 @@
-name: Frontend bundle diagnostics (report)
+name: Frontend bundle diagnostics (comment)
 
 on:
   workflow_run:
@@ -28,7 +28,7 @@ on:
       - .github/scripts/utility.mts
       - .github/scripts/frontend-bundle-diagnostics.render-md.mts
       - .github/workflows/frontend-bundle-diagnostics.inspect.yml
-      - .github/workflows/frontend-bundle-diagnostics.report.yml
+      - .github/workflows/frontend-bundle-diagnostics.comment.yml
 
 permissions:
   actions: read
