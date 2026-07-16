@@ -313,15 +313,12 @@ function toHeapSnapshotReport(report: BrowserMetricsReport): HeapSnapshotReport 
 	};
 }
 
-export function renderFrontendBrowserReport(base: BrowserMetricsReport, head: BrowserMetricsReport, options: {
+function renderMd(base: BrowserMetricsReport, head: BrowserMetricsReport, options: {
 	headHeapSnapshotUrl?: string;
 	detailedHtmlUrl?: string;
 } = {}) {
 	const headHeapSnapshotUrl = options.headHeapSnapshotUrl;
 	const detailedHtmlUrl = options.detailedHtmlUrl;
-	const sampleSummary = base.sampleCount === head.sampleCount
-		? `${base.sampleCount} samples per side`
-		: `${base.sampleCount} base sample(s), ${head.sampleCount} head sample(s)`;
 	const heapSnapshotTable = heapSnapshotUtil.renderHeapSnapshotTable(toHeapSnapshotReport(base), toHeapSnapshotReport(head));
 	const lines = [
 		'## 🖥 Frontend Browser Diagnostics Report',
@@ -330,8 +327,6 @@ export function renderFrontendBrowserReport(base: BrowserMetricsReport, head: Br
 		'',
 		'<i>Only metrics showing significant changes are displayed.</i>',
 		'',
-		//`> Measured ${sampleSummary} with fresh headless Chrome profiles, browser cache disabled, service workers bypassed, and forced V8 GC before each heap snapshot. Base/Head values are medians; Δ median is the median of paired Head - Base sample deltas; percent uses Δ median / Base median; ± and Δ MAD are median absolute deviations. Scenario: sign up, dismiss the initial account setup dialog, create the first timeline note, then wait until that note is visible.`,
-		//'',
 		detailedHtmlUrl == null || detailedHtmlUrl === '' ? null : `[View details](${detailedHtmlUrl})`,
 		detailedHtmlUrl == null || detailedHtmlUrl === '' ? null : '',
 		'<details>',
@@ -370,7 +365,7 @@ async function main() {
 
 	const base = JSON.parse(await readFile(baseFile, 'utf8')) as BrowserMetricsReport;
 	const head = JSON.parse(await readFile(headFile, 'utf8')) as BrowserMetricsReport;
-	await writeFile(outputFile, renderFrontendBrowserReport(base, head, {
+	await writeFile(outputFile, renderMd(base, head, {
 		headHeapSnapshotUrl: process.env.FRONTEND_BROWSER_HEAD_HEAP_SNAPSHOT_ARTIFACT_URL,
 		detailedHtmlUrl: process.env.FRONTEND_BROWSER_DETAILED_HTML_ARTIFACT_URL,
 	}));

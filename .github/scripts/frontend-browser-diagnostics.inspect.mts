@@ -234,7 +234,7 @@ async function saveRepresentativeHeadHeapSnapshot(report: BrowserMetricsReport, 
 	await rm(headHeapSnapshotWorkDir, { recursive: true, force: true });
 }
 
-async function measureRepo(label: 'base' | 'head', repoDir: string, outputPath: string, heapSnapshotSavePath?: string) {
+async function genReport(label: 'base' | 'head', repoDir: string, outputPath: string, heapSnapshotSavePath?: string) {
 	let server: ReturnType<typeof util.startServer> | null = null;
 
 	try {
@@ -269,8 +269,8 @@ async function measureRepo(label: 'base' | 'head', repoDir: string, outputPath: 
 }
 
 async function main() {
-	await measureRepo('base', resolve(baseDirArg), resolve(baseOutputArg));
-	await measureRepo('head', resolve(headDirArg), resolve(headOutputArg), headHeapSnapshotOutputArg == null ? undefined : resolve(headHeapSnapshotOutputArg));
+	await genReport('base', resolve(baseDirArg), resolve(baseOutputArg));
+	await genReport('head', resolve(headDirArg), resolve(headOutputArg), resolve(headHeapSnapshotOutputArg));
 }
 
 await main();
