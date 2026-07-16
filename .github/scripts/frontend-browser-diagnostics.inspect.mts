@@ -11,12 +11,15 @@ import { HeadlessChromeController, summarizeBrowserDiagnostics, summarizeNetwork
 import type { BrowserMeasurement, NetworkRequest, NetworkSummary } from './chrome.mts';
 import { closeUserSetupDialog, postNote, signupThroughUi, visitHome } from '../../packages/frontend/test/e2e/shared.ts';
 
-const [baseDirArg, headDirArg, baseOutputArg, headOutputArg, headHeapSnapshotOutputArg] = process.argv.slice(2);
+const [baseDirArg, headDirArg, baseOutputArg, headOutputArg, baseHeapSnapshotOutputArg, headHeapSnapshotOutputArg] = process.argv.slice(2);
 
 const baseUrl = process.env.FRONTEND_BROWSER_METRICS_URL ?? 'http://127.0.0.1:61812';
 const sampleCount = util.readIntegerEnv('FRONTEND_BROWSER_METRICS_SAMPLE_COUNT', 5, 1);
 const heapSnapshotBreakdownTopN = util.readIntegerEnv('FRONTEND_BROWSER_HEAP_SNAPSHOT_BREAKDOWN_TOP_N', heapSnapshotUtil.defaultHeapSnapshotBreakdownTopN, 1);
-const headHeapSnapshotWorkDir = resolve('frontend-browser-head-heap-snapshots');
+const heapSnapshotWorkDirs = {
+	base: resolve('frontend-browser-base-heap-snapshots'),
+	head: resolve('frontend-browser-head-heap-snapshots'),
+} as const;
 
 type BrowserMeasurementSample = BrowserMeasurement & {
 	round: number;
@@ -223,28 +226,26 @@ async function measureSample(label: 'base' | 'head', round: number, heapSnapshot
 	});
 }
 
-function headHeapSnapshotPath(round: number) {
-	return join(headHeapSnapshotWorkDir, `round-${round}.heapsnapshot`);
+function heapSnapshotPath(label: 'base' | 'head', round: number) {
+	return join(heapSnapshotWorkDirs[label], `round-${round}.heapsnapshot`);
 }
 
-async function saveRepresentativeHeadHeapSnapshot(report: BrowserMetricsReport, outputPath: string) {
+async function saveRepresentativeHeapSnapshot(label: 'base' | 'head', report: BrowserMetricsReport, outputPath: string) {
 	const representative = selectRepresentativeSample(report.samples, sample => sample.heapSnapshot.categories.total);
-	await copyFile(headHeapSnapshotPath(representative.round), outputPath);
-	process.stderr.write(`[head] Selected round ${representative.round} heap snapshot for artifact\n`);
-	await rm(headHeapSnapshotWorkDir, { recursive: true, force: true });
+	await copyFile(heapSnapshotPath(label, representative.round), outputPath);
+	process.stderr.write(`[${label}] Selected round ${representative.round} heap snapshot for artifact\n`);
+	await rm(heapSnapshotWorkDirs[label], { recursive: true, force: true });
 }
 
-async function genReport(label: 'base' | 'head', repoDir: string, outputPath: string, heapSnapshotSavePath?: string) {
+async function genReport(label: 'base' | 'head', repoDir: string, outputPath: string, heapSnapshotSavePath: string) {
 	let server: ReturnType<typeof util.startServer> | null = null;
 
 	try {
 		server = util.startServer(label, repoDir);
 		await util.waitForServer(baseUrl, server!);
 
-		if (label === 'head' && heapSnapshotSavePath != null) {
-			await rm(headHeapSnapshotWorkDir, { recursive: true, force: true });
-			await mkdir(headHeapSnapshotWorkDir, { recursive: true });
-		}
+		await rm(heapSnapshotWorkDirs[label], { recursive: true, force: true });
+		await mkdir(heapSnapshotWorkDirs[label], { recursive: true });
 
 		const samples: BrowserMeasurementSample[] = [];
 		for (let round = 1; round <= sampleCount; round++) {
@@ -252,7 +253,7 @@ async function genReport(label: 'base' | 'head', repoDir: string, outputPath: st
 			samples.push(await measureSample(
 				label,
 				round,
-				label === 'head' && heapSnapshotSavePath != null ? headHeapSnapshotPath(round) : undefined,
+				heapSnapshotPath(label, round),
 			));
 		}
 
@@ -260,8 +261,8 @@ async function genReport(label: 'base' | 'head', repoDir: string, outputPath: st
 		await writeFile(outputPath, JSON.stringify(report, null, '\t'));
 		process.stderr.write(`[${label}] Wrote browser metrics report to ${outputPath}\n`);
 
-		if (label === 'head' && heapSnapshotSavePath != null) {
-			await saveRepresentativeHeadHeapSnapshot(report, heapSnapshotSavePath);
+		if (heapSnapshotSavePath != null) {
+			await saveRepresentativeHeapSnapshot(label, report, heapSnapshotSavePath);
 		}
 	} finally {
 		if (server != null) await util.stopServer(server);
@@ -269,7 +270,7 @@ async function genReport(label: 'base' | 'head', repoDir: string, outputPath: st
 }
 
 async function main() {
-	await genReport('base', resolve(baseDirArg), resolve(baseOutputArg));
+	await genReport('base', resolve(baseDirArg), resolve(baseOutputArg), resolve(baseHeapSnapshotOutputArg));
 	await genReport('head', resolve(headDirArg), resolve(headOutputArg), resolve(headHeapSnapshotOutputArg));
 }
 

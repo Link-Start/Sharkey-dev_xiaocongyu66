@@ -314,10 +314,10 @@ function toHeapSnapshotReport(report: BrowserMetricsReport): HeapSnapshotReport 
 }
 
 function renderMd(base: BrowserMetricsReport, head: BrowserMetricsReport, options: {
-	headHeapSnapshotUrl?: string;
+	baseHeapSnapshotUrl: string;
+	headHeapSnapshotUrl: string;
 	detailedHtmlUrl?: string;
-} = {}) {
-	const headHeapSnapshotUrl = options.headHeapSnapshotUrl;
+}) {
 	const detailedHtmlUrl = options.detailedHtmlUrl;
 	const heapSnapshotTable = heapSnapshotUtil.renderHeapSnapshotTable(toHeapSnapshotReport(base), toHeapSnapshotReport(head));
 	const lines = [
@@ -343,7 +343,7 @@ function renderMd(base: BrowserMetricsReport, head: BrowserMetricsReport, option
 		'',
 		heapSnapshotUtil.renderHeapSnapshotSankey(toHeapSnapshotReport(head), 'Head'),
 		'',
-		`[Download representative head heap snapshot](${headHeapSnapshotUrl})`,
+		`Download representative heap snapshot: [base](${options.baseHeapSnapshotUrl}) / [head](${options.headHeapSnapshotUrl})`,
 		'</details>',
 		'',
 	];
@@ -366,7 +366,8 @@ async function main() {
 	const base = JSON.parse(await readFile(baseFile, 'utf8')) as BrowserMetricsReport;
 	const head = JSON.parse(await readFile(headFile, 'utf8')) as BrowserMetricsReport;
 	await writeFile(outputFile, renderMd(base, head, {
-		headHeapSnapshotUrl: process.env.FRONTEND_BROWSER_HEAD_HEAP_SNAPSHOT_ARTIFACT_URL,
+		baseHeapSnapshotUrl: process.env.FRONTEND_BROWSER_BASE_HEAP_SNAPSHOT_ARTIFACT_URL!,
+		headHeapSnapshotUrl: process.env.FRONTEND_BROWSER_HEAD_HEAP_SNAPSHOT_ARTIFACT_URL!,
 		detailedHtmlUrl: process.env.FRONTEND_BROWSER_DETAILED_HTML_ARTIFACT_URL,
 	}));
 }
