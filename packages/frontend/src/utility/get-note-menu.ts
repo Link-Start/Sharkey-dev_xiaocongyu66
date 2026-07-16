@@ -803,14 +803,77 @@ export async function translateNote(noteId: string, translation: Ref<Misskey.ent
 			}
 		}
 
-		translation.value = await misskeyApi('notes/translate', {
-			noteId,
-			targetLang,
-			...(typeof selective === 'boolean' ? { selective } : {}),
-		});
+		// Prefer HTTP SSE streaming (AI path); fall back to classic JSON translate
+		let streamOk = false;
+		try {
+			const { translateNoteStream } = await import('@/utility/translate-stream.js');
+			let acc = '';
+			const streamResult = await translateNoteStream(
+				{
+					noteId,
+					targetLang,
+					...(typeof selective === 'boolean' ? { selective } : {}),
+				},
+				{
+					onCached: (text, sourceLang) => {
+						translation.value = { text, sourceLang: sourceLang ?? undefined } as any;
+						streamOk = true;
+					},
+					onDelta: (chunk) => {
+						acc += chunk;
+						translation.value = { text: acc } as any;
+						streamOk = true;
+					},
+					onReplace: (text) => {
+						acc = text;
+						translation.value = { text: acc } as any;
+						streamOk = true;
+					},
+					onDone: (text, sourceLang) => {
+						acc = text;
+						translation.value = { text, sourceLang: sourceLang ?? undefined } as any;
+						streamOk = true;
+					},
+					onError: (err) => {
+						// Will surface below if nothing usable was streamed
+						(translateNote as any)._lastStreamError = err;
+					},
+				},
+			);
+			if (streamResult === 'ok' && translation.value && (translation.value as any).text) {
+				return;
+			}
+			if (streamResult === 'error' && !((translation.value as any)?.text)) {
+				const err = (translateNote as any)._lastStreamError ?? { code: 'TRANSLATION_FAILED' };
+				throw err;
+			}
+			// fallback or incomplete stream without text
+			if (!streamOk || !((translation.value as any)?.text)) {
+				translation.value = await misskeyApi('notes/translate', {
+					noteId,
+					targetLang,
+					...(typeof selective === 'boolean' ? { selective } : {}),
+				});
+			}
+		} catch (streamErr) {
+			// Network / endpoint missing → classic
+			if (!((translation.value as any)?.text)) {
+				try {
+					translation.value = await misskeyApi('notes/translate', {
+						noteId,
+						targetLang,
+						...(typeof selective === 'boolean' ? { selective } : {}),
+					});
+				} catch (err) {
+					throw streamErr ?? err;
+				}
+			}
+		}
 	} catch (err) {
 		console.error(`Translation failed for ${noteId}: `, err);
-		translation.value = false;
+		if (!((translation.value as any)?.text)) {
+			translation.value = false;
+		}
 		// Surface structured API codes (AI_AUTH_FAILED / 401, AI_FORBIDDEN / 403, …)
 		try {
 			const os = await import('@/os.js');

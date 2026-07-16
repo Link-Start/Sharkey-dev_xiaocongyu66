@@ -28,6 +28,7 @@ import { renderFullError } from '@/misc/render-full-error.js';
 import { ApiError } from './error.js';
 import { ApiLoggerService } from './ApiLoggerService.js';
 import { AuthenticateService, AuthenticationError } from './AuthenticateService.js';
+import { isSseResponse } from '@/misc/sse-response.js';
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { IEndpointMeta, IEndpoint } from './endpoints.js';
 
@@ -166,11 +167,15 @@ export class ApiCallService {
 			return;
 		}
 		await this.authenticateService.authenticate(token).then(async ([user, app]) => {
-			await this.call(endpoint, user, app, body, null, request, reply).then((res) => {
+			await this.call(endpoint, user, app, body, null, request, reply).then(async (res) => {
 				if (request.method === 'GET' && endpoint.meta.cacheSec && !token && !user) {
 					reply.header('Cache-Control', `public, max-age=${endpoint.meta.cacheSec}`);
 				}
-				this.send(reply, res);
+				if (isSseResponse(res)) {
+					await this.sendSse(reply, request, res);
+				} else {
+					this.send(reply, res);
+				}
 			}).catch((err: ApiError) => {
 				this.#sendApiError(reply, err);
 			});
@@ -265,6 +270,74 @@ export class ApiCallService {
 		} else {
 			// 文字列を返す場合は、JSON.stringify通さないとJSONと認識されない
 			reply.send(typeof x === 'string' ? JSON.stringify(x) : x);
+		}
+	}
+
+	/**
+	 * Stream Server-Sent Events (text/event-stream).
+	 * Used by notes/translate-stream — one request, unidirectional token deltas.
+	 */
+	@bindThis
+	private async sendSse(
+		reply: FastifyReply,
+		request: FastifyRequest,
+		sse: { events: AsyncIterable<{ event?: string; data: Record<string, unknown> | string }> },
+	): Promise<void> {
+		reply.hijack();
+		const raw = reply.raw;
+		raw.writeHead(200, {
+			'Content-Type': 'text/event-stream; charset=utf-8',
+			'Cache-Control': 'no-cache, no-transform',
+			'Connection': 'keep-alive',
+			'X-Accel-Buffering': 'no',
+			'X-Robots-Tag': 'noindex',
+		});
+		// Flush headers early (Node HTTP)
+		if (typeof (raw as any).flushHeaders === 'function') {
+			(raw as any).flushHeaders();
+		}
+
+		let closed = false;
+		const onClose = () => {
+			closed = true;
+			try {
+				(sse as any).abort?.abort();
+			} catch { /* ignore */ }
+		};
+		request.raw.on('close', onClose);
+		raw.on('close', onClose);
+
+		const writeEvent = (event: string | undefined, data: unknown) => {
+			if (closed || raw.writableEnded) return;
+			const payload = typeof data === 'string' ? data : JSON.stringify(data);
+			if (event) raw.write(`event: ${event}\n`);
+			// Split multi-line data per SSE spec
+			for (const line of payload.split('\n')) {
+				raw.write(`data: ${line}\n`);
+			}
+			raw.write('\n');
+		};
+
+		try {
+			// Opening comment helps some proxies flush
+			raw.write(': ok\n\n');
+			for await (const ev of sse.events) {
+				if (closed) break;
+				writeEvent(ev.event, ev.data);
+			}
+		} catch (err) {
+			if (!closed && !raw.writableEnded) {
+				writeEvent('error', {
+					code: 'TRANSLATION_FAILED',
+					message: err instanceof Error ? err.message : 'stream failed',
+				});
+			}
+		} finally {
+			request.raw.off('close', onClose);
+			raw.off('close', onClose);
+			if (!raw.writableEnded) {
+				raw.end();
+			}
 		}
 	}
 

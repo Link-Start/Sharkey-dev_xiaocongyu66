@@ -45,6 +45,8 @@ export type AiTranslateInput = {
 	nativeLang?: string | null;
 	/** Skip content-hash cache (admin/debug) */
 	skipCache?: boolean;
+	/** Abort upstream stream when the client disconnects */
+	signal?: AbortSignal;
 };
 
 export type AiTranslateResult = {
@@ -52,6 +54,14 @@ export type AiTranslateResult = {
 	sourceLang?: string;
 	provider: 'ai';
 };
+
+/** Chunks yielded by translateStream (HTTP SSE pipeline). */
+export type AiTranslateStreamEvent =
+	| { type: 'cached'; text: string; sourceLang?: string }
+	| { type: 'delta'; text: string }
+	/** Replace entire buffer (e.g. after refusal retry). */
+	| { type: 'replace'; text: string }
+	| { type: 'done'; text: string; sourceLang?: string };
 
 /** Machine codes returned to API clients for AI translate failures. */
 export type AiTranslationErrorCode =
@@ -352,6 +362,97 @@ export class AiTranslationService {
 		}
 	}
 
+	/**
+	 * Stream translation deltas (OpenAI-compatible chat.completions stream).
+	 * Yields `cached` when Redis hit; otherwise `delta`* then `done`.
+	 */
+	@bindThis
+	public async *translateStream(input: AiTranslateInput): AsyncGenerator<AiTranslateStreamEvent> {
+		const text = (input.text ?? '').trim();
+		if (!text) {
+			yield { type: 'done', text: '' };
+			return;
+		}
+
+		if (!this.isScopeEnabled(input.scope)) {
+			throw new AiTranslationError('AI translation is disabled for this scope.', 'AI_SCOPE_DISABLED');
+		}
+
+		const ep = this.resolveEndpoint(input.scope, input.userOverride);
+		if (!ep) {
+			throw new AiTranslationError('AI translation is not configured (missing endpoint or API key).', 'AI_NOT_CONFIGURED');
+		}
+
+		const c = this.getConfig();
+		const selective = input.selective ?? input.userOverride?.selective ?? c.selectiveByDefault;
+		const targetLang = this.normalizeLang(
+			input.userOverride?.targetLang?.trim() || input.targetLang,
+		);
+		const nativeLang = this.normalizeLang(
+			input.nativeLang?.trim()
+			|| input.userOverride?.targetLang?.trim()
+			|| targetLang,
+		);
+
+		const cacheKey = this.contentCacheKey(text, targetLang, selective === true, input.scope);
+		if (c.cacheEnabled !== false && !input.skipCache) {
+			const hit = await this.contentCache.get(cacheKey);
+			if (hit?.t) {
+				yield { type: 'cached', text: hit.t, sourceLang: hit.l };
+				return;
+			}
+		}
+
+		const userContent = this.buildUserContent(text, targetLang, selective === true, nativeLang);
+		const messages = this.buildMessageStack(ep, c, userContent, false, nativeLang);
+
+		try {
+			let full = '';
+			for await (const delta of this.streamOpenAiChatCompletions(ep, messages, input.signal)) {
+				if (!delta) continue;
+				full += delta;
+				yield { type: 'delta', text: delta };
+			}
+
+			let out = this.cleanOutput(full);
+
+			// Refusal → non-stream retry with stronger PHI, then replace client buffer
+			if ((!out || this.looksLikeRefusal(full)) && c.uncensored) {
+				this.logger.debug('Stream refusal-like; non-stream PHI retry');
+				const retryMsgs = this.buildMessageStack(ep, c, userContent, true, nativeLang);
+				const raw = await this.callOpenAiCompatible(ep, retryMsgs);
+				out = this.cleanOutput(raw);
+				if (out) {
+					yield { type: 'replace', text: out };
+					full = out;
+				}
+			}
+
+			if (!out) {
+				throw new AiTranslationError('AI returned an empty translation.', 'AI_EMPTY_RESPONSE');
+			}
+
+			if (c.cacheEnabled !== false) {
+				const ttlMs = this.resolveCacheTtlMs(c);
+				await this.contentCache.set(cacheKey, { t: out, l: undefined }, ttlMs);
+			}
+
+			yield { type: 'done', text: out };
+		} catch (err) {
+			if (err instanceof AiTranslationError) {
+				this.logger.warn(`AI translate stream failed: ${err.code} ${err.message}`);
+				throw err;
+			}
+			const msg = err instanceof Error ? err.message : String(err);
+			this.logger.warn(`AI translate stream failed: ${msg}`);
+			const lower = msg.toLowerCase();
+			if (lower.includes('timeout') || lower.includes('aborted') || lower.includes('etimedout') || lower.includes('abort')) {
+				throw new AiTranslationError(msg, 'AI_TIMEOUT');
+			}
+			throw new AiTranslationError(msg, 'AI_UPSTREAM_ERROR');
+		}
+	}
+
 	/** sha256 of normalized source text + translation parameters */
 	@bindThis
 	public contentCacheKey(text: string, targetLang: string, selective: boolean, scope: AiTranslationScope): string {
@@ -525,6 +626,116 @@ export class AiTranslationService {
 	private normalizeBaseUrl(baseUrl: string): string {
 		assertSafeAiEndpointUrl(baseUrl);
 		return normalizeOpenAiV1Base(baseUrl);
+	}
+
+	/**
+	 * OpenAI-compatible chat.completions with stream:true.
+	 * Yields content deltas only (not role/tool noise).
+	 */
+	@bindThis
+	private async *streamOpenAiChatCompletions(
+		ep: AiTranslationEndpointConfig,
+		messages: ChatMsg[],
+		signal?: AbortSignal,
+	): AsyncGenerator<string> {
+		const base = this.normalizeBaseUrl(ep.baseUrl!);
+		const timeoutMs = Math.max(1000, Math.min(ep.requestTimeoutMs || 20000, 120_000));
+		const url = `${base}/chat/completions`;
+		const body = {
+			model: ep.model,
+			temperature: 0.15,
+			stream: true,
+			messages,
+		};
+
+		assertSafeAiEndpointUrl(url);
+		const res = await this.httpRequestService.send(url, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				authorization: `Bearer ${ep.apiKey!}`,
+				accept: 'text/event-stream',
+				'x-client-name': 'sharkey',
+				'x-title': 'sharkey-ai-translate-stream',
+			},
+			body: JSON.stringify(body),
+			timeout: timeoutMs,
+			isLocalAddressAllowed: false,
+			allowHttp: false,
+			// node-fetch: pass through abort if client disconnects
+			// (HttpRequestService uses its own AbortController for timeout; we race client signal)
+		}, {
+			throwErrorWhenResponseNotOk: false,
+			validators: [],
+		});
+
+		if (!res.ok) {
+			throw aiErrorFromHttpStatus(res.status);
+		}
+
+		if (!res.body) {
+			// Fallback: non-stream body
+			const t = await res.text();
+			if (t.trim()) {
+				// Try parse as full JSON completion
+				try {
+					const json = JSON.parse(t);
+					const content = json?.choices?.[0]?.message?.content;
+					if (typeof content === 'string' && content) {
+						yield content;
+						return;
+					}
+				} catch { /* raw text */ }
+				yield t;
+			}
+			return;
+		}
+
+		// node-fetch body is Node.js Readable
+		const readable = res.body as NodeJS.ReadableStream;
+		const decoder = new TextDecoder('utf-8');
+		let buffer = '';
+
+		const onAbort = () => {
+			try {
+				(readable as any).destroy?.(new Error('aborted'));
+			} catch { /* ignore */ }
+		};
+		if (signal) {
+			if (signal.aborted) onAbort();
+			else signal.addEventListener('abort', onAbort, { once: true });
+		}
+
+		try {
+			for await (const chunk of readable as AsyncIterable<Buffer | string>) {
+				if (signal?.aborted) break;
+				buffer += typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true });
+				const lines = buffer.split(/\r?\n/);
+				buffer = lines.pop() ?? '';
+
+				for (const line of lines) {
+					const trimmed = line.trim();
+					if (!trimmed || trimmed.startsWith(':')) continue; // SSE comment / keep-alive
+					if (!trimmed.startsWith('data:')) continue;
+					const data = trimmed.slice(5).trim();
+					if (data === '[DONE]') return;
+
+					try {
+						const json = JSON.parse(data);
+						const delta = json?.choices?.[0]?.delta?.content
+							?? json?.choices?.[0]?.text
+							?? '';
+						if (typeof delta === 'string' && delta.length > 0) {
+							yield delta;
+						}
+					} catch {
+						// ignore malformed SSE lines
+					}
+				}
+			}
+		} finally {
+			if (signal) signal.removeEventListener('abort', onAbort);
+		}
 	}
 
 	@bindThis
