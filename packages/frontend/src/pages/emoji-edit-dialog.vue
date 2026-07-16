@@ -13,7 +13,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	@closed="emit('closed')"
 >
 	<template v-if="emoji" #header>:{{ emoji.name }}:</template>
-	<template v-else #header>New emoji</template>
+	<template v-else #header>{{ i18n.ts.addEmoji }}</template>
 
 	<div style="display: flex; flex-direction: column; min-height: 100%;">
 		<div class="_spacer" style="--MI_SPACER-min: 20px; --MI_SPACER-max: 28px; flex-grow: 1;">
@@ -66,7 +66,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<MkInfo warn>{{ i18n.ts.rolesThatCanBeUsedThisEmojiAsReactionPublicRoleWarn }}</MkInfo>
 					</div>
 				</MkFolder>
-				<MkSwitch v-model="isSensitive">isSensitive</MkSwitch>
+				<MkSwitch v-model="isSensitive">{{ i18n.ts.sensitive }}</MkSwitch>
 				<MkSwitch v-model="localOnly">{{ i18n.ts.localOnly }}</MkSwitch>
 				<MkButton v-if="emoji" danger @click="del()"><i class="ti ti-trash"></i> {{ i18n.ts.delete }}</MkButton>
 			</div>

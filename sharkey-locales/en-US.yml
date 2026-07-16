@@ -822,3 +822,12 @@ _activity:
   followRemote: "Follow (remote)"
   followedLocal: "Followed (local)"
   followedRemote: "Followed (remote)"
+
+_customEmojisManagerLegacy:
+  selectMode: "Select mode"
+  selectAll: "Select all"
+  setCategory: "Set category"
+  setTag: "Set tag"
+  addTag: "Add tag"
+  removeTag: "Remove tag"
+  setLicense: "Set license"

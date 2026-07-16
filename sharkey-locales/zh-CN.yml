@@ -824,3 +824,12 @@ _themeNames:
   "7a5bc13b-df8f-4d44-8e94-4452f0c634bb": "U0 深色"
   "3cdfd635-4d5e-4d06-9ba3-20f123f0999b": "Rosé Pine"
   "919c91ac-c6fa-43dc-a423-3cc84fd67d7c": "Rosé Pine 黎明"
+
+_customEmojisManagerLegacy:
+  selectMode: "选择模式"
+  selectAll: "全选"
+  setCategory: "设置分类"
+  setTag: "设置标签"
+  addTag: "添加标签"
+  removeTag: "移除标签"
+  setLicense: "设置许可信息"

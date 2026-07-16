@@ -15967,6 +15967,36 @@ export interface Locale extends ILocale {
          */
         "followedRemote": string;
     };
+    "_customEmojisManagerLegacy": {
+        /**
+         * Select mode
+         */
+        "selectMode": string;
+        /**
+         * Select all
+         */
+        "selectAll": string;
+        /**
+         * Set category
+         */
+        "setCategory": string;
+        /**
+         * Set tag
+         */
+        "setTag": string;
+        /**
+         * Add tag
+         */
+        "addTag": string;
+        /**
+         * Remove tag
+         */
+        "removeTag": string;
+        /**
+         * Set license
+         */
+        "setLicense": string;
+    };
 }
 export type Locales = {
     [lang: string]: Locale;
