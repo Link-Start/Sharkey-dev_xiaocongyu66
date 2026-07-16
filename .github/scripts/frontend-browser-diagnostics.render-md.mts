@@ -372,6 +372,7 @@ async function main() {
 	}));
 }
 
+// 直接実行されたときだけ呼ぶための判定(テストなどでこのファイル内の関数をimportするだけのとき用)
 if (process.argv[1] != null && import.meta.url === pathToFileURL(process.argv[1]).href) {
 	await main();
 }
