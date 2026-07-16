@@ -135,13 +135,18 @@ export async function translateTextLocal(
 	});
 
 	if (!res.ok) {
-		// Preserve status for UI (401 / 403 / 429 / …)
+		// Preserve status for UI (400 / 401 / 402 / 403 / 502 / 522 / …)
 		const err = new Error(`Local AI HTTP ${res.status}`) as Error & { code?: string; status?: number };
 		err.status = res.status;
-		if (res.status === 401) err.code = 'AI_AUTH_FAILED';
-		else if (res.status === 403) err.code = 'AI_FORBIDDEN';
-		else if (res.status === 429) err.code = 'AI_RATE_LIMITED';
-		else if (res.status === 408 || res.status === 504) err.code = 'AI_TIMEOUT';
+		const st = res.status;
+		if (st === 400) err.code = 'AI_BAD_REQUEST';
+		else if (st === 401) err.code = 'AI_AUTH_FAILED';
+		else if (st === 402) err.code = 'AI_PAYMENT_REQUIRED';
+		else if (st === 403) err.code = 'AI_FORBIDDEN';
+		else if (st === 429) err.code = 'AI_RATE_LIMITED';
+		else if (st === 408 || st === 504) err.code = 'AI_TIMEOUT';
+		else if (st === 502) err.code = 'AI_BAD_GATEWAY';
+		else if (st === 522) err.code = 'AI_ORIGIN_UNREACHABLE';
 		else err.code = 'AI_UPSTREAM_ERROR';
 		throw err;
 	}

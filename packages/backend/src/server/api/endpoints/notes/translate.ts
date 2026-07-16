@@ -64,15 +64,29 @@ export const meta = {
 			kind: 'server',
 			httpStatusCode: 503,
 		},
+		aiBadRequest: {
+			message: 'AI provider rejected the request (HTTP 400 Bad Request). Check model name and request format.',
+			code: 'AI_BAD_REQUEST',
+			id: 'a1t0c0n1-0001-4000-8000-000000000400',
+			kind: 'client',
+			httpStatusCode: 502,
+		},
 		aiAuthFailed: {
-			message: 'AI provider rejected the API key (HTTP 401).',
+			message: 'AI provider rejected the API key (HTTP 401 Unauthorized).',
 			code: 'AI_AUTH_FAILED',
 			id: 'a1t0c0n1-0001-4000-8000-000000000401',
 			kind: 'server',
 			httpStatusCode: 502,
 		},
+		aiPaymentRequired: {
+			message: 'AI provider requires payment or has insufficient quota (HTTP 402).',
+			code: 'AI_PAYMENT_REQUIRED',
+			id: 'a1t0c0n1-0001-4000-8000-000000000402',
+			kind: 'server',
+			httpStatusCode: 502,
+		},
 		aiForbidden: {
-			message: 'AI provider denied access (HTTP 403).',
+			message: 'AI provider denied access (HTTP 403 Forbidden).',
 			code: 'AI_FORBIDDEN',
 			id: 'a1t0c0n1-0001-4000-8000-000000000403',
 			kind: 'server',
@@ -92,10 +106,24 @@ export const meta = {
 			kind: 'server',
 			httpStatusCode: 504,
 		},
+		aiBadGateway: {
+			message: 'AI gateway/upstream error (HTTP 502 Bad Gateway).',
+			code: 'AI_BAD_GATEWAY',
+			id: 'a1t0c0n1-0001-4000-8000-000000000502',
+			kind: 'server',
+			httpStatusCode: 502,
+		},
+		aiOriginUnreachable: {
+			message: 'AI origin is unreachable (HTTP 522). Check network, DNS, or provider status.',
+			code: 'AI_ORIGIN_UNREACHABLE',
+			id: 'a1t0c0n1-0001-4000-8000-000000000522',
+			kind: 'server',
+			httpStatusCode: 502,
+		},
 		aiUpstreamError: {
 			message: 'AI provider returned an error.',
 			code: 'AI_UPSTREAM_ERROR',
-			id: 'a1t0c0n1-0001-4000-8000-000000000502',
+			id: 'a1t0c0n1-0001-4000-8000-0000000005xx',
 			kind: 'server',
 			httpStatusCode: 502,
 		},
@@ -270,10 +298,14 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			if (e instanceof AiTranslationError) {
 				const table: Record<AiTranslationError['code'], typeof meta.errors[keyof typeof meta.errors]> = {
 					AI_NOT_CONFIGURED: meta.errors.aiNotConfigured,
+					AI_BAD_REQUEST: meta.errors.aiBadRequest,
 					AI_AUTH_FAILED: meta.errors.aiAuthFailed,
+					AI_PAYMENT_REQUIRED: meta.errors.aiPaymentRequired,
 					AI_FORBIDDEN: meta.errors.aiForbidden,
 					AI_RATE_LIMITED: meta.errors.aiRateLimited,
 					AI_TIMEOUT: meta.errors.aiTimeout,
+					AI_BAD_GATEWAY: meta.errors.aiBadGateway,
+					AI_ORIGIN_UNREACHABLE: meta.errors.aiOriginUnreachable,
 					AI_UPSTREAM_ERROR: meta.errors.aiUpstreamError,
 					AI_EMPTY_RESPONSE: meta.errors.aiEmptyResponse,
 					AI_SCOPE_DISABLED: meta.errors.aiScopeDisabled,
@@ -286,19 +318,24 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			throw e;
 		};
 
+		/** Do not hide hard config/auth/quota failures behind classic translators */
+		const isHardAiFailure = (e: unknown): boolean =>
+			e instanceof AiTranslationError && (
+				e.code === 'AI_AUTH_FAILED'
+				|| e.code === 'AI_FORBIDDEN'
+				|| e.code === 'AI_PAYMENT_REQUIRED'
+				|| e.code === 'AI_BAD_REQUEST'
+				|| e.code === 'AI_NOT_CONFIGURED'
+				|| e.code === 'AI_SCOPE_DISABLED'
+			);
+
 		try {
 			if (opts.preferAi && opts.canAi) {
 				try {
 					const ai = await tryAi();
 					if (ai) return ai;
 				} catch (e) {
-					// Prefer surfacing auth/config errors over silent classic fallback
-					if (e instanceof AiTranslationError && (
-						e.code === 'AI_AUTH_FAILED'
-						|| e.code === 'AI_FORBIDDEN'
-						|| e.code === 'AI_NOT_CONFIGURED'
-						|| e.code === 'AI_SCOPE_DISABLED'
-					)) {
+					if (isHardAiFailure(e)) {
 						mapAiError(e);
 					}
 					// Other AI failures: try classic, then rethrow AI error if classic missing

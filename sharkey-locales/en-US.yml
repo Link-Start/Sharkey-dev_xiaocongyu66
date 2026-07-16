@@ -765,6 +765,10 @@ loginDates: "Login Dates"
 root: "Root"
 
 _apiErrors:
+  AI_BAD_REQUEST: "AI provider rejected the request (HTTP 400). Check model name and request parameters."
+  AI_PAYMENT_REQUIRED: "AI provider requires payment or has no remaining quota (HTTP 402)."
+  AI_BAD_GATEWAY: "AI gateway error (HTTP 502 Bad Gateway). Upstream may be down or misconfigured."
+  AI_ORIGIN_UNREACHABLE: "AI origin unreachable (HTTP 522). Check network, DNS, firewall, or provider status."
   TRANSLATION_FAILED: "Translation failed. Please try again later."
   AI_NOT_CONFIGURED: "AI translation is not configured (missing endpoint or API key)."
   AI_AUTH_FAILED: "AI provider rejected the API key (HTTP 401 Unauthorized). Check the key in admin settings."

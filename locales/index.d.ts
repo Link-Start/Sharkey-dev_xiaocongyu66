@@ -14078,6 +14078,22 @@ export interface Locale extends ILocale {
          */
         "NO_SUCH_USER_LIST": string;
         /**
+         * AI provider rejected the request (HTTP 400). Check model name and request parameters.
+         */
+        "AI_BAD_REQUEST": string;
+        /**
+         * AI provider requires payment or has no remaining quota (HTTP 402).
+         */
+        "AI_PAYMENT_REQUIRED": string;
+        /**
+         * AI gateway error (HTTP 502 Bad Gateway). Upstream may be down or misconfigured.
+         */
+        "AI_BAD_GATEWAY": string;
+        /**
+         * AI origin unreachable (HTTP 522). Check network, DNS, firewall, or provider status.
+         */
+        "AI_ORIGIN_UNREACHABLE": string;
+        /**
          * Translation failed. Please try again later.
          */
         "TRANSLATION_FAILED": string;

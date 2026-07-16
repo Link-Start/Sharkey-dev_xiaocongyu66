@@ -115,9 +115,17 @@ const CODE_FALLBACKS: Record<string, { en: string; zh: string }> = {
 		en: 'AI translation is not configured (missing endpoint or API key).',
 		zh: 'AI 翻译未配置（缺少接口地址或 API 密钥）。',
 	},
+	AI_BAD_REQUEST: {
+		en: 'AI provider rejected the request (HTTP 400). Check model name and request parameters.',
+		zh: 'AI 服务拒绝了请求（HTTP 400 错误请求）。请检查模型名称与请求参数。',
+	},
 	AI_AUTH_FAILED: {
 		en: 'AI provider rejected the API key (HTTP 401 Unauthorized). Check the key in admin settings.',
 		zh: 'AI 服务拒绝了 API 密钥（HTTP 401 未授权）。请检查后台配置的密钥。',
+	},
+	AI_PAYMENT_REQUIRED: {
+		en: 'AI provider requires payment or has no remaining quota (HTTP 402).',
+		zh: 'AI 服务需要付费或额度不足（HTTP 402）。请检查账单/套餐余额。',
 	},
 	AI_FORBIDDEN: {
 		en: 'AI provider denied access (HTTP 403 Forbidden). Check plan / IP allowlist / model permission.',
@@ -130,6 +138,14 @@ const CODE_FALLBACKS: Record<string, { en: string; zh: string }> = {
 	AI_TIMEOUT: {
 		en: 'AI translation timed out. Try again or raise the timeout in admin settings.',
 		zh: 'AI 翻译超时。请重试，或在后台调高超时时间。',
+	},
+	AI_BAD_GATEWAY: {
+		en: 'AI gateway error (HTTP 502 Bad Gateway). Upstream may be down or misconfigured.',
+		zh: 'AI 网关错误（HTTP 502 坏网关）。上游可能宕机或配置有误。',
+	},
+	AI_ORIGIN_UNREACHABLE: {
+		en: 'AI origin unreachable (HTTP 522). Check network, DNS, firewall, or provider status.',
+		zh: '无法连接到 AI 源站（HTTP 522）。请检查网络、DNS、防火墙或服务商状态。',
 	},
 	AI_UPSTREAM_ERROR: {
 		en: 'AI provider returned an error. Check the endpoint URL and model name.',
@@ -242,10 +258,14 @@ export function formatApiError(
 		const m = e.message.match(/\bHTTP\s+(\d{3})\b/i);
 		if (m) {
 			const st = Number(m[1]);
-			if (st === 401) code = 'AI_AUTH_FAILED';
+			if (st === 400) code = 'AI_BAD_REQUEST';
+			else if (st === 401) code = 'AI_AUTH_FAILED';
+			else if (st === 402) code = 'AI_PAYMENT_REQUIRED';
 			else if (st === 403) code = 'AI_FORBIDDEN';
 			else if (st === 429) code = 'AI_RATE_LIMITED';
 			else if (st === 408 || st === 504) code = 'AI_TIMEOUT';
+			else if (st === 502) code = 'AI_BAD_GATEWAY';
+			else if (st === 522) code = 'AI_ORIGIN_UNREACHABLE';
 			else if (st >= 400) code = 'AI_UPSTREAM_ERROR';
 		}
 	}

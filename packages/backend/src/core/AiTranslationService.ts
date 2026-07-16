@@ -53,24 +53,57 @@ export type AiTranslateResult = {
 	provider: 'ai';
 };
 
+/** Machine codes returned to API clients for AI translate failures. */
+export type AiTranslationErrorCode =
+	| 'AI_NOT_CONFIGURED'
+	| 'AI_BAD_REQUEST'       // HTTP 400
+	| 'AI_AUTH_FAILED'       // HTTP 401
+	| 'AI_PAYMENT_REQUIRED'  // HTTP 402
+	| 'AI_FORBIDDEN'         // HTTP 403
+	| 'AI_RATE_LIMITED'      // HTTP 429
+	| 'AI_TIMEOUT'           // HTTP 408 / 504
+	| 'AI_BAD_GATEWAY'       // HTTP 502
+	| 'AI_ORIGIN_UNREACHABLE'// HTTP 522 (e.g. Cloudflare)
+	| 'AI_UPSTREAM_ERROR'    // other 4xx/5xx
+	| 'AI_EMPTY_RESPONSE'
+	| 'AI_SCOPE_DISABLED';
+
 /** Structured failure from upstream AI / config (not a generic null). */
 export class AiTranslationError extends Error {
 	override name = 'AiTranslationError';
 
 	constructor(
 		message: string,
-		public readonly code:
-			| 'AI_NOT_CONFIGURED'
-			| 'AI_AUTH_FAILED'
-			| 'AI_FORBIDDEN'
-			| 'AI_RATE_LIMITED'
-			| 'AI_TIMEOUT'
-			| 'AI_UPSTREAM_ERROR'
-			| 'AI_EMPTY_RESPONSE'
-			| 'AI_SCOPE_DISABLED',
+		public readonly code: AiTranslationErrorCode,
 		public readonly httpStatus?: number,
 	) {
 		super(message);
+	}
+}
+
+/** Map upstream HTTP status → typed error (never include response body). */
+export function aiErrorFromHttpStatus(status: number): AiTranslationError {
+	const msg = `AI endpoint HTTP ${status}`;
+	switch (status) {
+		case 400:
+			return new AiTranslationError(msg, 'AI_BAD_REQUEST', status);
+		case 401:
+			return new AiTranslationError(msg, 'AI_AUTH_FAILED', status);
+		case 402:
+			return new AiTranslationError(msg, 'AI_PAYMENT_REQUIRED', status);
+		case 403:
+			return new AiTranslationError(msg, 'AI_FORBIDDEN', status);
+		case 408:
+		case 504:
+			return new AiTranslationError(msg, 'AI_TIMEOUT', status);
+		case 429:
+			return new AiTranslationError(msg, 'AI_RATE_LIMITED', status);
+		case 502:
+			return new AiTranslationError(msg, 'AI_BAD_GATEWAY', status);
+		case 522:
+			return new AiTranslationError(msg, 'AI_ORIGIN_UNREACHABLE', status);
+		default:
+			return new AiTranslationError(msg, 'AI_UPSTREAM_ERROR', status);
 	}
 }
 
@@ -561,20 +594,7 @@ export class AiTranslationService {
 		const text = await res.text();
 		if (!res.ok) {
 			// Map status for clients; never echo upstream body (SK-061)
-			const status = res.status;
-			if (status === 401) {
-				throw new AiTranslationError(`AI endpoint HTTP ${status}`, 'AI_AUTH_FAILED', status);
-			}
-			if (status === 403) {
-				throw new AiTranslationError(`AI endpoint HTTP ${status}`, 'AI_FORBIDDEN', status);
-			}
-			if (status === 429) {
-				throw new AiTranslationError(`AI endpoint HTTP ${status}`, 'AI_RATE_LIMITED', status);
-			}
-			if (status === 408 || status === 504) {
-				throw new AiTranslationError(`AI endpoint HTTP ${status}`, 'AI_TIMEOUT', status);
-			}
-			throw new AiTranslationError(`AI endpoint HTTP ${status}`, 'AI_UPSTREAM_ERROR', status);
+			throw aiErrorFromHttpStatus(res.status);
 		}
 		let json: any;
 		try {

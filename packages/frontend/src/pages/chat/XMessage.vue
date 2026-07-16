@@ -394,7 +394,15 @@ async function translateMessage() {
 						return;
 					}
 				} catch (e: any) {
-					if (e?.code === 'AI_AUTH_FAILED' || e?.code === 'AI_FORBIDDEN' || e?.code === 'AI_RATE_LIMITED') {
+					if (
+						e?.code === 'AI_AUTH_FAILED'
+						|| e?.code === 'AI_FORBIDDEN'
+						|| e?.code === 'AI_PAYMENT_REQUIRED'
+						|| e?.code === 'AI_BAD_REQUEST'
+						|| e?.code === 'AI_RATE_LIMITED'
+						|| e?.code === 'AI_BAD_GATEWAY'
+						|| e?.code === 'AI_ORIGIN_UNREACHABLE'
+					) {
 						throw e;
 					}
 					console.warn('Local AI chat translate failed, falling back:', e);

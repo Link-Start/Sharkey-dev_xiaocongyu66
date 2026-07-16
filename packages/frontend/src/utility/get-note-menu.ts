@@ -787,7 +787,15 @@ export async function translateNote(noteId: string, translation: Ref<Misskey.ent
 					}
 				} catch (e: any) {
 					// Auth/permission errors from local key: surface immediately (don't hide as generic fail)
-					if (e?.code === 'AI_AUTH_FAILED' || e?.code === 'AI_FORBIDDEN' || e?.code === 'AI_RATE_LIMITED') {
+					if (
+						e?.code === 'AI_AUTH_FAILED'
+						|| e?.code === 'AI_FORBIDDEN'
+						|| e?.code === 'AI_PAYMENT_REQUIRED'
+						|| e?.code === 'AI_BAD_REQUEST'
+						|| e?.code === 'AI_RATE_LIMITED'
+						|| e?.code === 'AI_BAD_GATEWAY'
+						|| e?.code === 'AI_ORIGIN_UNREACHABLE'
+					) {
 						throw e;
 					}
 					console.warn('Local AI translate failed, falling back to instance:', e);

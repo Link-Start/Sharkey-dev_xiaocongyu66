@@ -745,6 +745,10 @@ previousRootUser: "先前的根用户"
 newRootUser: "新的根用户"
 
 _apiErrors:
+  AI_BAD_REQUEST: "AI 服务拒绝了请求（HTTP 400 错误请求）。请检查模型名称与请求参数。"
+  AI_PAYMENT_REQUIRED: "AI 服务需要付费或额度不足（HTTP 402）。请检查账单/套餐余额。"
+  AI_BAD_GATEWAY: "AI 网关错误（HTTP 502 坏网关）。上游可能宕机或配置有误。"
+  AI_ORIGIN_UNREACHABLE: "无法连接到 AI 源站（HTTP 522）。请检查网络、DNS、防火墙或服务商状态。"
   TRANSLATION_FAILED: "翻译失败，请稍后再试。"
   AI_NOT_CONFIGURED: "AI 翻译未配置（缺少接口地址或 API 密钥）。"
   AI_AUTH_FAILED: "AI 服务拒绝了 API 密钥（HTTP 401 未授权）。请检查后台配置的密钥。"
