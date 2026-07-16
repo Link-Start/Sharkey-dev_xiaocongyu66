@@ -50,7 +50,8 @@ import { prefer } from '@/preferences.js';
 
 const SECOND_FETCH_LIMIT = 30;
 const TOLERANCE = 16;
-const APPEAR_MINIMUM_INTERVAL = 600;
+// Longer gap so infinite-scroll cannot alternate button/spinner every few hundred ms
+const APPEAR_MINIMUM_INTERVAL = 1200;
 
 export type Paging<E extends keyof Misskey.Endpoints = keyof Misskey.Endpoints> = {
 	endpoint: E;
@@ -201,10 +202,12 @@ async function init(): Promise<void> {
 	items.value = new Map();
 	queue.value = new Map();
 	fetching.value = true;
+	more.value = false;
 	const params = getActualValue<Paging['params']>(props.pagination.params, {});
+	const limit = props.pagination.limit ?? 10;
 	await misskeyApi<MisskeyEntity[]>(props.pagination.endpoint, {
 		...params,
-		limit: props.pagination.limit ?? 10,
+		limit,
 		allowPartial: true,
 	}).then(res => {
 		for (let i = 0; i < res.length; i++) {
@@ -218,7 +221,9 @@ async function init(): Promise<void> {
 		} else {
 			if (props.pagination.reversed) moreFetching.value = true;
 			concatItems(res);
-			more.value = true;
+			// Only offer "load more" if the page was full — partial page means end of feed.
+			// (Previously more=true whenever res.length>0, causing infinite auto-load flicker.)
+			more.value = res.length >= limit;
 		}
 
 		error.value = false;
@@ -228,6 +233,7 @@ async function init(): Promise<void> {
 	}, err => {
 		error.value = true;
 		fetching.value = false;
+		more.value = false;
 	});
 }
 
@@ -241,6 +247,7 @@ const fetchMore = async (): Promise<void> => {
 	try {
 		const params = getActualValue<Paging['params']>(props.pagination.params, {});
 		const offsetMode = getActualValue(props.pagination.offsetMode, false);
+		const sizeBefore = items.value.size;
 		const res = await misskeyApi<MisskeyEntity[]>(props.pagination.endpoint, {
 			...params,
 			limit: SECOND_FETCH_LIMIT,
@@ -254,6 +261,9 @@ const fetchMore = async (): Promise<void> => {
 			const item = res[i];
 			if (i === 10) item._shouldInsertAd_ = true;
 		}
+
+		// Drop ids we already have so empty/overlap pages end pagination
+		const fresh = res.filter(item => !items.value.has(item.id));
 
 		const reverseConcat = (_res: typeof res) => {
 			const oldHeight = scrollableElement.value ? scrollableElement.value.scrollHeight : getBodyScrollHeight();
@@ -272,23 +282,23 @@ const fetchMore = async (): Promise<void> => {
 			});
 		};
 
-		if (res.length === 0) {
+		if (fresh.length === 0) {
 			if (props.pagination.reversed) {
-				await reverseConcat(res);
-				more.value = false;
-			} else {
-				items.value = concatMapWithArray(items.value, res);
-				more.value = false;
+				await reverseConcat([]);
 			}
+			more.value = false;
 		} else {
 			if (props.pagination.reversed) {
-				await reverseConcat(res);
-				more.value = true;
+				await reverseConcat(fresh);
 			} else {
-				items.value = concatMapWithArray(items.value, res);
-				more.value = true;
+				items.value = concatMapWithArray(items.value, fresh);
 			}
+			// Full page of *new* items → maybe more; short or all-duplicate → stop
+			more.value = res.length >= SECOND_FETCH_LIMIT && items.value.size > sizeBefore;
 		}
+	} catch {
+		// Stop auto-load loop on error (otherwise spinner/button flicker forever)
+		more.value = false;
 	} finally {
 		moreFetching.value = false;
 	}
@@ -299,6 +309,7 @@ const fetchMoreAhead = async (): Promise<void> => {
 	moreFetching.value = true;
 	const params = getActualValue<Paging['params']>(props.pagination.params, {});
 	const offsetMode = getActualValue(props.pagination.offsetMode, false);
+	const sizeBefore = items.value.size;
 	await misskeyApi<MisskeyEntity[]>(props.pagination.endpoint, {
 		...params,
 		limit: SECOND_FETCH_LIMIT,
@@ -308,15 +319,16 @@ const fetchMoreAhead = async (): Promise<void> => {
 			sinceId: Array.from(items.value.keys()).at(-1),
 		}),
 	}).then(res => {
-		if (res.length === 0) {
-			items.value = concatMapWithArray(items.value, res);
+		const fresh = res.filter(item => !items.value.has(item.id));
+		if (fresh.length === 0) {
 			more.value = false;
 		} else {
-			items.value = concatMapWithArray(items.value, res);
-			more.value = true;
+			items.value = concatMapWithArray(items.value, fresh);
+			more.value = res.length >= SECOND_FETCH_LIMIT && items.value.size > sizeBefore;
 		}
 		moreFetching.value = false;
 	}, err => {
+		more.value = false;
 		moreFetching.value = false;
 	});
 };
