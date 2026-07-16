@@ -242,7 +242,7 @@ async function genReport(label: 'base' | 'head', repoDir: string, outputPath: st
 
 	try {
 		server = util.startServer(label, repoDir);
-		await util.waitForServer(baseUrl, server!);
+		await util.waitForServer(baseUrl, server);
 
 		await rm(heapSnapshotWorkDirs[label], { recursive: true, force: true });
 		await mkdir(heapSnapshotWorkDirs[label], { recursive: true });
@@ -261,9 +261,7 @@ async function genReport(label: 'base' | 'head', repoDir: string, outputPath: st
 		await writeFile(outputPath, JSON.stringify(report, null, '\t'));
 		process.stderr.write(`[${label}] Wrote browser metrics report to ${outputPath}\n`);
 
-		if (heapSnapshotSavePath != null) {
-			await saveRepresentativeHeapSnapshot(label, report, heapSnapshotSavePath);
-		}
+		await saveRepresentativeHeapSnapshot(label, report, heapSnapshotSavePath);
 	} finally {
 		if (server != null) await util.stopServer(server);
 	}
