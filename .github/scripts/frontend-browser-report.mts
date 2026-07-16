@@ -8,13 +8,14 @@ import { pathToFileURL } from 'node:url';
 import * as util from './utility.mts';
 import * as heapSnapshotUtil from './heap-snapshot-util.mts';
 import type { HeapSnapshotData, HeapSnapshotReport } from './heap-snapshot-util.mts';
-import type { NetworkRequest } from './chrome.mts';
+import type { BrowserDiagnostics, NetworkRequest } from './chrome.mts';
 
 export type BrowserMeasurement = {
 	label: string;
 	timestamp: string;
 	url: string;
 	scenario: string;
+	diagnostics: BrowserDiagnostics;
 	durationMs: number;
 	network: {
 		requestCount: number;
@@ -171,8 +172,19 @@ function getMetric(report: BrowserMeasurement, key: string) {
 	return report.performance.cdpMetrics[key];
 }
 
+export function renderBrowserDiagnosticsRows(base: BrowserMetricsReport, head: BrowserMetricsReport, all = false) {
+	return [
+		metricRow('Page errors', base, head, summary => summary.diagnostics.pageErrorCount, sample => sample.diagnostics.pageErrorCount, util.formatNumber, 1, !all),
+		metricRow('Console log', base, head, summary => summary.diagnostics.console.log, sample => sample.diagnostics.console.log, util.formatNumber, 1, !all),
+		metricRow('Console warnings', base, head, summary => summary.diagnostics.console.warn, sample => sample.diagnostics.console.warn, util.formatNumber, 1, !all),
+		metricRow('Console errors', base, head, summary => summary.diagnostics.console.error, sample => sample.diagnostics.console.error, util.formatNumber, 1, !all),
+		metricRow('Console info', base, head, summary => summary.diagnostics.console.info, sample => sample.diagnostics.console.info, util.formatNumber, 1, !all),
+	].filter(row => row != null);
+}
+
 function renderSummaryTable(base: BrowserMetricsReport, head: BrowserMetricsReport, all = false) {
 	const rows = [
+		...renderBrowserDiagnosticsRows(base, head, all),
 		//metricRow('Scenario duration', base, head, summary => summary.durationMs, sample => sample.durationMs, formatMs),
 		metricRow('Requests', base, head, summary => summary.network.requestCount, sample => sample.network.requestCount, util.formatNumber, 1, !all),
 		//metricRow('Failed requests', base, head, summary => summary.network.failedRequestCount, sample => sample.network.failedRequestCount, util.formatNumber),

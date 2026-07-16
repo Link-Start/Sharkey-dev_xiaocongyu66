@@ -7,7 +7,7 @@ import { copyFile, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import * as util from './utility.mts';
 import * as heapSnapshotUtil from './heap-snapshot-util.mts';
-import { HeadlessChromeController, summarizeNetwork } from './chrome.mts';
+import { HeadlessChromeController, summarizeBrowserDiagnostics, summarizeNetwork } from './chrome.mts';
 import type { BrowserMeasurement, NetworkRequest, NetworkSummary } from './chrome.mts';
 import { closeUserSetupDialog, postNote, signupThroughUi, visitHome } from '../../packages/frontend/test/e2e/shared.ts';
 
@@ -173,6 +173,7 @@ function summarizeSamples(label: 'base' | 'head', samples: BrowserMeasurementSam
 		timestamp: new Date().toISOString(),
 		url: baseUrl,
 		scenario: representative.scenario,
+		diagnostics: summarizeBrowserDiagnostics(samples.map(sample => sample.diagnostics)),
 		durationMs: finiteMedian(samples.map(sample => sample.durationMs)),
 		network: summarizeNetworkSamples(samples),
 		performance: summarizePerformanceSamples(samples),
@@ -210,6 +211,7 @@ async function measureSample(label: 'base' | 'head', round: number, heapSnapshot
 			timestamp: new Date().toISOString(),
 			url: baseUrl,
 			scenario: 'fresh browser signup, first timeline note, after the note becomes visible',
+			diagnostics: chrome.collectDiagnostics(),
 			durationMs,
 			network: summarizeNetwork(chrome.networkRequests, baseUrl, chrome.webSocketConnections),
 			networkRequests: chrome.networkRequests,

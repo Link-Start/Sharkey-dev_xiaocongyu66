@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { writeFile } from 'node:fs/promises';
 import type { Browser, BrowserContext, CDPSession, Page } from 'playwright';
 import type { HeapSnapshotData } from './heap-snapshot-util.mts';
+import * as util from './utility.mts';
 
 export type NetworkRequest = {
 	requestId: string;
@@ -89,11 +90,65 @@ export type TabMemory = {
 	totalBytes: number;
 };
 
+export type BrowserConsoleMetrics = {
+	log: number;
+	warn: number;
+	error: number;
+	info: number;
+};
+
+export type BrowserDiagnostics = {
+	pageErrorCount: number;
+	console: BrowserConsoleMetrics;
+};
+
+export function createBrowserDiagnostics(): BrowserDiagnostics {
+	return {
+		pageErrorCount: 0,
+		console: {
+			log: 0,
+			warn: 0,
+			error: 0,
+			info: 0,
+		},
+	};
+}
+
+export function recordPageError(diagnostics: BrowserDiagnostics) {
+	diagnostics.pageErrorCount += 1;
+}
+
+function isBrowserConsoleMetricKey(value: string): value is keyof BrowserConsoleMetrics {
+	return value === 'log' || value === 'warn' || value === 'error' || value === 'info';
+}
+
+export function recordConsoleMessageType(diagnostics: BrowserDiagnostics, messageType: string) {
+	const metricKey = messageType === 'warning' ? 'warn' : messageType;
+	if (!isBrowserConsoleMetricKey(metricKey)) return;
+	diagnostics.console[metricKey] += 1;
+}
+
+export function summarizeBrowserDiagnostics(samples: BrowserDiagnostics[]): BrowserDiagnostics {
+	if (samples.length === 0) throw new Error('No browser diagnostic samples');
+	const median = (select: (sample: BrowserDiagnostics) => number) => util.median(samples.map(select));
+
+	return {
+		pageErrorCount: median(sample => sample.pageErrorCount),
+		console: {
+			log: median(sample => sample.console.log),
+			warn: median(sample => sample.console.warn),
+			error: median(sample => sample.console.error),
+			info: median(sample => sample.console.info),
+		},
+	};
+}
+
 export type BrowserMeasurement = {
 	label: string;
 	timestamp: string;
 	url: string;
 	scenario: string;
+	diagnostics: BrowserDiagnostics;
 	durationMs: number;
 	network: NetworkSummary;
 	performance: {
@@ -149,6 +204,7 @@ type PlaywrightBrowserOptions = {
 export class HeadlessChromeController {
 	public networkRequests: NetworkRequest[] = [];
 	public webSocketConnections: WebSocketConnection[] = [];
+	private readonly diagnostics = createBrowserDiagnostics();
 	private readonly browser: Browser;
 	private readonly context: BrowserContext;
 	public readonly page: Page;
@@ -168,6 +224,12 @@ export class HeadlessChromeController {
 		this.cdp = cdp;
 		this.page.setDefaultTimeout(options.scenarioTimeoutMs);
 		this.page.setDefaultNavigationTimeout(options.scenarioTimeoutMs);
+		this.page.on('pageerror', () => {
+			recordPageError(this.diagnostics);
+		});
+		this.page.on('console', message => {
+			recordConsoleMessageType(this.diagnostics, message.type());
+		});
 	}
 
 	static async create(label: string, options: PlaywrightBrowserOptions): Promise<HeadlessChromeController> {
@@ -374,6 +436,13 @@ export class HeadlessChromeController {
 			this.page.evaluate(expression),
 			new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`Playwright evaluate timed out after ${timeoutMs}ms`)), timeoutMs).unref()),
 		]) as T;
+	}
+
+	public collectDiagnostics(): BrowserDiagnostics {
+		return {
+			pageErrorCount: this.diagnostics.pageErrorCount,
+			console: { ...this.diagnostics.console },
+		};
 	}
 
 	public async collectPerformance(): Promise<BrowserMeasurement['performance']> {
