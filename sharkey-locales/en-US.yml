@@ -66,6 +66,7 @@ silencedByBase: "This host is silenced implicitly because a base domain is silen
 mediaSilencedByBase: "This host's media is silenced implicitly because a base domain's media is silenced. To un-silence this host, first un-silence the base domain(s)."
 driveSearchbarPlaceholder: "Search drive"
 fileNotSelected: "No file selected"
+pleaseSelect: "Please select"
 background: "Background"
 antennaUsersDescription: "List one username per line. Use \"*@instance.com\" to specify all users of an instance"
 aboutMisskey: "About Sharkey"

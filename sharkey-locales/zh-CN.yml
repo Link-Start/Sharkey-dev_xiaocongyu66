@@ -66,6 +66,7 @@ silencedByBase: "这个服务器被隐式静音，因为主域名被静音。要
 mediaSilencedByBase: "这个服务器的媒体文件被隐式隐藏，因为主域名被隐藏了媒体文件。要取消对这个服务器的媒体文件隐藏，请先取消对于主域名的隐藏。"
 driveSearchbarPlaceholder: "搜索网盘"
 fileNotSelected: "未选择文件"
+pleaseSelect: "请选择"
 background: "背景图"
 antennaUsersDescription: "一行一个用户名。使用「*@instance.com」来指定一个服务器的所有用户"
 aboutMisskey: "关于 Sharkey"
