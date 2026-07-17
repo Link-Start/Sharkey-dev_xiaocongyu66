@@ -224,7 +224,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 							<SearchMarker :keywords="['search', 'engine']">
 								<MkPreferenceContainer k="searchEngine">
-									<MkSelect v-model="searchEngine" placeholder="Other">
+									<MkSelect v-model="searchEngine" :placeholder="i18n.ts.searchEngineOther">
 										<template #label><SearchLabel>{{ i18n.ts.searchEngine }}</SearchLabel></template>
 										<option
 											v-for="[key, value] in Object.entries(searchEngineMap)" :key="key" :value="key"

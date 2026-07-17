@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <template>
 <div class="_gaps_m">
-	<MkSelect v-model="statusbar.type" placeholder="Please select">
+	<MkSelect v-model="statusbar.type" :placeholder="i18n.ts.pleaseSelect">
 		<template #label>{{ i18n.ts.type }}</template>
 		<option value="rss">RSS</option>
 		<option v-if="instance.federation !== 'none' && policies.canViewFederation" value="federation">Federation</option>
