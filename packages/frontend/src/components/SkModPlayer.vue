@@ -16,7 +16,7 @@ Media player for module files. Displays the pattern in real time as it plays.
 <div v-else :class="$style.mod_player_enabled">
 	<div ref="patternDisplay" :style="{ height: displayHeight + 'px' }" :class="$style.pattern_display" @click="togglePattern()" @scroll="scrollHandler" @scrollend="scrollEndHandle">
 		<div v-if="patternHide" :class="$style.pattern_hide">
-			<b><i class="ph-eye ph-bold ph-lg"></i> Pattern Hidden</b>
+			<b><i class="ph-eye ph-bold ph-lg"></i> {{ i18n.ts.patternHidden ?? 'Pattern Hidden' }}</b>
 			<span>{{ i18n.ts.clickToShow }}</span>
 		</div>
 		<span :class="$style.patternShadowTop"></span>
