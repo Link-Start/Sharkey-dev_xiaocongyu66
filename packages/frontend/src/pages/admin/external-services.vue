@@ -39,17 +39,17 @@ SPDX-License-Identifier: AGPL-3.0-only
 				</MkFolder>
 
 				<MkFolder>
-					<template #label>LibreTranslate Translation</template>
+					<template #label>{{ i18n.ts.libreTranslateTranslation }}</template>
 
 					<div class="_gaps_m">
 						<MkInput v-model="libreTranslateURL" :placeholder="'example.com/translate'">
 							<template #prefix><i class="ph-globe-simple ph-bold ph-lg"></i></template>
-							<template #label>LibreTranslate URL</template>
+							<template #label>{{ i18n.ts.libreTranslateURL }}</template>
 						</MkInput>
 
 						<MkInput v-model="libreTranslateKey">
 							<template #prefix><i class="ti ti-key"></i></template>
-							<template #label>LibreTranslate Api Key</template>
+							<template #label>{{ i18n.ts.libreTranslateApiKey }}</template>
 						</MkInput>
 
 						<MkButton primary @click="save_libre">Save</MkButton>
