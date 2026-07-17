@@ -12,9 +12,12 @@ export function validateContentTypeSetAsActivityPub(response: Response): void {
 	if (contentType === '') {
 		throw new IdentifiableError('d09dc850-b76c-4f45-875a-7389339d78b8', `invalid AP response from ${response.url}: no content-type header`, true);
 	}
+	// Profile URI must appear as a parameter value (not a free substring of the type).
+	// e.g. application/ld+json; profile="https://www.w3.org/ns/activitystreams"
+	const hasAsProfile = /(?:^|;)\s*profile\s*=\s*(?:"https:\/\/www\.w3\.org\/ns\/activitystreams"|https:\/\/www\.w3\.org\/ns\/activitystreams)(?:\s|;|$)/i.test(contentType);
 	if (
 		contentType.startsWith('application/activity+json') ||
-		(contentType.startsWith('application/ld+json;') && contentType.includes('https://www.w3.org/ns/activitystreams'))
+		(contentType.startsWith('application/ld+json') && hasAsProfile)
 	) {
 		return;
 	}

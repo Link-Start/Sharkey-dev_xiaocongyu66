@@ -221,6 +221,8 @@ function iframeOnLoad() {
 }
 
 function windowEventHandler(event: MessageEvent) {
+	// Only accept messages from our embed iframe + same origin
+	if (event.origin !== window.location.origin) return;
 	if (event.source !== iframeEl.value?.contentWindow) {
 		return;
 	}

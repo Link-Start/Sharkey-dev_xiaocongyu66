@@ -204,7 +204,8 @@ function parseVersionString(packageName: string, depType: DepType, depName: stri
 		versionString = versionString.replaceAll(/(\b|^)[x*]+(\b|$)/g, '*');
 	}
 
-	const versionMatch = versionString.match(/^([\^<>~=]*)((\d+|\*)(\.(\d+|\*)+)*)(\b|$|[-+])/);
+	// Bounded quantifiers to avoid ReDoS on pathological version strings
+	const versionMatch = versionString.match(/^([\^<>~=]{0,8})((\d{1,12}|\*)(\.(\d{1,12}|\*)){0,6})(\b|$|[-+])/);
 	if (!versionMatch) {
 		console.warn(`[${packageName}/${depType}/${depName}] Skipping version string "${versionString}" - not in a parseable format`);
 		return null;

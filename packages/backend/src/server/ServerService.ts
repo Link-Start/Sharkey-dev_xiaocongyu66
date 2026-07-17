@@ -122,7 +122,13 @@ export class ServerService implements BeforeApplicationShutdown {
 		//
 		// this is not required by standard but protect us from peers that did not validate final URL.
 		if (this.config.disallowExternalApRedirect) {
-			const maybeApLookupRegex = /application\/activity\+json|application\/ld\+json.+activitystreams/i;
+			// Linear-time Accept checks (avoid polynomial ReDoS on crafted Accept headers).
+			const isApLookupAccept = (accept: string): boolean => {
+				const a = accept.toLowerCase();
+				if (a.includes('application/activity+json')) return true;
+				// ld+json + activitystreams profile — substring checks, not nested quantifiers
+				return a.includes('application/ld+json') && a.includes('activitystreams');
+			};
 			fastify.addHook('onSend', (request, reply, _, done) => {
 				const location = reply.getHeader('location');
 				if (reply.statusCode < 300 || reply.statusCode >= 400 || typeof location !== 'string') {
@@ -130,7 +136,7 @@ export class ServerService implements BeforeApplicationShutdown {
 					return;
 				}
 
-				if (!maybeApLookupRegex.test(request.headers.accept ?? '')) {
+				if (!isApLookupAccept(request.headers.accept ?? '')) {
 					done();
 					return;
 				}

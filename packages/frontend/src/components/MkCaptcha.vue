@@ -208,10 +208,19 @@ function callback(response?: string) {
 }
 
 function onReceivedMessage(message: MessageEvent) {
-	if (message.data.token) {
-		if (props.instanceUrl && new URL(message.origin).host === new URL(props.instanceUrl).host) {
-			callback(message.data.token);
-		}
+	// Require a configured captcha origin and exact host match (missing-origin-check).
+	if (!props.instanceUrl || typeof message.origin !== 'string') return;
+	let expectedHost: string;
+	let actualHost: string;
+	try {
+		expectedHost = new URL(props.instanceUrl).hostname;
+		actualHost = new URL(message.origin).hostname;
+	} catch {
+		return;
+	}
+	if (actualHost !== expectedHost) return;
+	if (message.data && typeof message.data.token === 'string') {
+		callback(message.data.token);
 	}
 }
 

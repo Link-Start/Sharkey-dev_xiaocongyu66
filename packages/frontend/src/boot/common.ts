@@ -141,15 +141,19 @@ export async function common(createVue: () => Promise<App<Element>>) {
 	});
 
 	//#region loginId
+	// Only honor loginId from our own origin navigation (query on this page).
+	// Treat as an untrusted hint: must match a locally stored account; never skip auth.
 	const params = new URLSearchParams(window.location.search);
 	const loginId = params.get('loginId');
+	// Misskey IDs are [a-zA-Z0-9]+ — reject anything else so a crafted id cannot bypass checks.
+	const SAFE_LOGIN_ID = /^[a-zA-Z0-9]{1,32}$/;
 
-	if (loginId) {
+	if (loginId && SAFE_LOGIN_ID.test(loginId)) {
 		const target = getUrlWithoutLoginId(window.location.href);
 
 		if (!$i || $i.id !== loginId) {
 			const account = await getAccountFromId(loginId);
-			if (account) {
+			if (account && account.token) {
 				await login(account.token, target);
 			}
 		}

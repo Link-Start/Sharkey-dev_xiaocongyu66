@@ -14,6 +14,12 @@ function isPureObject(value: unknown): value is Record<PropertyKey, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function isSafeKey(key: string): boolean {
+	return !DANGEROUS_KEYS.has(key);
+}
+
 /**
  * valueにないキーをdefからもらう（再帰的）\
  * nullはそのまま、undefinedはdefの値
@@ -22,6 +28,7 @@ export function deepMerge<X extends Record<PropertyKey, unknown>>(value: DeepPar
 	if (isPureObject(value) && isPureObject(def)) {
 		const result = deepClone(value as Cloneable) as X;
 		for (const [k, v] of Object.entries(def) as [keyof X, X[keyof X]][]) {
+			if (typeof k === 'string' && !isSafeKey(k)) continue;
 			if (!Object.prototype.hasOwnProperty.call(value, k) || value[k] === undefined) {
 				result[k] = v;
 			} else if (isPureObject(v) && isPureObject(result[k])) {
@@ -49,15 +56,18 @@ function _deepAssign(target: Record<PropertyKey, unknown>, ...partials: (Record<
 			if (!isPureObject(partial)) continue;
 
 			for (const [key, value] of Object.entries(partial)) {
+				// Block prototype-polluting keys (CodeQL js/prototype-pollution-utility)
+				if (!isSafeKey(key)) continue;
+
 				// Populate empty keys
-				if (!Reflect.has(target, key)) {
+				if (!Object.prototype.hasOwnProperty.call(target, key)) {
 					target[key] = value;
 					continue;
 				}
 
 				// Merge objects
 				if (isPureObject(target[key]) && isPureObject(value)) {
-					_deepAssign(target[key], value);
+					_deepAssign(target[key] as Record<PropertyKey, unknown>, value);
 					continue;
 				}
 

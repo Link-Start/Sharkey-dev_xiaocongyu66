@@ -55,15 +55,17 @@ const props = defineProps<{
 	token: string;
 }>();
 
-const getUrlParams = () =>
-	window.location.search
-		.substring(1)
-		.split('&')
-		.reduce((result, query) => {
-			const [k, v] = query.split('=');
-			result[k] = decodeURI(v);
-			return result;
-		}, {} as Record<string, string>);
+const getUrlParams = (): Record<string, string> => {
+	// Use URLSearchParams — never write user-controlled keys onto a bare object
+	// (avoids remote property injection / prototype pollution via query keys).
+	const result: Record<string, string> = Object.create(null);
+	const params = new URLSearchParams(window.location.search);
+	for (const [k, v] of params.entries()) {
+		if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+		result[k] = v;
+	}
+	return result;
+};
 
 const state = ref<'waiting' | 'accepted' | 'fetch-session-error' | 'denied' | null>(null);
 const session = ref<Misskey.entities.AuthSessionShowResponse | null>(null);

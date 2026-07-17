@@ -48,7 +48,17 @@ export class BunnyService {
 
 	@bindThis
 	public usingBunnyCDN() {
-		return this.meta.objectStorageEndpoint && this.meta.objectStorageEndpoint.endsWith('bunnycdn.com');
+		const endpoint = this.meta.objectStorageEndpoint?.trim();
+		if (!endpoint) return false;
+		// Parse as host (with or without scheme) so "evilbunnycdn.com" cannot match.
+		try {
+			const host = endpoint.includes('://')
+				? new URL(endpoint).hostname
+				: endpoint.split('/')[0].split(':')[0];
+			return host === 'bunnycdn.com' || host.endsWith('.bunnycdn.com');
+		} catch {
+			return false;
+		}
 	}
 
 	@bindThis

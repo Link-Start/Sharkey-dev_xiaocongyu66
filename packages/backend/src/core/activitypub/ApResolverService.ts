@@ -327,11 +327,13 @@ export class Resolver {
 			log.contextHash = contextHash;
 		}
 
-		if (
-			Array.isArray(object['@context']) ?
-				!(object['@context'] as unknown[]).includes('https://www.w3.org/ns/activitystreams') :
-				object['@context'] !== 'https://www.w3.org/ns/activitystreams'
-		) {
+		// Require exact ActivityStreams context URI (no substring / host confusion).
+		const AS_CONTEXT = 'https://www.w3.org/ns/activitystreams';
+		const ctx = object['@context'];
+		const hasAsContext = Array.isArray(ctx)
+			? (ctx as unknown[]).some((c) => c === AS_CONTEXT)
+			: ctx === AS_CONTEXT;
+		if (!hasAsContext) {
 			throw new IdentifiableError('72180409-793c-4973-868e-5a118eb5519b', `failed to resolve ${value}: response does not have ActivityStreams context`);
 		}
 

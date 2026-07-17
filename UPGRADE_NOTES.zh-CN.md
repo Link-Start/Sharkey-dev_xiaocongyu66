@@ -1,5 +1,31 @@
-> 中文: [UPGRADE_NOTES.zh-CN.md](./UPGRADE_NOTES.zh-CN.md)
+# 升级说明
 
+> English: [UPGRADE_NOTES.md](./UPGRADE_NOTES.md)
+
+从旧版本升级到本分支时，请先阅读本文与官方 Sharkey 升级文档。
+
+## 建议步骤
+
+1. **备份** 数据库与 `files/`、`.config/`  
+2. 阅读 [UPGRADE_NOTES.md](./UPGRADE_NOTES.md) 中的版本相关条目  
+3. 拉取代码后执行依赖安装与构建：`pnpm install && pnpm build`  
+4. 运行数据库迁移（按你的部署方式，通常 `pnpm migrate` 或容器启动时自动迁移）  
+5. 重启服务并检查日志  
+
+## 本分支额外注意
+
+- AI 翻译 / 审核相关配置见管理后台「AI」  
+- WebSocket 依赖 `ws` 已升级至 8.21.x（安全修复）  
+- 帖子 AI 翻译支持 SSE 流式：`notes/translate-stream`  
+
+## 原文
+
+完整英文/上游说明见 [UPGRADE_NOTES.md](./UPGRADE_NOTES.md)。
+
+<details>
+<summary>原文摘录</summary>
+
+```
 # Upgrade Notes
 
 ## 2025.5.2
@@ -97,3 +123,7 @@ WHERE ( -- Exclude pure renotes (boosts)
 ORDER BY id DESC -- This part is very important: it ensures that we only load the *latest* notes of each type. Do not remove it!
 ON CONFLICT DO NOTHING; -- Any conflicts are guaranteed to be older notes that we can ignore.
 ```
+
+```
+
+</details>

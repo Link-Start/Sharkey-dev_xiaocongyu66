@@ -58,7 +58,14 @@ export class SponsorsService {
 
 	@bindThis
 	private async fetchInstanceSponsors(): Promise<Sponsor[]> {
-		if (!this.meta.donationUrl?.startsWith('https://opencollective.com')) {
+		// Require exact Open Collective host (avoid https://opencollective.com.evil.example/)
+		let donationHost: string | null = null;
+		try {
+			donationHost = this.meta.donationUrl ? new URL(this.meta.donationUrl).hostname : null;
+		} catch {
+			donationHost = null;
+		}
+		if (donationHost !== 'opencollective.com' && !donationHost?.endsWith('.opencollective.com')) {
 			return [];
 		}
 

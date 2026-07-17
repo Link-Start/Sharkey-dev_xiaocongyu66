@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { randomInt } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import * as Redis from 'ioredis';
 import * as Reversi from 'misskey-reversi';
@@ -155,7 +156,7 @@ export class ReversiService {
 			'BYSCORE');
 
 		if (invitations.length > 0) {
-			const invitorId = invitations[Math.floor(Math.random() * invitations.length)];
+			const invitorId = invitations[randomInt(invitations.length)];
 			await this.redisClient.zrem(`reversi:matchSpecific:${me.id}`, invitorId);
 
 			const game = await this.matched(invitorId, me.id, {
@@ -297,7 +298,8 @@ export class ReversiService {
 	private async startGame(game: MiReversiGame) {
 		let bw: number;
 		if (game.bw === 'random') {
-			bw = Math.random() > 0.5 ? 1 : 2;
+			// Fair side assignment — use CSPRNG (CodeQL js/insecure-randomness)
+			bw = randomInt(2) === 0 ? 1 : 2;
 		} else {
 			bw = parseInt(game.bw, 10);
 		}

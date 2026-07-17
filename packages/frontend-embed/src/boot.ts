@@ -88,8 +88,10 @@ if (localeOutdated) {
 // サイズの制限
 document.documentElement.style.maxWidth = '500px';
 
-// iframeIdの設定
+// iframeIdの設定 — only accept messages from same origin (or parent when embedded)
 function setIframeIdHandler(event: MessageEvent) {
+	// When embedded, parent may be same-site or opener; require same origin as this document.
+	if (event.origin !== window.location.origin) return;
 	if (event.data?.type === 'misskey:embedParent:registerIframeId' && event.data.payload?.iframeId != null) {
 		setIframeId(event.data.payload.iframeId);
 		window.removeEventListener('message', setIframeIdHandler);

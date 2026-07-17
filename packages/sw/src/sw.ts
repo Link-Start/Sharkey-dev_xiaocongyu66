@@ -202,6 +202,11 @@ globalThis.addEventListener('notificationclose', (ev: ServiceWorkerGlobalScopeEv
 });
 
 globalThis.addEventListener('message', (ev: ServiceWorkerGlobalScopeEventMap['message']) => {
+	// Service workers only receive messages from controlled pages of this origin;
+	// still reject missing/foreign origins when present (CodeQL missing-origin-check).
+	const allowedOrigin = self.location.origin;
+	if (ev.origin && ev.origin !== allowedOrigin) return;
+
 	ev.waitUntil((async (): Promise<void> => {
 		switch (ev.data) {
 			case 'clear':
@@ -213,12 +218,12 @@ globalThis.addEventListener('message', (ev: ServiceWorkerGlobalScopeEventMap['me
 				return; // TODO
 		}
 
-		if (typeof ev.data === 'object') {
+		if (typeof ev.data === 'object' && ev.data !== null) {
 			// E.g. '[object Array]' → 'array'
 			const otype = Object.prototype.toString.call(ev.data).slice(8, -1).toLowerCase();
 
 			if (otype === 'object') {
-				if (ev.data.msg === 'initialize') {
+				if (ev.data.msg === 'initialize' && typeof ev.data.lang === 'string') {
 					swLang.setLang(ev.data.lang);
 				}
 			}

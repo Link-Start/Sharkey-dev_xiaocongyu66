@@ -65,15 +65,21 @@ async function startControllerEndpoints(config: Config) {
 	const port = config.port + 1000;
 	const fastify = Fastify();
 
+	// Test-only: allowlist keys to avoid remote property injection / log injection from arbitrary body dumps.
+	const ENV_KEY_RE = /^[A-Z][A-Z0-9_]{0,63}$/;
 	fastify.post<{ Body: { key?: string, value?: string } }>('/env', async (req, res) => {
-		console.log(req.body);
-		const key = req.body['key'];
-		if (!key) {
+		const key = typeof req.body?.key === 'string' ? req.body.key : '';
+		if (!key || !ENV_KEY_RE.test(key) || key === '__proto__' || key === 'constructor' || key === 'prototype') {
 			res.code(400).send({ success: false });
 			return;
 		}
-
-		process.env[key] = req.body['value'];
+		const value = req.body?.value;
+		if (value != null && typeof value !== 'string') {
+			res.code(400).send({ success: false });
+			return;
+		}
+		// Do not log raw body (log injection). Key is constrained by allowlist above.
+		process.env[key] = value;
 
 		res.code(200).send({ success: true });
 	});
