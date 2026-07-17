@@ -27,7 +27,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 								<template #icon><i class="ph-upload ph-bold ph-lg"></i></template>
 								<!-- TODO translations -->
 								<MkRadios v-model="noteType" style="padding-bottom: 8px;" small>
-									<template #label>Origin</template>
+									<template #label>{{ i18n.ts.origin }}</template>
 									<option value="Misskey">Misskey/Firefish/Sharkey</option>
 									<option value="Mastodon">Mastodon</option>
 									<option value="Pleroma">Pleroma/Akkoma</option>

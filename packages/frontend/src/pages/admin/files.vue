@@ -20,10 +20,10 @@ SPDX-License-Identifier: AGPL-3.0-only
 			</div>
 			<div class="inputs" style="display: flex; gap: var(--MI-margin); flex-wrap: wrap;">
 				<MkInput v-model="userId" :debounce="true" type="search" style="margin: 0; flex: 1;">
-					<template #label>User ID</template>
+					<template #label>{{ i18n.ts.userId }}</template>
 				</MkInput>
 				<MkInput v-model="type" :debounce="true" type="search" style="margin: 0; flex: 1;">
-					<template #label>MIME type</template>
+					<template #label>{{ i18n.ts.mimeType }}</template>
 				</MkInput>
 			</div>
 			<MkFileListForAdmin :pagination="pagination" :viewMode="viewMode"/>

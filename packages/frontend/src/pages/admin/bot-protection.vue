@@ -108,7 +108,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<a
 							href="https://developers.google.com/recaptcha/docs/faq?hl=ja#id-like-to-run-automated-tests-with-recaptcha.-what-should-i-do"
 							target="_blank"
-						>reCAPTCHA FAQ</a>
+						>{{ i18n.ts.recaptchaFaq }}</a>
 					</div>
 				</div>
 			</MkInfo>
@@ -138,7 +138,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						{{ i18n.ts._captcha.testSiteKeyMessage }}
 					</div>
 					<div>
-						<span>ref: </span><a href="https://developers.cloudflare.com/turnstile/troubleshooting/testing/" target="_blank">Cloudflare Docs</a>
+						<span>ref: </span><a href="https://developers.cloudflare.com/turnstile/troubleshooting/testing/" target="_blank">{{ i18n.ts.cloudflareDocs }}</a>
 					</div>
 				</div>
 			</MkInfo>
@@ -172,7 +172,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						{{ i18n.ts._captcha.testSiteKeyMessage }}
 					</div>
 					<div>
-						<span>ref: </span><a href="https://docs.friendlycaptcha.com/#/installation?id=_3-verifying-the-captcha-solution-on-the-server" target="_blank">FriendlyCaptcha Docs</a>
+						<span>ref: </span><a href="https://docs.friendlycaptcha.com/#/installation?id=_3-verifying-the-captcha-solution-on-the-server" target="_blank">{{ i18n.ts.friendlyCaptchaDocs }}</a>
 					</div>
 				</div>
 			</MkInfo>

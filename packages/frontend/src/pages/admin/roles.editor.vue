@@ -6,7 +6,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <template>
 <div class="_gaps">
 	<MkInput v-if="readonly" :modelValue="role.id" :readonly="true">
-		<template #label>ID</template>
+		<template #label>{{ i18n.ts.id }}</template>
 	</MkInput>
 
 	<MkInput v-model="role.name" :readonly="readonly">
@@ -587,7 +587,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<template #label>{{ i18n.ts._role.useBaseValue }}</template>
 					</MkSwitch>
 					<MkInput v-model="role.policies.wordMuteLimit.value" :disabled="role.policies.wordMuteLimit.useDefault" type="number" :readonly="readonly">
-						<template #suffix>chars</template>
+						<template #suffix>{{ i18n.ts.chars }}</template>
 					</MkInput>
 					<MkRange v-model="role.policies.wordMuteLimit.priority" :min="0" :max="2" :step="1" easing :textConverter="(v) => v === 0 ? i18n.ts._role._priority.low : v === 1 ? i18n.ts._role._priority.middle : v === 2 ? i18n.ts._role._priority.high : ''">
 						<template #label>{{ i18n.ts._role.priority }}</template>

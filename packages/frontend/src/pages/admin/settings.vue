@@ -121,7 +121,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 			<MkFolder>
 				<template #icon><i class="ti ti-world-cog"></i></template>
-				<template #label>ServiceWorker</template>
+				<template #label>{{ i18n.ts.serviceWorker }}</template>
 				<template v-if="serviceWorkerForm.modified.value" #footer>
 					<MkFormFooter :form="serviceWorkerForm"/>
 				</template>

@@ -10,7 +10,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 	</MkInput>
 
 	<MkInput v-model="url" type="url">
-		<template #label>URL</template>
+		<template #label>{{ i18n.ts.url }}</template>
 	</MkInput>
 
 	<MkInput v-model="secret">
