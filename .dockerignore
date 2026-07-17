@@ -12,7 +12,9 @@ node_modules/
 packages/*/node_modules
 redis/
 files/
-fluent-emojis/
+# fluent-emojis/ must NOT be ignored: assets are vendored in-tree (not a live
+# gitlink). Vite resolves /fluent-emoji/* → fluent-emojis/dist/* at build time
+# (e.g. about-sharkey.vue → 1f3c6.png). Ignoring this path breaks `pnpm build`.
 .pnp.*
 
 # .yarn関連
