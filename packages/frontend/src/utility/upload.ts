@@ -35,6 +35,11 @@ export function uploadFile(
 	folder?: string | Misskey.entities.DriveFolder | null,
 	name?: string,
 	keepOriginal = false,
+	/**
+	 * When false (default), server reuses same-user content hash and may share
+	 * physical storage across users. Pass true only when a distinct logical file is required.
+	 */
+	force = false,
 ): Promise<Misskey.entities.DriveFile> {
 	if ($i == null) throw new Error('Not logged in');
 
@@ -90,7 +95,7 @@ export function uploadFile(
 
 			const formData = new FormData();
 			formData.append('i', $i!.token);
-			formData.append('force', 'true');
+			formData.append('force', force ? 'true' : 'false');
 			formData.append('file', resizedImage ?? file);
 			formData.append('name', ctx.name);
 			if (_folder) formData.append('folderId', _folder);

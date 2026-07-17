@@ -104,19 +104,20 @@ export class MiDriveFile {
 	})
 	public webpublicType: string | null;
 
-	@Index({ unique: true })
+	// Not unique: multiple logical files may share the same physical storage (content-hash dedup).
+	@Index()
 	@Column('varchar', {
 		length: 256, nullable: true,
 	})
 	public accessKey: string | null;
 
-	@Index({ unique: true })
+	@Index()
 	@Column('varchar', {
 		length: 256, nullable: true,
 	})
 	public thumbnailAccessKey: string | null;
 
-	@Index({ unique: true })
+	@Index()
 	@Column('varchar', {
 		length: 256, nullable: true,
 	})

@@ -145,14 +145,19 @@ export class DriveFileEntityService implements OnModuleInit {
 	public async calcDriveUsageOf(user: MiUser['id'] | { id: MiUser['id'] }): Promise<number> {
 		const id = typeof user === 'object' ? user.id : user;
 
-		const { sum } = await this.driveFilesRepository
+		// One physical object may back multiple logical rows (content-hash dedup).
+		// Count each accessKey once so shared storage is not over-billed for a user.
+		const rows = await this.driveFilesRepository
 			.createQueryBuilder('file')
-			.where('file.userId = :id', { id: id })
+			.select('file.accessKey', 'accessKey')
+			.addSelect('MAX(file.size)', 'size')
+			.where('file.userId = :id', { id })
 			.andWhere('file.isLink = FALSE')
-			.select('SUM(file.size)', 'sum')
-			.getRawOne();
+			.andWhere('file.accessKey IS NOT NULL')
+			.groupBy('file.accessKey')
+			.getRawMany<{ accessKey: string; size: string }>();
 
-		return parseInt(sum, 10) || 0;
+		return rows.reduce((acc, r) => acc + (parseInt(r.size, 10) || 0), 0);
 	}
 
 	@bindThis

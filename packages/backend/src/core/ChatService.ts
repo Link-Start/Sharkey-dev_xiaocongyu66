@@ -659,6 +659,26 @@ export class ChatService {
 		return messages;
 	}
 
+	/**
+	 * Recent file attachments in a room (one entry per message that has a file).
+	 * Ordered newest message first.
+	 */
+	@bindThis
+	public async roomRecentFiles(roomId: MiChatRoom['id'], limit: number): Promise<MiChatMessage[]> {
+		const messages = await this.chatMessagesRepository.createQueryBuilder('message')
+			.where('message.toRoomId = :roomId', { roomId })
+			.andWhere('message.fileId IS NOT NULL')
+			.andWhere('message.isHidden = false')
+			.leftJoinAndSelect('message.file', 'file')
+			.leftJoinAndSelect('message.fromUser', 'fromUser')
+			.orderBy('message.id', 'DESC')
+			.take(limit)
+			.getMany();
+
+		// Drop rows whose file was hard-deleted (SET NULL may lag; join can be null)
+		return messages.filter(m => m.file != null);
+	}
+
 	@bindThis
 	public async userHistory(meId: MiUser['id'], limit: number): Promise<MiChatMessage[]> {
 		const history: MiChatMessage[] = [];

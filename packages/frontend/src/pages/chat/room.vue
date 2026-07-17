@@ -50,6 +50,17 @@ SPDX-License-Identifier: AGPL-3.0-only
 					</MkInfo>
 				</div>
 
+				<!-- Recent group files (sticky strip under banners) -->
+				<ChatRecentFiles
+					v-if="room && canViewTimeline && !needJoin && !initializing"
+					:roomId="room.id"
+					:title="tChat('recentFiles')"
+					:expandLabel="tChat('showRecentFiles')"
+					:collapseLabel="tChat('hideRecentFiles')"
+					:refreshKey="recentFilesRefreshKey"
+					@select="onRecentFileSelect"
+				/>
+
 				<div v-if="initializing">
 					<MkLoading/>
 				</div>
@@ -232,6 +243,7 @@ import XMembers from './room.members.vue';
 import XInfo from './room.info.vue';
 import XManage from './room.manage.vue';
 import ChatAnnouncementBar from './ChatAnnouncementBar.vue';
+import ChatRecentFiles, { type ChatRoomFileItem } from './ChatRecentFiles.vue';
 import type { NormalizedChatMessage, ChatRoomView } from './chat-types.js';
 import { normalizeChatMessage } from './chat-normalize.js';
 import {
@@ -283,7 +295,7 @@ function tChat(key: string) {
 }
 /** Pin strip / manage folder title — works even if locale pack lacks `announcement` key */
 const announcementTitle = computed(() => {
-	const v = (i18n.ts as any).announcement;
+	const v = i18n.ts.announcement;
 	if (typeof v === 'string' && v.length > 0 && !String(v).includes('announcement')) return v;
 	return tChat('roomAnnouncement');
 });
@@ -340,6 +352,8 @@ const joinError = ref('');
 const loadError = ref('');
 const roomPreviewName = ref('');
 const isMember = ref(false);
+/** Bump to reload sticky recent-files strip when a new attachment arrives. */
+const recentFilesRefreshKey = ref(0);
 const joinPolicy = ref<'public' | 'link' | 'invite' | 'closed'>('invite');
 /** Staff may open any room timeline without joining (abuse-report deep links). */
 const isStaffViewer = computed(() => iAmModerator);
@@ -599,6 +613,11 @@ function wsSendMessage(payload: {
 	} catch {
 		return false;
 	}
+}
+
+async function onRecentFileSelect(item: ChatRoomFileItem) {
+	tab.value = 'chat';
+	await onSearchJump(item.messageId);
 }
 
 function scrollToMessage(id: string) {
@@ -1215,6 +1234,11 @@ function onMessage(message: Misskey.entities.ChatMessageLite) {
 	if (knownMessageIds.has(normalized.id)) return;
 	knownMessageIds.add(normalized.id);
 	messages.value.unshift(normalized);
+
+	// Refresh sticky recent-files strip when a new attachment lands in this room
+	if (props.roomId && (normalized.file || (normalized as any).fileId)) {
+		recentFilesRefreshKey.value++;
+	}
 
 	// Cap only at live edge — never trim while pinned/reading history
 	// (would drop the jumped-to message and "squeeze" the user away)

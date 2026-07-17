@@ -513,7 +513,7 @@ export class DriveService {
 		this.registerLogger.debug(`Detected file info: ${JSON.stringify(info)}`);
 
 		if (user && !force) {
-		// Check if there is a file with the same hash
+			// Same-user content hash: return existing logical file (no new row).
 			const matched = await this.driveFilesRepository.findOneBy({
 				md5: info.md5,
 				userId: user.id,
@@ -636,6 +636,8 @@ export class DriveService {
 			file.uri = uri;
 		}
 
+		let reusedStorage = false;
+
 		if (isLink) {
 			try {
 				file.size = 0;
@@ -660,10 +662,23 @@ export class DriveService {
 				}
 			}
 		} else {
-			file = await (this.save(file, path, detectedName, info));
+			// Cross-user content-hash reuse: new logical row, same physical storage keys.
+			// Physical object is kept until every logical file referencing it is deleted.
+			if (!force) {
+				const shared = await this.findSharedStorageByHash(info.md5, info.size);
+				if (shared != null) {
+					this.registerLogger.debug(`reusing storage from file ${shared.id} (md5=${info.md5}) for user ${user?.id ?? 'none'}`);
+					file = await this.cloneSharedStorageFile(file, shared, detectedName, info, sensitive);
+					reusedStorage = true;
+				} else {
+					file = await (this.save(file, path, detectedName, info));
+				}
+			} else {
+				file = await (this.save(file, path, detectedName, info));
+			}
 		}
 
-		this.registerLogger.info(`Created file ${file.id} (${detectedName}) of type ${info.type.mime} for user ${user?.id ?? '<none>'}`);
+		this.registerLogger.info(`Created file ${file.id} (${detectedName}) of type ${info.type.mime} for user ${user?.id ?? '<none>'}${reusedStorage ? ' [shared storage]' : ''}`);
 
 		if (user) {
 			this.driveFileEntityService.pack(file, { self: true }).then(packedFile => {
@@ -673,13 +688,16 @@ export class DriveService {
 			});
 		}
 
-		this.driveChart.update(file, true);
-		if (file.userHost == null) {
-			// ローカルユーザーのみ
-			this.perUserDriveChart.update(file, true);
-		} else {
-			if (this.meta.enableChartsForFederatedInstances) {
-				this.instanceChart.updateDrive(file, true);
+		// Shared storage already counted when the first physical copy was created.
+		if (!reusedStorage) {
+			this.driveChart.update(file, true);
+			if (file.userHost == null) {
+				// ローカルユーザーのみ
+				this.perUserDriveChart.update(file, true);
+			} else {
+				if (this.meta.enableChartsForFederatedInstances) {
+					this.instanceChart.updateDrive(file, true);
+				}
 			}
 		}
 
@@ -748,33 +766,121 @@ export class DriveService {
 		await this.queueService.createDeleteFileJob(file.id, isExpired, deleter?.id);
 	}
 
+	/**
+	 * Find an existing local stored file with the same content hash to share storage with.
+	 */
+	@bindThis
+	private async findSharedStorageByHash(md5: string, size: number): Promise<MiDriveFile | null> {
+		return await this.driveFilesRepository.createQueryBuilder('file')
+			.where('file.md5 = :md5', { md5 })
+			.andWhere('file.size = :size', { size })
+			.andWhere('file.isLink = FALSE')
+			.andWhere('file.accessKey IS NOT NULL')
+			.orderBy('file.id', 'ASC')
+			.getOne();
+	}
+
+	/**
+	 * Create a new logical drive_file row that points at another file's physical objects.
+	 */
+	@bindThis
+	private async cloneSharedStorageFile(
+		file: MiDriveFile,
+		shared: MiDriveFile,
+		name: string,
+		info: FileInfo,
+		sensitive: boolean | null,
+	): Promise<MiDriveFile> {
+		file.url = shared.url;
+		file.thumbnailUrl = shared.thumbnailUrl;
+		file.webpublicUrl = shared.webpublicUrl;
+		file.accessKey = shared.accessKey;
+		file.thumbnailAccessKey = shared.thumbnailAccessKey;
+		file.webpublicAccessKey = shared.webpublicAccessKey;
+		file.webpublicType = shared.webpublicType;
+		file.storedInternal = shared.storedInternal;
+		file.isLink = false;
+		file.name = name;
+		file.type = info.type.mime;
+		file.md5 = info.md5;
+		file.size = info.size;
+		if (shared.properties && Object.keys(file.properties ?? {}).length === 0) {
+			file.properties = shared.properties;
+		}
+		if (file.blurhash == null && shared.blurhash != null) {
+			file.blurhash = shared.blurhash;
+		}
+		if (sensitive && !file.isSensitive) {
+			file.isSensitive = true;
+		}
+		return await this.driveFilesRepository.insertOne(file);
+	}
+
+	/**
+	 * Whether any other drive_file still references the same physical storage key.
+	 */
+	@bindThis
+	private async hasOtherStorageRefs(file: MiDriveFile): Promise<boolean> {
+		if (file.accessKey == null || file.isLink) return false;
+		const count = await this.driveFilesRepository.createQueryBuilder('file')
+			.where('file.accessKey = :key', { key: file.accessKey })
+			.andWhere('file.id != :id', { id: file.id })
+			.getCount();
+		return count > 0;
+	}
+
 	@bindThis
 	public async deleteFileSync(file: MiDriveFile, isExpired = false, deleter?: { id: string }) {
-		const promises: Promise<void>[] = [];
+		// Content-hash dedup: keep physical objects while any logical file still points at them.
+		const keepPhysical = !file.isLink && await this.hasOtherStorageRefs(file);
 
-		if (file.storedInternal) {
-			promises.push(this.deleteLocalFile(file.accessKey!));
+		if (!keepPhysical) {
+			const promises: Promise<void>[] = [];
 
-			if (file.thumbnailUrl) {
-				promises.push(this.deleteLocalFile(file.thumbnailAccessKey!));
+			if (file.storedInternal) {
+				if (file.accessKey) promises.push(this.deleteLocalFile(file.accessKey));
+
+				if (file.thumbnailUrl && file.thumbnailAccessKey) {
+					promises.push(this.deleteLocalFile(file.thumbnailAccessKey));
+				}
+
+				if (file.webpublicUrl && file.webpublicAccessKey) {
+					promises.push(this.deleteLocalFile(file.webpublicAccessKey));
+				}
+			} else if (!file.isLink) {
+				if (file.accessKey) promises.push(this.deleteObjectStorageFile(file.accessKey));
+
+				if (file.thumbnailUrl && file.thumbnailAccessKey) {
+					promises.push(this.deleteObjectStorageFile(file.thumbnailAccessKey));
+				}
+
+				if (file.webpublicUrl && file.webpublicAccessKey) {
+					promises.push(this.deleteObjectStorageFile(file.webpublicAccessKey));
+				}
 			}
 
-			if (file.webpublicUrl) {
-				promises.push(this.deleteLocalFile(file.webpublicAccessKey!));
-			}
-		} else if (!file.isLink) {
-			promises.push(this.deleteObjectStorageFile(file.accessKey!));
-
-			if (file.thumbnailUrl) {
-				promises.push(this.deleteObjectStorageFile(file.thumbnailAccessKey!));
-			}
-
-			if (file.webpublicUrl) {
-				promises.push(this.deleteObjectStorageFile(file.webpublicAccessKey!));
-			}
+			await Promise.all(promises);
+		} else {
+			this.registerLogger.debug(`skip physical delete for ${file.id}: storage still referenced (accessKey=${file.accessKey})`);
 		}
 
-		await Promise.all(promises);
+		// When keeping physical storage, only drop the logical row + events (skip chart decrement of shared bytes).
+		if (keepPhysical && !(isExpired && file.userHost !== null && file.uri != null)) {
+			await this.driveFilesRepository.delete(file.id);
+			if (file.userId) {
+				this.globalEventService.publishDriveStream(file.userId, 'fileDeleted', file.id);
+			}
+			if (deleter && await this.roleService.isModerator(deleter) && (file.userId !== deleter.id)) {
+				const user = file.userId ? await this.cacheService.findUserById(file.userId) : null;
+				await this.moderationLogService.log(deleter, 'deleteDriveFile', {
+					fileId: file.id,
+					fileUserId: file.userId,
+					fileUserUsername: user?.username ?? null,
+					fileUserHost: user?.host ?? null,
+				});
+			}
+			return;
+		}
 
 		await this.deletePostProcess(file, isExpired, deleter);
 	}
