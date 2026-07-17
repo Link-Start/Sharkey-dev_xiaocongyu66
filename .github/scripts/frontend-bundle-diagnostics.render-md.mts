@@ -9,29 +9,6 @@ import * as util from './utility.mts';
 
 const locale = 'ja-JP';
 
-//function sharePercent(value, total) {
-//	if (total === 0) return '0%';
-//	return Math.round((value / total) * 100) + '%';
-//}
-
-//function tableCell(value) {
-//	return String(value).replaceAll('|', '\\|').replaceAll('\r', ' ').replaceAll('\n', ' ');
-//}
-
-//function code(value) {
-//	const sanitized = String(value).replaceAll('\r', ' ').replaceAll('\n', ' ');
-//	const backtickRuns = sanitized.match(/`+/g) ?? [];
-//	const fenceLength = Math.max(1, ...backtickRuns.map((run) => run.length + 1));
-//	const fence = '`'.repeat(fenceLength);
-//	const padding = sanitized.startsWith('`') || sanitized.endsWith('`') ? ' ' : '';
-//
-//	return `${fence}${padding}${sanitized}${padding}${fence}`;
-//}
-
-//function tableCode(value) {
-//	return tableCell(code(value));
-//}
-
 type Manifest = Record<string, { file?: string; src?: string; name?: string; isEntry?: boolean; imports?: string[] }>;
 
 const stableNamedChunks = new Set(['vue', 'i18n']);
@@ -505,10 +482,6 @@ function renderFrontendChunkReport(before: Awaited<ReturnType<typeof collectRepo
 	};
 	const startupGenerated = generatedAggregate(beforeStartupChunks, afterStartupChunks);
 
-	//const largeRows = comparisonRows
-	//	.sort((a, b) => b.sortSize - a.sortSize || a.name.localeCompare(b.name))
-	//	.slice(0, 30);
-
 	return [
 		'<details>',
 		`<summary>${formatChunkChangeSummary('Chunk size diff', diffSummary)}</summary>`,
@@ -526,55 +499,7 @@ function renderFrontendChunkReport(before: Awaited<ReturnType<typeof collectRepo
 		'',
 		'</details>',
 		'',
-		//'<details>',
-		//`<summary>Largest</summary>`,
-		//'',
-		//markdownTable(largeRows),
-		//'',
-		//'</details>',
-		//'',
 	].join('\n');
-}
-
-function renderFrontendBundleReport(before: ReturnType<typeof collectVisualizerReport>, after: ReturnType<typeof collectVisualizerReport>) {
-	const lines = [
-		...renderVisualizerSummaryTable(before, after),
-		'',
-		//'<details>',
-		//'<summary>Top 10</summary>',
-		//'',
-	];
-
-	/*
-	for (const row of after.hotModules.slice(0, 10)) {
-		lines.push(`- ${code(row.id)}: ${sharePercent(row.renderedLength, after.metrics.renderedLength)} (${formatBytes(row.renderedLength)})`);
-	}
-
-	lines.push(
-		'',
-		'</details>',
-	);
-
-	lines.push(
-		'',
-		'<details>',
-		'<summary>Hot Modules (Self Size)</summary>',
-		'',
-		'| Module | Bundles | Rendered | Share | Gzip | Brotli | Imports | Imported By |',
-		'|---|---:|---:|---:|---:|---:|---:|---:|',
-	);
-
-	for (const row of after.hotModules.slice(0, 15)) {
-		lines.push(`| ${tableCode(row.id)} | ${row.bundles} | ${formatBytes(row.renderedLength)} | ${sharePercent(row.renderedLength, after.metrics.renderedLength)} | ${formatBytes(row.gzipLength)} | ${formatBytes(row.brotliLength)} | ${row.importedCount} | ${row.importedByCount} |`);
-	}
-
-	lines.push(
-		'',
-		'</details>',
-	);
-	*/
-
-	return lines.join('\n');
 }
 
 const args = process.argv.slice(2);
@@ -594,7 +519,7 @@ const body = [
 	'',
 	'## Bundle Stats',
 	'',
-	renderFrontendBundleReport(beforeVisualizerReport, afterVisualizerReport),
+	renderVisualizerSummaryTable(beforeVisualizerReport, afterVisualizerReport),
 	'',
 	visualizerArtifactLink,
 ].join('\n');

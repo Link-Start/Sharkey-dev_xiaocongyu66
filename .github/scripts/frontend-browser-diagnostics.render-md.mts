@@ -91,32 +91,16 @@ export type BrowserMetricsReport = {
 	samples: BrowserMeasurementSample[];
 };
 
-function truncate(value: string, maxLength = 140) {
-	if (value.length <= maxLength) return value;
-	return `${value.slice(0, maxLength - 3)}...`;
-}
-
-function formatMs(value: number | null | undefined) {
-	if (value == null || !Number.isFinite(value)) return '-';
-	if (value >= 1_000) return `${util.formatNumber(value / 1_000)} s`;
-	return `${util.formatNumber(value)} ms`;
-}
-
-function formatSecondsAsMs(value: number | null | undefined) {
-	if (value == null || !Number.isFinite(value)) return '-';
-	return formatMs(value * 1_000);
-}
-
 function formatDelta(delta: number, formatter: (value: number) => string, colorThreshold = 0) {
 	if (delta === 0) return formatter(0);
 	return util.formatColoredDelta(delta, v => formatter(v), colorThreshold);
 }
 
-function finiteValues(values: (number | null | undefined)[]) {
-	return values.filter(value => Number.isFinite(value)) as number[];
-}
-
 function sampleSpread(report: BrowserMetricsReport, getValue: (sample: BrowserMeasurementSample) => number | null | undefined) {
+	function finiteValues(values: (number | null | undefined)[]) {
+		return values.filter(value => Number.isFinite(value)) as number[];
+	}
+
 	const values = finiteValues(report.samples.map(sample => getValue(sample)));
 	if (values.length < 2) return null;
 
@@ -170,7 +154,7 @@ function getMetric(report: BrowserMeasurement, key: string) {
 
 function renderSummaryTable(base: BrowserMetricsReport, head: BrowserMetricsReport, all = false) {
 	const rows = [
-		//metricRow('Scenario duration', base, head, summary => summary.durationMs, sample => sample.durationMs, formatMs),
+		//metricRow('Scenario duration', base, head, summary => summary.durationMs, sample => sample.durationMs, util.formatMs),
 		metricRow('Requests', base, head, summary => summary.network.requestCount, sample => sample.network.requestCount, util.formatNumber, 1, !all),
 		//metricRow('Failed requests', base, head, summary => summary.network.failedRequestCount, sample => sample.network.failedRequestCount, util.formatNumber),
 		metricRow('Encoded network', base, head, summary => summary.network.totalEncodedBytes, sample => sample.network.totalEncodedBytes, util.formatBytes, 10000, !all),
@@ -182,11 +166,11 @@ function renderSummaryTable(base: BrowserMetricsReport, head: BrowserMetricsRepo
 		metricRow('Fetch/XHR encoded', base, head, summary => resourceTypeBytes(summary, ['Fetch', 'XHR']), sample => resourceTypeSampleBytes(sample, ['Fetch', 'XHR']), util.formatBytes, 10000, !all),
 		metricRow('Image encoded', base, head, summary => resourceTypeBytes(summary, ['Image']), sample => resourceTypeSampleBytes(sample, ['Image']), util.formatBytes, 10000, !all),
 		metricRow('Font encoded', base, head, summary => resourceTypeBytes(summary, ['Font']), sample => resourceTypeSampleBytes(sample, ['Font']), util.formatBytes, 10000, !all),
-		//metricRow('First contentful paint', base, head, summary => summary.performance.webVitals.firstContentfulPaintMs, sample => sample.performance.webVitals.firstContentfulPaintMs, formatMs),
-		//metricRow('Load event end', base, head, summary => summary.performance.webVitals.loadEventEndMs, sample => sample.performance.webVitals.loadEventEndMs, formatMs),
+		//metricRow('First contentful paint', base, head, summary => summary.performance.webVitals.firstContentfulPaintMs, sample => sample.performance.webVitals.firstContentfulPaintMs, util.formatMs),
+		//metricRow('Load event end', base, head, summary => summary.performance.webVitals.loadEventEndMs, sample => sample.performance.webVitals.loadEventEndMs, util.formatMs),
 		//metricRow('Long tasks', base, head, summary => summary.performance.webVitals.longTaskCount, sample => sample.performance.webVitals.longTaskCount, util.formatNumber),
-		//metricRow('Long task duration', base, head, summary => summary.performance.webVitals.longTaskDurationMs, sample => sample.performance.webVitals.longTaskDurationMs, formatMs),
-		//metricRow('Max long task', base, head, summary => summary.performance.webVitals.maxLongTaskDurationMs, sample => sample.performance.webVitals.maxLongTaskDurationMs, formatMs),
+		//metricRow('Long task duration', base, head, summary => summary.performance.webVitals.longTaskDurationMs, sample => sample.performance.webVitals.longTaskDurationMs, util.formatMs),
+		//metricRow('Max long task', base, head, summary => summary.performance.webVitals.maxLongTaskDurationMs, sample => sample.performance.webVitals.maxLongTaskDurationMs, util.formatMs),
 		//metricRow('JS heap used', base, head, summary => summary.performance.runtimeHeap?.usedSize ?? getMetric(summary, 'JSHeapUsedSize'), sample => sample.performance.runtimeHeap?.usedSize ?? getMetric(sample, 'JSHeapUsedSize'), util.formatBytes),
 		//metricRow('JS heap total', base, head, summary => summary.performance.runtimeHeap?.totalSize ?? getMetric(summary, 'JSHeapTotalSize'), sample => sample.performance.runtimeHeap?.totalSize ?? getMetric(sample, 'JSHeapTotalSize'), util.formatBytes),
 		//metricRow('V8 heap snapshot total', base, head, summary => summary.heapSnapshot.categories.total, sample => sample.heapSnapshot.categories.total, util.formatBytes, 10000),
@@ -195,8 +179,8 @@ function renderSummaryTable(base: BrowserMetricsReport, head: BrowserMetricsRepo
 		//metricRow('JS event listeners', base, head, summary => getMetric(summary, 'JSEventListeners'), sample => getMetric(sample, 'JSEventListeners'), util.formatNumber),
 		//metricRow('Layout count', base, head, summary => getMetric(summary, 'LayoutCount'), sample => getMetric(sample, 'LayoutCount'), util.formatNumber),
 		//metricRow('Recalc style count', base, head, summary => getMetric(summary, 'RecalcStyleCount'), sample => getMetric(sample, 'RecalcStyleCount'), util.formatNumber),
-		//metricRow('Script duration', base, head, summary => getMetric(summary, 'ScriptDuration'), sample => getMetric(sample, 'ScriptDuration'), formatSecondsAsMs),
-		//metricRow('Task duration', base, head, summary => getMetric(summary, 'TaskDuration'), sample => getMetric(sample, 'TaskDuration'), formatSecondsAsMs),
+		//metricRow('Script duration', base, head, summary => getMetric(summary, 'ScriptDuration'), sample => getMetric(sample, 'ScriptDuration'), util.formatSecondsAsMs),
+		//metricRow('Task duration', base, head, summary => getMetric(summary, 'TaskDuration'), sample => getMetric(sample, 'TaskDuration'), util.formatSecondsAsMs),
 		metricRow('WebSocket connections', base, head, summary => summary.network.webSocketConnectionCount, sample => sample.network.webSocketConnectionCount, util.formatNumber, 1, !all),
 		metricRow('WebSocket sent', base, head, summary => summary.network.webSocketSentBytes, sample => sample.network.webSocketSentBytes, util.formatBytes, 10000, !all),
 		metricRow('WebSocket received', base, head, summary => summary.network.webSocketReceivedBytes, sample => sample.network.webSocketReceivedBytes, util.formatBytes, 10000, !all),
@@ -263,42 +247,6 @@ function renderResourceTypeTable(base: BrowserMetricsReport, head: BrowserMetric
 	return lines.join('\n');
 }
 
-function renderLargestRequests(report: BrowserMetricsReport, title: string) {
-	if (report.summary.network.largestRequests.length === 0) return null;
-
-	const lines = [
-		`<details><summary>${title}</summary>`,
-		'',
-		'| Resource | Type | Status | Encoded | Decoded |',
-		'| --- | --- | ---: | ---: | ---: |',
-	];
-
-	for (const request of report.summary.network.largestRequests.slice(0, 10)) {
-		lines.push(`| \`${util.escapeMdTableCell(truncate(request.url))}\` | ${util.escapeMdTableCell(request.resourceType)} | ${request.status ?? '-'} | ${util.formatBytes(request.encodedBytes)} | ${util.formatBytes(request.decodedBodyBytes)} |`);
-	}
-
-	lines.push('', '</details>');
-	return lines.join('\n');
-}
-
-function renderFailedRequests(report: BrowserMetricsReport, title: string) {
-	if (report.summary.network.failedRequests.length === 0) return null;
-
-	const lines = [
-		`<details><summary>${title}</summary>`,
-		'',
-		'| Resource | Type | Status | Error |',
-		'| --- | --- | ---: | --- |',
-	];
-
-	for (const request of report.summary.network.failedRequests.slice(0, 20)) {
-		lines.push(`| \`${util.escapeMdTableCell(truncate(request.url))}\` | ${util.escapeMdTableCell(request.resourceType)} | ${request.status ?? '-'} | ${util.escapeMdTableCell(request.errorText ?? '')} |`);
-	}
-
-	lines.push('', '</details>');
-	return lines.join('\n');
-}
-
 function toHeapSnapshotReport(report: BrowserMetricsReport): HeapSnapshotReport {
 	return {
 		summary: report.summary.heapSnapshot,
@@ -343,15 +291,6 @@ function renderMd(base: BrowserMetricsReport, head: BrowserMetricsReport, option
 		'</details>',
 		'',
 	];
-
-	for (const section of [
-		//renderLargestRequests(head, 'Largest representative head requests'),
-		//renderFailedRequests(base, 'Failed representative base requests'),
-		//renderFailedRequests(head, 'Failed representative head requests'),
-	]) {
-		if (section == null) continue;
-		lines.push(section, '');
-	}
 
 	return lines.filter(line => line != null).join('\n').trimEnd() + '\n';
 }
