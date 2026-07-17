@@ -1383,6 +1383,7 @@ driveAboutTip: |-
   也可以在发布帖子时重复使用文件，或在发布帖子前预先上传文件。<br>
   <b>删除文件时，其将从至今为止所有用到该文件的地方（如帖子、页面、头像、横幅）消失。</b><br>
   也可以新建文件夹来整理文件。
+scrollToClose: 滚动关闭
 _chat:
   roomAnnouncement: 公告
   e2eeAlwaysOn: 端到端加密
@@ -2426,6 +2427,8 @@ _ago:
   monthsAgo: '{n} 月前'
   yearsAgo: '{n} 年前'
   invalid: 没有
+  now: 现在
+  never: 从未
 _timeIn:
   seconds: '{n}秒后'
   minutes: '{n} 分后'
@@ -2434,6 +2437,8 @@ _timeIn:
   weeks: '{n} 周后'
   months: '{n} 月后'
   years: '{n} 年后'
+  now: 现在
+  never: 从未
 _time:
   second: 秒
   minute: 分
@@ -4018,6 +4023,7 @@ schedulePost: 定时发布帖子
 schedulePostList: 定时发布帖子列表
 postOn: 在何时发出
 scheduledNotes: 定时发布的帖子
+never: 从未
 robotsTxt: 自定义 robots.txt
 robotsTxtDescription: 向此处增加内容，会覆盖 Sharkey 默认附带的 robots.txt。
 defaultCW: 新帖子的默认内容警告
@@ -4196,6 +4202,16 @@ setRootUser: 设定根 (root) 用户
 setRootUserWarning: 你现在已经是根 (root) 用户了；你可以把它交给别人。如果你想在这么做之后继续当管理员，你应该在移交<em>之前</em>，通过「角色」给自己添加管理员权限
 previousRootUser: 先前的根用户
 newRootUser: 新的根用户
+userDeleted: 此用户已被删除。
+restartDeletion: 重新开始删除账户
+restartDeletionDescription: 最近一次账户删除尝试于 {date}。如果删除失败或不完整，可点击此按钮重新开始删除流程。
+restartDeletionConfirm: 确定要重新开始此账户的删除流程吗？
+deletedAt: 删除时间
+lastFetchedAt: 上次抓取时间
+lastFetchedFeaturedAt: 上次抓取精选时间
+lastFetchedOutboxAt: 上次抓取发件箱时间
+loginDates: 登录日期
+root: 根用户
 change: 更改
 customEmojisBeta: 自定义表情符号（测试版）
 systemWebhook: 系统 Webhook
