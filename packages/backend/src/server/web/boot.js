@@ -165,6 +165,7 @@
 		document.head.appendChild(css);
 	}
 
+
 	/**
 	 * Readable error text for PromiseRejectionEvent / Error / plain values.
 	 * @param {any} details
@@ -176,7 +177,6 @@
 		if (details instanceof Error) {
 			return details.stack || `${details.name}: ${details.message}`;
 		}
-		// DOM PromiseRejectionEvent (boot shows SOMETHING_HAPPENED_IN_PROMISE)
 		if (typeof details === 'object' && 'reason' in details) {
 			const inner = formatErrorDetails(/** @type {any} */ (details).reason);
 			if (inner) return inner;
@@ -193,18 +193,34 @@
 	}
 
 	/**
+	 * Escape text for HTML body.
+	 * @param {string} s
+	 * @returns {string}
+	 */
+	function escapeHtml(s) {
+		return String(s)
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;');
+	}
+
+	/**
+	 * Boot error page layout (original Sharkey style):
+	 *   top    — error title + code + reload
+	 *   middle — recovery tool links (/flush, /cli, /bios)
+	 *   bottom — full log (always expanded)
+	 *
 	 * @param {string} code
 	 * @param {any} [details]
 	 * @returns {Promise<void>}
 	 */
 	async function renderError(code, details) {
-		// Cannot set property 'innerHTML' of null を回避
 		if (document.readyState === 'loading') {
 			await new Promise(resolve => window.addEventListener('DOMContentLoaded', resolve));
 		}
 
 		const locale = JSON.parse(localStorage.getItem('locale') || '{}');
-
 		const messages = Object.assign({
 			title: 'Failed to initialize Sharkey',
 			solution: 'The following actions may solve the problem.',
@@ -212,235 +228,193 @@
 			solution2: 'Disable an adblocker',
 			solution3: 'Clear the browser cache',
 			solution4: '(Tor Browser) Set dom.webaudio.enabled to true',
-			toolsTitle: 'Built-in recovery tools',
-			toolsHint: 'Use these first — no need to dig through browser settings.',
-			otherOption: 'Other options',
-			otherOption1: 'Clear preferences and cache (/flush)',
-			otherOption2: 'Start the simple client (/cli)',
-			otherOption3: 'Start the repair tool (/bios)',
-			flushPrimary: 'Clear cache (flush)',
+			toolsTitle: 'Recovery tools',
+			toolsHint: 'Open a built-in tool (recommended first):',
+			otherOption1: 'Clear preferences and cache',
+			otherOption2: 'Start the simple client',
+			otherOption3: 'Start the repair tool',
+			fullLog: 'Full log',
 		}, locale?._bootErrors || {});
 		const reload = locale?.reload || 'Reload';
 
-		let errorsElement = document.getElementById('errors');
+		const logBody = formatErrorDetails(details);
 
-		if (!errorsElement) {
+		// Rebuild page once; append extra log blocks if multiple errors fire
+		let logEl = document.getElementById('full-log');
+		if (!logEl) {
 			document.body.innerHTML = `
 			<svg class="icon-warning" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
 				<path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
 				<path d="M12 9v2m0 4v.01"></path>
 				<path d="M5 19h14a2 2 0 0 0 1.84 -2.75l-7.1 -12.25a2 2 0 0 0 -3.5 0l-7.1 12.25a2 2 0 0 0 1.75 2.75"></path>
 			</svg>
-			<h1>${messages.title}</h1>
-			<button class="button-big" type="button" onclick="location.reload();">
-				<span class="button-label-big">${reload}</span>
-			</button>
-			<a href="/flush" class="flush-link">
-				<button class="button-flush" type="button">
-					<span class="button-label-flush">${messages.flushPrimary || messages.otherOption1}</span>
+
+			<!-- TOP: error -->
+			<section class="err-section err-top">
+				<h1>${escapeHtml(messages.title)}</h1>
+				<p class="err-code"><code>ERROR CODE: ${escapeHtml(code)}</code></p>
+				<button class="button-big" type="button" onclick="location.reload();">
+					<span class="button-label-big">${escapeHtml(reload)}</span>
 				</button>
-			</a>
-			<div class="tools-panel">
-				<p class="tools-title"><b>${messages.toolsTitle}</b></p>
-				<p class="tools-hint">${messages.toolsHint}</p>
-				<div class="tools-row">
-					<a href="/flush"><button class="button-small" type="button"><span class="button-label-small">${messages.otherOption1}</span></button></a>
-					<a href="/cli"><button class="button-small" type="button"><span class="button-label-small">${messages.otherOption2}</span></button></a>
-					<a href="/bios"><button class="button-small" type="button"><span class="button-label-small">${messages.otherOption3}</span></button></a>
-				</div>
-			</div>
-			<p><b>${messages.solution}</b></p>
-			<p>${messages.solution1}</p>
-			<p>${messages.solution2}</p>
-			<p>${messages.solution3}</p>
-			<p>${messages.solution4}</p>
-			<br>
-			<div id="errors"></div>
+			</section>
+
+			<!-- MIDDLE: tools -->
+			<section class="err-section err-tools">
+				<p><b>${escapeHtml(messages.toolsTitle)}</b></p>
+				<p class="err-hint">${escapeHtml(messages.toolsHint)}</p>
+				<p>
+					<a href="/flush"><button class="button-small" type="button"><span class="button-label-small">${escapeHtml(messages.otherOption1)}</span></button></a>
+				</p>
+				<p>
+					<a href="/cli"><button class="button-small" type="button"><span class="button-label-small">${escapeHtml(messages.otherOption2)}</span></button></a>
+				</p>
+				<p>
+					<a href="/bios"><button class="button-small" type="button"><span class="button-label-small">${escapeHtml(messages.otherOption3)}</span></button></a>
+				</p>
+				<p class="err-tips"><b>${escapeHtml(messages.solution)}</b></p>
+				<p>${escapeHtml(messages.solution1)}</p>
+				<p>${escapeHtml(messages.solution2)}</p>
+				<p>${escapeHtml(messages.solution3)}</p>
+				<p>${escapeHtml(messages.solution4)}</p>
+			</section>
+
+			<!-- BOTTOM: full log -->
+			<section class="err-section err-log">
+				<p><b>${escapeHtml(messages.fullLog)}</b></p>
+				<pre id="full-log" class="full-log"></pre>
+			</section>
 			`;
-			errorsElement = document.getElementById('errors');
-		}
-		const detailsElement = document.createElement('details');
-		detailsElement.id = 'errorInfo';
-		const detailText = formatErrorDetails(details)
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;');
-		detailsElement.innerHTML = `
-		<br>
-		<summary>
-			<code>ERROR CODE: ${code}</code>
-		</summary>
-		<pre class="error-detail">${detailText}</pre>`;
-		errorsElement?.appendChild(detailsElement);
-		addStyle(`
-		* {
-			font-family: BIZ UDGothic, Roboto, HelveticaNeue, Arial, sans-serif;
-		}
-
-		#sharkey_app,
-		#splash {
-			display: none !important;
-		}
-
-		body,
-		html {
-			background-color: #222;
-			color: #dfddcc;
-			justify-content: center;
-			margin: auto;
-			padding: 10px;
-			text-align: center;
-		}
-
-		button {
-			border-radius: 999px;
-			padding: 0px 12px 0px 12px;
-			border: none;
-			cursor: pointer;
-			margin-bottom: 12px;
-		}
-
-		.button-big {
-			background: linear-gradient(90deg, rgb(134, 179, 0), rgb(74, 179, 0));
-			line-height: 50px;
-		}
-
-		.button-big:hover {
-			background: rgb(153, 204, 0);
-		}
-
-		.button-flush {
-			background: linear-gradient(90deg, #3d7ea6, #2a6f97);
-			line-height: 46px;
-			min-width: 220px;
-		}
-
-		.button-flush:hover {
-			background: #4a90b8;
-		}
-
-		.button-label-flush {
-			color: #fff;
-			font-weight: bold;
-			font-size: 1.05em;
-			padding: 12px;
-		}
-
-		.flush-link {
-			display: inline-block;
-			margin: 0 8px 8px;
-		}
-
-		.tools-panel {
-			max-width: 36rem;
-			margin: 1rem auto 1.5rem;
-			padding: 14px 16px;
-			border-radius: 12px;
-			background: #2a2a2a;
-			border: 1px solid #444;
-		}
-
-		.tools-title {
-			margin: 0 0 6px;
-			color: #b8e000;
-		}
-
-		.tools-hint {
-			margin: 0 0 12px;
-			font-size: 14px;
-			opacity: 0.85;
-		}
-
-		.tools-row {
-			display: flex;
-			flex-wrap: wrap;
-			gap: 8px;
-			justify-content: center;
-		}
-
-		.tools-row a {
-			display: inline-block;
-		}
-
-		.button-small {
-			background: #444;
-			line-height: 40px;
-			margin-bottom: 0;
-		}
-
-		.button-small:hover {
-			background: #555;
-		}
-
-		.button-label-big {
-			color: #222;
-			font-weight: bold;
-			font-size: 1.2em;
-			padding: 12px;
+			logEl = document.getElementById('full-log');
+			addStyle(`
+* {
+	font-family: BIZ UDGothic, Roboto, HelveticaNeue, Arial, sans-serif;
+}
+#sharkey_app,
+#splash {
+	display: none !important;
+}
+body,
+html {
+	background-color: #222;
+	color: #dfddcc;
+	justify-content: center;
+	margin: auto;
+	padding: 10px;
+	text-align: center;
+}
+.err-section {
+	max-width: 40rem;
+	margin: 0 auto 1.25rem;
+}
+.err-top {
+	margin-bottom: 1.5rem;
+}
+.err-code {
+	margin: 0.75rem auto 1rem;
+}
+.err-code code {
+	display: inline-block;
+	font-family: Fira, FiraCode, monospace;
+	background: #333;
+	padding: 0.5rem 1rem;
+	border-radius: 10px;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+.err-hint {
+	opacity: 0.85;
+	font-size: 15px;
+	margin-top: 0;
+}
+.err-tips {
+	margin-top: 1.25rem;
+}
+button {
+	border-radius: 999px;
+	padding: 0 12px;
+	border: none;
+	cursor: pointer;
+	margin-bottom: 12px;
+}
+.button-big {
+	background: linear-gradient(90deg, rgb(134, 179, 0), rgb(74, 179, 0));
+	line-height: 50px;
+}
+.button-big:hover {
+	background: rgb(153, 204, 0);
+}
+.button-small {
+	background: #444;
+	line-height: 40px;
+}
+.button-small:hover {
+	background: #555;
+}
+.button-label-big {
+	color: #222;
+	font-weight: bold;
+	font-size: 1.2em;
+	padding: 12px;
+}
+.button-label-small {
+	color: rgb(153, 204, 0);
+	font-size: 16px;
+	padding: 12px;
+}
+a {
+	color: rgb(134, 179, 0);
+	text-decoration: none;
+}
+p, li {
+	font-size: 16px;
+}
+.icon-warning {
+	color: #dec340;
+	height: 4rem;
+	padding-top: 2rem;
+}
+h1 {
+	font-size: 1.5em;
+	margin: 1em;
+}
+.full-log {
+	display: block;
+	text-align: left;
+	font-family: Fira, FiraCode, ui-monospace, monospace;
+	font-size: 12px;
+	line-height: 1.45;
+	background: #333;
+	color: #dfddcc;
+	padding: 0.75rem 1rem;
+	max-width: 40rem;
+	max-height: min(50vh, 28rem);
+	overflow: auto;
+	border-radius: 10px;
+	margin: 0.5rem auto 2rem;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+@media screen and (max-width: 500px) {
+	.full-log, .err-section {
+		max-width: 92vw;
+	}
+}
+`);
 		}
 
-		.button-label-small {
-			color: rgb(153, 204, 0);
-			font-size: 15px;
-			padding: 10px 12px;
-		}
-
-		a {
-			color: rgb(134, 179, 0);
-			text-decoration: none;
-		}
-
-		p,
-		li {
-			font-size: 16px;
-		}
-
-		.icon-warning {
-			color: #dec340;
-			height: 4rem;
-			padding-top: 2rem;
-		}
-
-		h1 {
-			font-size: 1.5em;
-			margin: 1em;
-		}
-
-		code, pre.error-detail {
-			font-family: Fira, FiraCode, ui-monospace, monospace;
-		}
-
-		pre.error-detail {
-			text-align: left;
-			white-space: pre-wrap;
-			word-break: break-word;
-			margin: 0.5rem 0 0;
-			font-size: 12px;
-			opacity: 0.9;
-		}
-
-		#errorInfo {
-			background: #333;
-			margin-bottom: 2rem;
-			padding: 0.5rem 1rem;
-			width: min(40rem, 92vw);
-			border-radius: 10px;
-			justify-content: center;
-			margin: auto;
-		}
-
-		#errorInfo summary {
-			cursor: pointer;
-		}
-
-		#errorInfo summary > * {
-			display: inline;
-		}
-
-		@media screen and (max-width: 500px) {
-			#errorInfo {
-				width: 92%;
+		if (logEl) {
+			const block =
+				`ERROR CODE: ${code}\n` +
+				`TIME: ${new Date().toISOString()}\n` +
+				`URL: ${location.href}\n` +
+				`UA: ${navigator.userAgent}\n` +
+				`\n---\n\n` +
+				(logBody || '(no detail)');
+			if (logEl.textContent && logEl.textContent.trim().length > 0) {
+				logEl.textContent += '\n\n==========\n\n' + block;
+			} else {
+				logEl.textContent = block;
 			}
-		}`);
+		}
 	}
 })();

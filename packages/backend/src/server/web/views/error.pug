@@ -40,42 +40,45 @@ body
 		path(d="M12 9v2m0 4v.01")
 		path(d="M5 19h14a2 2 0 0 0 1.84 -2.75l-7.1 -12.25a2 2 0 0 0 -3.5 0l-7.1 12.25a2 2 0 0 0 1.75 2.75")
 
-	h1(data-i18n="title") Failed to initialize Sharkey
+	//- TOP: error
+	section.err-section.err-top
+		h1(data-i18n="title") Failed to initialize Sharkey
+		p.err-code
+			code.
+				ERROR CODE: #{code}
+				ERROR ID: #{id}
+		button.button-big(type="button" onclick="location.reload();")
+			span.button-label-big(data-i18n-reload) Reload
 
-	button.button-big(onclick="location.reload();")
-		span.button-label-big(data-i18n-reload) Reload
+	//- MIDDLE: tools
+	section.err-section.err-tools
+		p
+			b(data-i18n="toolsTitle") Recovery tools
+		p.err-hint(data-i18n="toolsHint") Open a built-in tool (recommended first):
+		p
+			a(href="/flush")
+				button.button-small(type="button")
+					span.button-label-small(data-i18n="otherOption1") Clear preferences and cache
+		p
+			a(href="/cli")
+				button.button-small(type="button")
+					span.button-label-small(data-i18n="otherOption2") Start the simple client
+		p
+			a(href="/bios")
+				button.button-small(type="button")
+					span.button-label-small(data-i18n="otherOption3") Start the repair tool
+		p.err-tips
+			b(data-i18n="solution") The following actions may solve the problem.
+		p(data-i18n="solution1") Update your os and browser
+		p(data-i18n="solution2") Disable an adblocker
+		p(data-i18n="solution3") Clear your browser cache
+		p(data-i18n="solution4") (Tor Browser) Set dom.webaudio.enabled to true
+		p(data-i18n="serverError") If reloading after a period of time does not resolve the problem, contact the server administrator with the following ERROR ID.
 
-	//- Built-in tools always visible (flush / cli / bios)
-	a(href="/flush" style="display:inline-block;margin:0 6px 8px;")
-		button.button-small
-			span.button-label-small(data-i18n="flushPrimary") Clear cache (flush)
-
-	p
-		b(data-i18n="toolsTitle") Built-in recovery tools
-	p(data-i18n="toolsHint" style="opacity:0.85;font-size:14px;") Use these first — no need to dig through browser settings.
-
-	div(style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px;")
-		a(href="/flush")
-			button.button-small
-				span.button-label-small(data-i18n="otherOption1") Clear preferences and cache (/flush)
-		a(href="/cli")
-			button.button-small
-				span.button-label-small(data-i18n="otherOption2") Start the simple client (/cli)
-		a(href="/bios")
-			button.button-small
-				span.button-label-small(data-i18n="otherOption3") Start the repair tool (/bios)
-
-	p(data-i18n="serverError") If reloading after a period of time does not resolve the problem, contact the server administrator with the following ERROR ID.
-
-	div#errors
-		code.
+	//- BOTTOM: full log
+	section.err-section.err-log
+		p
+			b(data-i18n="fullLog") Full log
+		pre#full-log.full-log.
 			ERROR CODE: #{code}
 			ERROR ID: #{id}
-
-	p
-		b(data-i18n="solution") The following actions may solve the problem.
-
-	p(data-i18n="solution1") Update your os and browser
-	p(data-i18n="solution2") Disable an adblocker
-	p(data-i18n="solution3") Clear your browser cache
-	p(data-i18n="solution4") (Tor Browser) Set dom.webaudio.enabled to true

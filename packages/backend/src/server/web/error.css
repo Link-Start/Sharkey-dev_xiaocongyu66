@@ -23,6 +23,40 @@ html {
 	text-align: center;
 }
 
+.err-section {
+	max-width: 40rem;
+	margin: 0 auto 1.25rem;
+}
+
+.err-top {
+	margin-bottom: 1.5rem;
+}
+
+.err-code {
+	margin: 0.75rem auto 1rem;
+}
+
+.err-code code {
+	display: inline-block;
+	font-family: Fira, FiraCode, monospace;
+	background: #333;
+	padding: 0.5rem 1rem;
+	border-radius: 10px;
+	white-space: pre-wrap;
+	word-break: break-word;
+	text-align: left;
+}
+
+.err-hint {
+	opacity: 0.85;
+	font-size: 15px;
+	margin-top: 0;
+}
+
+.err-tips {
+	margin-top: 1.25rem;
+}
+
 button {
 	border-radius: 999px;
 	padding: 0px 12px 0px 12px;
@@ -84,28 +118,30 @@ h1 {
 }
 
 code {
-	display: block;
 	font-family: Fira, FiraCode, monospace;
+}
+
+.full-log {
+	display: block;
+	text-align: left;
+	font-family: Fira, FiraCode, ui-monospace, monospace;
+	font-size: 12px;
+	line-height: 1.45;
 	background: #333;
-	padding: 0.5rem 1rem;
+	color: #dfddcc;
+	padding: 0.75rem 1rem;
 	max-width: 40rem;
+	max-height: min(50vh, 28rem);
+	overflow: auto;
 	border-radius: 10px;
-	justify-content: center;
-	margin: auto;
+	margin: 0.5rem auto 2rem;
 	white-space: pre-wrap;
 	word-break: break-word;
 }
 
-#errorInfo summary {
-	cursor: pointer;
-}
-
-#errorInfo summary>* {
-	display: inline;
-}
-
 @media screen and (max-width: 500px) {
-	#errorInfo {
-		width: 50%;
+	.full-log,
+	.err-section {
+		max-width: 92vw;
 	}
 }

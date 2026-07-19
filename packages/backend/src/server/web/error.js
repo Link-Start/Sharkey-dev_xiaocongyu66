@@ -17,13 +17,12 @@
 			solution2: 'Disable an adblocker',
 			solution3: 'Clear the browser cache',
 			solution4: '(Tor Browser) Set dom.webaudio.enabled to true',
-			toolsTitle: 'Built-in recovery tools',
-			toolsHint: 'Use these first — no need to dig through browser settings.',
-			flushPrimary: 'Clear cache (flush)',
-			otherOption: 'Other options',
-			otherOption1: 'Clear preferences and cache (/flush)',
-			otherOption2: 'Start the simple client (/cli)',
-			otherOption3: 'Start the repair tool (/bios)',
+			toolsTitle: 'Recovery tools',
+			toolsHint: 'Open a built-in tool (recommended first):',
+			otherOption1: 'Clear preferences and cache',
+			otherOption2: 'Start the simple client',
+			otherOption3: 'Start the repair tool',
+			fullLog: 'Full log',
 		}, locale?._bootErrors || {});
 		const reload = locale?.reload || 'Reload';
 

@@ -3322,13 +3322,13 @@ _bootErrors:
   solution2: Disable ad blocker
   solution3: Clear the browser cache
   solution4: Set the dom.webaudio.enabled to true for Tor Browser
-  toolsTitle: Built-in recovery tools
-  toolsHint: Use these first — no need to dig through browser settings.
-  flushPrimary: Clear cache (flush)
+  toolsTitle: Recovery tools
+  toolsHint: Open a built-in tool (recommended first):
   otherOption: Other options
-  otherOption1: Clear preferences and cache (/flush)
-  otherOption2: Start the simple client (/cli)
-  otherOption3: Start the repair tool (/bios)
+  otherOption1: Clear preferences and cache
+  otherOption2: Start the simple client
+  otherOption3: Start the repair tool
+  fullLog: Full log
 _search:
   searchScopeAll: All
   searchScopeLocal: Local
