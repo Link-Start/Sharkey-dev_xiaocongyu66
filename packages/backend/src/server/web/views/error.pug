@@ -1,7 +1,8 @@
 doctype html
 
 //
-	Sharkey error page — top: error, middle: tools, bottom: full log
+	Adaptive Sharkey error page
+	top: error · middle: tools · bottom: full log
 
 
 html.mk-error-page
@@ -11,7 +12,8 @@ html.mk-error-page
 		meta(name='viewport' content='width=device-width, initial-scale=1, viewport-fit=cover')
 		meta(name='application-name' content='Sharkey')
 		meta(name='referrer' content='origin')
-		meta(name='theme-color' content='#222222')
+		meta(name='theme-color' content='#1c1c1c')
+		meta(name='color-scheme' content='dark')
 
 		title
 			block title
@@ -26,8 +28,8 @@ html.mk-error-page
 body.mk-error-page
 	.err-wrap
 		//- TOP
-		.err-top
-			svg.icon-warning(xmlns="http://www.w3.org/2000/svg", viewBox="0 0 24 24", stroke-width="2", stroke="currentColor", fill="none", stroke-linecap="round", stroke-linejoin="round")
+		section.err-card.err-top
+			svg.icon-warning(xmlns="http://www.w3.org/2000/svg", viewBox="0 0 24 24", stroke-width="2", stroke="currentColor", fill="none", stroke-linecap="round", stroke-linejoin="round", aria-hidden="true")
 				path(stroke="none", d="M0 0h24v24H0z", fill="none")
 				path(d="M12 9v2m0 4v.01")
 				path(d="M5 19h14a2 2 0 0 0 1.84 -2.75l-7.1 -12.25a2 2 0 0 0 -3.5 0l-7.1 12.25a2 2 0 0 0 1.75 2.75")
@@ -39,16 +41,17 @@ body.mk-error-page
 			button.button-big#err-reload(type="button")
 				span.button-label-big(data-i18n-reload) Reload
 
-		//- MIDDLE: real <a> links (not nested buttons)
-		.err-mid
+		//- MIDDLE
+		section.err-card.err-mid
 			p.err-mid-title(data-i18n="toolsTitle") Recovery tools
 			p.err-mid-hint(data-i18n="toolsHint") Open a built-in tool (recommended first):
-			a.button-small(href="/flush")
-				span.button-label-small(data-i18n="otherOption1") Clear preferences and cache
-			a.button-small(href="/cli")
-				span.button-label-small(data-i18n="otherOption2") Start the simple client
-			a.button-small(href="/bios")
-				span.button-label-small(data-i18n="otherOption3") Start the repair tool
+			.err-tools
+				a.button-small(href="/flush")
+					span.button-label-small(data-i18n="otherOption1") Clear preferences and cache
+				a.button-small(href="/cli")
+					span.button-label-small(data-i18n="otherOption2") Start the simple client
+				a.button-small(href="/bios")
+					span.button-label-small(data-i18n="otherOption3") Start the repair tool
 			.err-tips
 				p
 					b(data-i18n="solution") The following actions may solve the problem.
@@ -59,7 +62,7 @@ body.mk-error-page
 				p(data-i18n="serverError") If reloading after a period of time does not resolve the problem, contact the server administrator with the following ERROR ID.
 
 		//- BOTTOM
-		.err-bot
+		section.err-card.err-bot
 			p.err-bot-title(data-i18n="fullLog") Full log
 			pre#full-log.full-log.
 				ERROR CODE: #{code}
