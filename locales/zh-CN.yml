@@ -1554,6 +1554,7 @@ _chat:
   recentFiles: 近期文件
   showRecentFiles: 展开
   hideRecentFiles: 收起
+  noRecentFiles: 这个群聊还没有共享文件
   hideTranslation: 隐藏翻译
   translateFailed: 翻译失败
   translated: 翻译

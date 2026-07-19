@@ -4,12 +4,19 @@ SPDX-License-Identifier: AGPL-3.0-only
 -->
 
 <!--
-  Horizontal strip of recent file attachments in a group chat.
-  Sticky under announcement bar; click jumps to the message.
+  Recent file attachments in a group chat.
+  layout=tab: full tab page (grid). layout=strip: legacy horizontal strip (unused).
 -->
 <template>
-<div v-if="items.length > 0" :class="$style.root">
-	<div :class="$style.head">
+<div v-if="loading || items.length > 0 || showEmpty" :class="[$style.root, layout === 'tab' && $style.asTab]">
+	<div v-if="layout === 'tab'" :class="$style.pageHead">
+		<span :class="$style.title">
+			<i class="ti ti-paperclip"></i>
+			{{ title }}
+		</span>
+		<span v-if="items.length > 0" :class="$style.count">{{ items.length }}</span>
+	</div>
+	<div v-else-if="layout === 'strip'" :class="$style.head">
 		<span :class="$style.title">
 			<i class="ti ti-paperclip"></i>
 			{{ title }}
@@ -26,7 +33,14 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<i :class="expanded ? 'ti ti-chevron-up' : 'ti ti-chevron-down'"></i>
 		</button>
 	</div>
-	<div v-show="expanded" :class="$style.scroller">
+
+	<div v-if="loading" :class="$style.loading">
+		<MkLoading :inline="true"/>
+	</div>
+	<div v-else-if="items.length === 0 && showEmpty" :class="$style.empty">
+		{{ emptyLabel }}
+	</div>
+	<div v-else-if="layout === 'tab' || expanded" :class="layout === 'tab' ? $style.grid : $style.scroller">
 		<button
 			v-for="item in items"
 			:key="item.messageId"
@@ -69,11 +83,12 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import * as Misskey from 'misskey-js';
 import { FILE_TYPE_BROWSERSAFE } from '@@/js/const.js';
 import bytes from '@/filters/bytes.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
+import MkLoading from '@/components/global/MkLoading.vue';
 
 export type ChatRoomFileItem = {
 	messageId: string;
@@ -82,14 +97,22 @@ export type ChatRoomFileItem = {
 	file: Misskey.entities.DriveFile;
 };
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
 	roomId: string;
 	title: string;
-	expandLabel: string;
-	collapseLabel: string;
+	expandLabel?: string;
+	collapseLabel?: string;
+	emptyLabel?: string;
 	/** Bump to reload (e.g. after a new file message) */
 	refreshKey?: number;
-}>();
+	/** tab = header tab page; strip = inline strip */
+	layout?: 'tab' | 'strip';
+}>(), {
+	layout: 'tab',
+	expandLabel: '',
+	collapseLabel: '',
+	emptyLabel: '',
+});
 
 const emit = defineEmits<{
 	(ev: 'select', item: ChatRoomFileItem): void;
@@ -98,6 +121,8 @@ const emit = defineEmits<{
 
 const items = ref<ChatRoomFileItem[]>([]);
 const expanded = ref(true);
+const loading = ref(false);
+const showEmpty = computed(() => props.layout === 'tab');
 let loadSeq = 0;
 
 function isImage(file: Misskey.entities.DriveFile) {
@@ -110,10 +135,11 @@ function isVideo(file: Misskey.entities.DriveFile) {
 
 async function load() {
 	const seq = ++loadSeq;
+	loading.value = true;
 	try {
 		const res = await misskeyApi('chat/rooms/files', {
 			roomId: props.roomId,
-			limit: 24,
+			limit: 48,
 		}) as ChatRoomFileItem[];
 		if (seq !== loadSeq) return;
 		items.value = Array.isArray(res) ? res.filter(x => x?.file?.id) : [];
@@ -122,6 +148,8 @@ async function load() {
 		if (seq !== loadSeq) return;
 		items.value = [];
 		emit('loaded', 0);
+	} finally {
+		if (seq === loadSeq) loading.value = false;
 	}
 }
 
@@ -134,15 +162,19 @@ defineExpose({ reload: load });
 
 <style lang="scss" module>
 .root {
-	position: sticky;
-	top: var(--MI-stickyTop, 0px);
-	z-index: 4;
-	margin: 0 0 6px;
-	padding: 6px 8px 8px;
-	border-radius: 8px;
-	background: color-mix(in srgb, var(--MI_THEME-panel) 92%, var(--MI_THEME-bg));
-	border: 1px solid var(--MI_THEME-divider);
-	box-shadow: 0 1px 0 color-mix(in srgb, var(--MI_THEME-bg) 80%, transparent);
+	margin: 0;
+}
+
+.asTab {
+	padding: 4px 0 16px;
+}
+
+.pageHead {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 12px;
+	padding: 0 2px;
 }
 
 .head {
@@ -157,9 +189,15 @@ defineExpose({ reload: load });
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
-	font-size: 0.8em;
+	font-size: 0.95em;
 	font-weight: 700;
-	opacity: 0.9;
+	opacity: 0.95;
+}
+
+.count {
+	font-size: 0.8em;
+	opacity: 0.55;
+	font-variant-numeric: tabular-nums;
 }
 
 .toggle {
@@ -175,6 +213,20 @@ defineExpose({ reload: load });
 		opacity: 1;
 		background: var(--MI_THEME-buttonBg);
 	}
+}
+
+.loading,
+.empty {
+	padding: 24px 8px;
+	text-align: center;
+	opacity: 0.7;
+	font-size: 0.9em;
+}
+
+.grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+	gap: 10px;
 }
 
 .scroller {
@@ -197,12 +249,13 @@ defineExpose({ reload: load });
 
 .card {
 	flex: 0 0 auto;
-	width: 96px;
+	width: 100%;
+	max-width: 100%;
 	scroll-snap-align: start;
 	text-align: left;
-	border-radius: 8px;
+	border-radius: 10px;
 	overflow: hidden;
-	background: var(--MI_THEME-bg);
+	background: var(--MI_THEME-panel);
 	border: 1px solid var(--MI_THEME-divider);
 	padding: 0;
 	color: inherit;
@@ -210,11 +263,16 @@ defineExpose({ reload: load });
 	&:hover {
 		border-color: color-mix(in srgb, var(--MI_THEME-accent) 40%, var(--MI_THEME-divider));
 	}
+
+	.scroller & {
+		width: 96px;
+	}
 }
 
 .thumb {
 	width: 100%;
-	height: 64px;
+	aspect-ratio: 1;
+	max-height: 120px;
 	background: color-mix(in srgb, var(--MI_THEME-fg) 6%, var(--MI_THEME-bg));
 	display: flex;
 	align-items: center;
@@ -263,7 +321,7 @@ defineExpose({ reload: load });
 }
 
 .meta {
-	padding: 4px 6px 6px;
+	padding: 6px 8px 8px;
 	display: flex;
 	flex-direction: column;
 	gap: 1px;
@@ -271,7 +329,7 @@ defineExpose({ reload: load });
 }
 
 .name {
-	font-size: 0.7em;
+	font-size: 0.75em;
 	font-weight: 600;
 	white-space: nowrap;
 	overflow: hidden;
@@ -280,6 +338,6 @@ defineExpose({ reload: load });
 
 .size {
 	font-size: 0.65em;
-	opacity: 0.65;
+	opacity: 0.55;
 }
 </style>

@@ -1559,6 +1559,7 @@ _chat:
   recentFiles: Recent files
   showRecentFiles: Show
   hideRecentFiles: Hide
+  noRecentFiles: No files shared in this room yet
   hideTranslation: Hide translation
   translateFailed: Translation failed
   translated: Translation

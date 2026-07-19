@@ -50,17 +50,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 					</MkInfo>
 				</div>
 
-				<!-- Recent group files (sticky strip under banners) -->
-				<ChatRecentFiles
-					v-if="room && canViewTimeline && !needJoin && !initializing"
-					:roomId="room.id"
-					:title="tChat('recentFiles')"
-					:expandLabel="tChat('showRecentFiles')"
-					:collapseLabel="tChat('hideRecentFiles')"
-					:refreshKey="recentFilesRefreshKey"
-					@select="onRecentFileSelect"
-				/>
-
 				<div v-if="initializing">
 					<MkLoading/>
 				</div>
@@ -182,6 +171,18 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 	<div v-if="tab === 'members' && canViewTimeline" class="_spacer" style="--MI_SPACER-w: 700px;">
 		<XMembers v-if="room != null" :room="room" @inviteUser="inviteUser"/>
+	</div>
+
+	<!-- Recent files as a top header tab (not inline in the message stream) -->
+	<div v-if="tab === 'files' && canViewTimeline && room" class="_spacer" style="--MI_SPACER-w: 700px;">
+		<ChatRecentFiles
+			:roomId="room.id"
+			:title="tChat('recentFiles')"
+			:emptyLabel="tChat('noRecentFiles')"
+			:refreshKey="recentFilesRefreshKey"
+			layout="tab"
+			@select="onRecentFileSelect"
+		/>
 	</div>
 
 	<div v-if="tab === 'info' && canViewTimeline" class="_spacer" style="--MI_SPACER-w: 700px;">
@@ -1492,6 +1493,11 @@ const headerTabs = computed(() => {
 			key: 'chat',
 			title: i18n.ts.chat,
 			icon: 'ti ti-messages',
+			iconOnly: narrow,
+		}, {
+			key: 'files',
+			title: tChat('recentFiles'),
+			icon: 'ti ti-paperclip',
 			iconOnly: narrow,
 		}, {
 			key: 'members',
