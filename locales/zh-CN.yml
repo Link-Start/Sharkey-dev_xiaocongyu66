@@ -3326,10 +3326,13 @@ _bootErrors:
   solution2: 禁用广告屏蔽插件
   solution3: 清除浏览器缓存
   solution4: （Tor Browser）将 dom.webaudio.enabled 设定为 true
+  toolsTitle: 内置修复工具
+  toolsHint: 请优先使用这些按钮，不必自己翻浏览器设置。
+  flushPrimary: 清除缓存（flush）
   otherOption: 其它选项
-  otherOption1: 清除客户端设定与缓存
-  otherOption2: 使用简易客户端
-  otherOption3: 启动修复工具
+  otherOption1: 清除客户端设定与缓存（/flush）
+  otherOption2: 使用简易客户端（/cli）
+  otherOption3: 启动修复工具（/bios）
 _search:
   searchScopeAll: 全部
   searchScopeLocal: 本地

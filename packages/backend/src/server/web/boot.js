@@ -166,6 +166,33 @@
 	}
 
 	/**
+	 * Readable error text for PromiseRejectionEvent / Error / plain values.
+	 * @param {any} details
+	 * @returns {string}
+	 */
+	function formatErrorDetails(details) {
+		if (details == null) return '';
+		if (typeof details === 'string') return details;
+		if (details instanceof Error) {
+			return details.stack || `${details.name}: ${details.message}`;
+		}
+		// DOM PromiseRejectionEvent (boot shows SOMETHING_HAPPENED_IN_PROMISE)
+		if (typeof details === 'object' && 'reason' in details) {
+			const inner = formatErrorDetails(/** @type {any} */ (details).reason);
+			if (inner) return inner;
+		}
+		try {
+			return JSON.stringify(details, Object.getOwnPropertyNames(details), 2);
+		} catch {
+			try {
+				return String(details);
+			} catch {
+				return '[unserializable error]';
+			}
+		}
+	}
+
+	/**
 	 * @param {string} code
 	 * @param {any} [details]
 	 * @returns {Promise<void>}
@@ -185,10 +212,13 @@
 			solution2: 'Disable an adblocker',
 			solution3: 'Clear the browser cache',
 			solution4: '(Tor Browser) Set dom.webaudio.enabled to true',
+			toolsTitle: 'Built-in recovery tools',
+			toolsHint: 'Use these first — no need to dig through browser settings.',
 			otherOption: 'Other options',
-			otherOption1: 'Clear preferences and cache',
-			otherOption2: 'Start the simple client',
-			otherOption3: 'Start the repair tool',
+			otherOption1: 'Clear preferences and cache (/flush)',
+			otherOption2: 'Start the simple client (/cli)',
+			otherOption3: 'Start the repair tool (/bios)',
+			flushPrimary: 'Clear cache (flush)',
 		}, locale?._bootErrors || {});
 		const reload = locale?.reload || 'Reload';
 
@@ -202,34 +232,28 @@
 				<path d="M5 19h14a2 2 0 0 0 1.84 -2.75l-7.1 -12.25a2 2 0 0 0 -3.5 0l-7.1 12.25a2 2 0 0 0 1.75 2.75"></path>
 			</svg>
 			<h1>${messages.title}</h1>
-			<button class="button-big" onclick="location.reload(true);">
+			<button class="button-big" type="button" onclick="location.reload();">
 				<span class="button-label-big">${reload}</span>
 			</button>
+			<a href="/flush" class="flush-link">
+				<button class="button-flush" type="button">
+					<span class="button-label-flush">${messages.flushPrimary || messages.otherOption1}</span>
+				</button>
+			</a>
+			<div class="tools-panel">
+				<p class="tools-title"><b>${messages.toolsTitle}</b></p>
+				<p class="tools-hint">${messages.toolsHint}</p>
+				<div class="tools-row">
+					<a href="/flush"><button class="button-small" type="button"><span class="button-label-small">${messages.otherOption1}</span></button></a>
+					<a href="/cli"><button class="button-small" type="button"><span class="button-label-small">${messages.otherOption2}</span></button></a>
+					<a href="/bios"><button class="button-small" type="button"><span class="button-label-small">${messages.otherOption3}</span></button></a>
+				</div>
+			</div>
 			<p><b>${messages.solution}</b></p>
 			<p>${messages.solution1}</p>
 			<p>${messages.solution2}</p>
 			<p>${messages.solution3}</p>
 			<p>${messages.solution4}</p>
-			<details style="color: #86b300;">
-				<summary>${messages.otherOption}</summary>
-				<a href="/flush">
-					<button class="button-small">
-						<span class="button-label-small">${messages.otherOption1}</span>
-					</button>
-				</a>
-				<br>
-				<a href="/cli">
-					<button class="button-small">
-						<span class="button-label-small">${messages.otherOption2}</span>
-					</button>
-				</a>
-				<br>
-				<a href="/bios">
-					<button class="button-small">
-						<span class="button-label-small">${messages.otherOption3}</span>
-					</button>
-				</a>
-			</details>
 			<br>
 			<div id="errors"></div>
 			`;
@@ -237,12 +261,16 @@
 		}
 		const detailsElement = document.createElement('details');
 		detailsElement.id = 'errorInfo';
+		const detailText = formatErrorDetails(details)
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;');
 		detailsElement.innerHTML = `
 		<br>
 		<summary>
 			<code>ERROR CODE: ${code}</code>
 		</summary>
-		<code>${details.toString()} ${JSON.stringify(details)}</code>`;
+		<pre class="error-detail">${detailText}</pre>`;
 		errorsElement?.appendChild(detailsElement);
 		addStyle(`
 		* {
@@ -281,9 +309,63 @@
 			background: rgb(153, 204, 0);
 		}
 
+		.button-flush {
+			background: linear-gradient(90deg, #3d7ea6, #2a6f97);
+			line-height: 46px;
+			min-width: 220px;
+		}
+
+		.button-flush:hover {
+			background: #4a90b8;
+		}
+
+		.button-label-flush {
+			color: #fff;
+			font-weight: bold;
+			font-size: 1.05em;
+			padding: 12px;
+		}
+
+		.flush-link {
+			display: inline-block;
+			margin: 0 8px 8px;
+		}
+
+		.tools-panel {
+			max-width: 36rem;
+			margin: 1rem auto 1.5rem;
+			padding: 14px 16px;
+			border-radius: 12px;
+			background: #2a2a2a;
+			border: 1px solid #444;
+		}
+
+		.tools-title {
+			margin: 0 0 6px;
+			color: #b8e000;
+		}
+
+		.tools-hint {
+			margin: 0 0 12px;
+			font-size: 14px;
+			opacity: 0.85;
+		}
+
+		.tools-row {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 8px;
+			justify-content: center;
+		}
+
+		.tools-row a {
+			display: inline-block;
+		}
+
 		.button-small {
 			background: #444;
 			line-height: 40px;
+			margin-bottom: 0;
 		}
 
 		.button-small:hover {
@@ -299,8 +381,8 @@
 
 		.button-label-small {
 			color: rgb(153, 204, 0);
-			font-size: 16px;
-			padding: 12px;
+			font-size: 15px;
+			padding: 10px 12px;
 		}
 
 		a {
@@ -324,15 +406,24 @@
 			margin: 1em;
 		}
 
-		code {
-			font-family: Fira, FiraCode, monospace;
+		code, pre.error-detail {
+			font-family: Fira, FiraCode, ui-monospace, monospace;
+		}
+
+		pre.error-detail {
+			text-align: left;
+			white-space: pre-wrap;
+			word-break: break-word;
+			margin: 0.5rem 0 0;
+			font-size: 12px;
+			opacity: 0.9;
 		}
 
 		#errorInfo {
 			background: #333;
 			margin-bottom: 2rem;
 			padding: 0.5rem 1rem;
-			width: 40rem;
+			width: min(40rem, 92vw);
 			border-radius: 10px;
 			justify-content: center;
 			margin: auto;
@@ -348,7 +439,7 @@
 
 		@media screen and (max-width: 500px) {
 			#errorInfo {
-				width: 50%;
+				width: 92%;
 			}
 		}`);
 	}
