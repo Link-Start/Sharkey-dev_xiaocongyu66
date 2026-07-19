@@ -167,7 +167,6 @@
 
 
 	/**
-	 * Readable error text for PromiseRejectionEvent / Error / plain values.
 	 * @param {any} details
 	 * @returns {string}
 	 */
@@ -175,25 +174,20 @@
 		if (details == null) return '';
 		if (typeof details === 'string') return details;
 		if (details instanceof Error) {
-			return details.stack || `${details.name}: ${details.message}`;
+			return details.stack || (details.name + ': ' + details.message);
 		}
-		if (typeof details === 'object' && 'reason' in details) {
-			const inner = formatErrorDetails(/** @type {any} */ (details).reason);
+		if (typeof details === 'object' && details !== null && 'reason' in details) {
+			const inner = formatErrorDetails(details.reason);
 			if (inner) return inner;
 		}
 		try {
 			return JSON.stringify(details, Object.getOwnPropertyNames(details), 2);
-		} catch {
-			try {
-				return String(details);
-			} catch {
-				return '[unserializable error]';
-			}
+		} catch (e) {
+			try { return String(details); } catch (e2) { return '[unserializable error]'; }
 		}
 	}
 
 	/**
-	 * Escape text for HTML body.
 	 * @param {string} s
 	 * @returns {string}
 	 */
@@ -206,22 +200,23 @@
 	}
 
 	/**
-	 * Boot error page layout (original Sharkey style):
-	 *   top    — error title + code + reload
-	 *   middle — recovery tool links (/flush, /cli, /bios)
-	 *   bottom — full log (always expanded)
-	 *
 	 * @param {string} code
 	 * @param {any} [details]
 	 * @returns {Promise<void>}
 	 */
 	async function renderError(code, details) {
 		if (document.readyState === 'loading') {
-			await new Promise(resolve => window.addEventListener('DOMContentLoaded', resolve));
+			await new Promise(function (resolve) {
+				window.addEventListener('DOMContentLoaded', resolve);
+			});
 		}
 
-		const locale = JSON.parse(localStorage.getItem('locale') || '{}');
-		const messages = Object.assign({
+		var locale = {};
+		try {
+			locale = JSON.parse(localStorage.getItem('locale') || '{}');
+		} catch (e) { /* ignore */ }
+
+		var messages = Object.assign({
 			title: 'Failed to initialize Sharkey',
 			solution: 'The following actions may solve the problem.',
 			solution1: 'Update your os and browser',
@@ -234,181 +229,132 @@
 			otherOption2: 'Start the simple client',
 			otherOption3: 'Start the repair tool',
 			fullLog: 'Full log',
-		}, locale?._bootErrors || {});
-		const reload = locale?.reload || 'Reload';
+		}, (locale && locale._bootErrors) || {});
+		var reload = (locale && locale.reload) || 'Reload';
+		var logBody = formatErrorDetails(details);
 
-		const logBody = formatErrorDetails(details);
-
-		// Rebuild page once; append extra log blocks if multiple errors fire
-		let logEl = document.getElementById('full-log');
+		var logEl = document.getElementById('full-log');
 		if (!logEl) {
-			document.body.innerHTML = `
-			<svg class="icon-warning" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-				<path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-				<path d="M12 9v2m0 4v.01"></path>
-				<path d="M5 19h14a2 2 0 0 0 1.84 -2.75l-7.1 -12.25a2 2 0 0 0 -3.5 0l-7.1 12.25a2 2 0 0 0 1.75 2.75"></path>
-			</svg>
+			// Ensure mobile fills the screen
+			document.documentElement.classList.add('mk-error-page');
+			document.body.classList.add('mk-error-page');
 
-			<!-- TOP: error -->
-			<section class="err-section err-top">
-				<h1>${escapeHtml(messages.title)}</h1>
-				<p class="err-code"><code>ERROR CODE: ${escapeHtml(code)}</code></p>
-				<button class="button-big" type="button" onclick="location.reload();">
-					<span class="button-label-big">${escapeHtml(reload)}</span>
-				</button>
-			</section>
+			document.body.innerHTML =
+				'<div class="err-wrap">' +
+					'<div class="err-top">' +
+						'<svg class="icon-warning" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">' +
+							'<path stroke="none" d="M0 0h24v24H0z" fill="none"></path>' +
+							'<path d="M12 9v2m0 4v.01"></path>' +
+							'<path d="M5 19h14a2 2 0 0 0 1.84 -2.75l-7.1 -12.25a2 2 0 0 0 -3.5 0l-7.1 12.25a2 2 0 0 0 1.75 2.75"></path>' +
+						'</svg>' +
+						'<h1>' + escapeHtml(messages.title) + '</h1>' +
+						'<div class="err-code-box"><code>ERROR CODE: ' + escapeHtml(code) + '</code></div>' +
+						'<button type="button" class="button-big" id="err-reload">' +
+							'<span class="button-label-big">' + escapeHtml(reload) + '</span>' +
+						'</button>' +
+					'</div>' +
 
-			<!-- MIDDLE: tools -->
-			<section class="err-section err-tools">
-				<p><b>${escapeHtml(messages.toolsTitle)}</b></p>
-				<p class="err-hint">${escapeHtml(messages.toolsHint)}</p>
-				<p>
-					<a href="/flush"><button class="button-small" type="button"><span class="button-label-small">${escapeHtml(messages.otherOption1)}</span></button></a>
-				</p>
-				<p>
-					<a href="/cli"><button class="button-small" type="button"><span class="button-label-small">${escapeHtml(messages.otherOption2)}</span></button></a>
-				</p>
-				<p>
-					<a href="/bios"><button class="button-small" type="button"><span class="button-label-small">${escapeHtml(messages.otherOption3)}</span></button></a>
-				</p>
-				<p class="err-tips"><b>${escapeHtml(messages.solution)}</b></p>
-				<p>${escapeHtml(messages.solution1)}</p>
-				<p>${escapeHtml(messages.solution2)}</p>
-				<p>${escapeHtml(messages.solution3)}</p>
-				<p>${escapeHtml(messages.solution4)}</p>
-			</section>
+					'<div class="err-mid">' +
+						'<p class="err-mid-title">' + escapeHtml(messages.toolsTitle) + '</p>' +
+						'<p class="err-mid-hint">' + escapeHtml(messages.toolsHint) + '</p>' +
+						// Use <a class="button"> only — never nest <button> inside <a> (breaks mobile taps)
+						'<a class="button-small" href="/flush"><span class="button-label-small">' + escapeHtml(messages.otherOption1) + '</span></a>' +
+						'<a class="button-small" href="/cli"><span class="button-label-small">' + escapeHtml(messages.otherOption2) + '</span></a>' +
+						'<a class="button-small" href="/bios"><span class="button-label-small">' + escapeHtml(messages.otherOption3) + '</span></a>' +
+						'<div class="err-tips">' +
+							'<p><b>' + escapeHtml(messages.solution) + '</b></p>' +
+							'<p>' + escapeHtml(messages.solution1) + '</p>' +
+							'<p>' + escapeHtml(messages.solution2) + '</p>' +
+							'<p>' + escapeHtml(messages.solution3) + '</p>' +
+							'<p>' + escapeHtml(messages.solution4) + '</p>' +
+						'</div>' +
+					'</div>' +
 
-			<!-- BOTTOM: full log -->
-			<section class="err-section err-log">
-				<p><b>${escapeHtml(messages.fullLog)}</b></p>
-				<pre id="full-log" class="full-log"></pre>
-			</section>
-			`;
+					'<div class="err-bot">' +
+						'<p class="err-bot-title">' + escapeHtml(messages.fullLog) + '</p>' +
+						'<pre id="full-log" class="full-log"></pre>' +
+					'</div>' +
+				'</div>';
+
+			var reloadBtn = document.getElementById('err-reload');
+			if (reloadBtn) {
+				reloadBtn.addEventListener('click', function () {
+					location.reload();
+				});
+			}
+
+			addStyle(
+'*{box-sizing:border-box;font-family:BIZ UDGothic,Roboto,HelveticaNeue,Arial,sans-serif;}' +
+'html.mk-error-page,body.mk-error-page{' +
+'  min-height:100%;min-height:100dvh;min-height:-webkit-fill-available;' +
+'  width:100%;margin:0;padding:0;' +
+'  background:#222;color:#dfddcc;' +
+'}' +
+'body.mk-error-page{' +
+'  display:flex;flex-direction:column;align-items:stretch;' +
+'  padding:max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));' +
+'}' +
+'#sharkey_app,#splash{display:none!important;}' +
+'.err-wrap{width:100%;max-width:28rem;margin:0 auto;flex:1;display:flex;flex-direction:column;}' +
+'.err-top{text-align:center;padding:8px 0 20px;}' +
+'.icon-warning{color:#dec340;height:3.5rem;width:3.5rem;display:block;margin:1rem auto 0;}' +
+'h1{font-size:1.35em;margin:0.75rem 0 1rem;font-weight:700;line-height:1.35;}' +
+'.err-code-box{margin:0 auto 1.25rem;}' +
+'.err-code-box code{' +
+'  display:inline-block;font-family:ui-monospace,Fira Code,monospace;font-size:13px;' +
+'  background:#333;padding:0.55rem 0.9rem;border-radius:10px;word-break:break-all;' +
+'}' +
+'.button-big{' +
+'  display:inline-flex;align-items:center;justify-content:center;' +
+'  min-width:min(100%, 16rem);width:auto;max-width:100%;' +
+'  border:none;border-radius:999px;cursor:pointer;' +
+'  background:linear-gradient(90deg,rgb(134,179,0),rgb(74,179,0));' +
+'  line-height:50px;padding:0 20px;margin:0 auto 4px;' +
+'  -webkit-tap-highlight-color:transparent;' +
+'}' +
+'.button-big:hover,.button-big:active{background:rgb(153,204,0);}' +
+'.button-label-big{color:#222;font-weight:bold;font-size:1.15em;}' +
+'.err-mid{text-align:center;padding:8px 0 16px;border-top:1px solid #3a3a3a;}' +
+'.err-mid-title{font-weight:700;font-size:1.05em;margin:1rem 0 0.35rem;color:#b8e000;}' +
+'.err-mid-hint{font-size:14px;opacity:0.8;margin:0 0 1rem;}' +
+'a.button-small{' +
+'  display:flex;align-items:center;justify-content:center;' +
+'  width:100%;max-width:22rem;margin:0 auto 10px;' +
+'  min-height:44px;line-height:44px;' +
+'  border-radius:999px;background:#444;color:rgb(153,204,0);' +
+'  text-decoration:none;font-size:15px;' +
+'  -webkit-tap-highlight-color:transparent;touch-action:manipulation;' +
+'}' +
+'a.button-small:hover,a.button-small:active{background:#555;}' +
+'.button-label-small{padding:0 14px;color:rgb(153,204,0);}' +
+'.err-tips{margin-top:1.25rem;text-align:left;max-width:22rem;margin-left:auto;margin-right:auto;}' +
+'.err-tips p{font-size:14px;margin:0.4rem 0;opacity:0.9;line-height:1.45;}' +
+'.err-bot{text-align:center;padding:8px 0 0;border-top:1px solid #3a3a3a;flex:1;display:flex;flex-direction:column;min-height:0;}' +
+'.err-bot-title{font-weight:700;margin:1rem 0 0.5rem;}' +
+'.full-log{' +
+'  display:block;text-align:left;flex:1;' +
+'  font-family:ui-monospace,Fira Code,monospace;font-size:11px;line-height:1.45;' +
+'  background:#2a2a2a;color:#dfddcc;' +
+'  padding:0.75rem 0.9rem;border-radius:10px;border:1px solid #3a3a3a;' +
+'  margin:0 0 1rem;white-space:pre-wrap;word-break:break-word;' +
+'  min-height:8rem;max-height:none;overflow:auto;' +
+'  -webkit-overflow-scrolling:touch;' +
+'}' +
+'@media (min-width:600px){' +
+'  .err-wrap{max-width:32rem;}' +
+'  .full-log{max-height:40vh;}' +
+'}'
+			);
 			logEl = document.getElementById('full-log');
-			addStyle(`
-* {
-	font-family: BIZ UDGothic, Roboto, HelveticaNeue, Arial, sans-serif;
-}
-#sharkey_app,
-#splash {
-	display: none !important;
-}
-body,
-html {
-	background-color: #222;
-	color: #dfddcc;
-	justify-content: center;
-	margin: auto;
-	padding: 10px;
-	text-align: center;
-}
-.err-section {
-	max-width: 40rem;
-	margin: 0 auto 1.25rem;
-}
-.err-top {
-	margin-bottom: 1.5rem;
-}
-.err-code {
-	margin: 0.75rem auto 1rem;
-}
-.err-code code {
-	display: inline-block;
-	font-family: Fira, FiraCode, monospace;
-	background: #333;
-	padding: 0.5rem 1rem;
-	border-radius: 10px;
-	white-space: pre-wrap;
-	word-break: break-word;
-}
-.err-hint {
-	opacity: 0.85;
-	font-size: 15px;
-	margin-top: 0;
-}
-.err-tips {
-	margin-top: 1.25rem;
-}
-button {
-	border-radius: 999px;
-	padding: 0 12px;
-	border: none;
-	cursor: pointer;
-	margin-bottom: 12px;
-}
-.button-big {
-	background: linear-gradient(90deg, rgb(134, 179, 0), rgb(74, 179, 0));
-	line-height: 50px;
-}
-.button-big:hover {
-	background: rgb(153, 204, 0);
-}
-.button-small {
-	background: #444;
-	line-height: 40px;
-}
-.button-small:hover {
-	background: #555;
-}
-.button-label-big {
-	color: #222;
-	font-weight: bold;
-	font-size: 1.2em;
-	padding: 12px;
-}
-.button-label-small {
-	color: rgb(153, 204, 0);
-	font-size: 16px;
-	padding: 12px;
-}
-a {
-	color: rgb(134, 179, 0);
-	text-decoration: none;
-}
-p, li {
-	font-size: 16px;
-}
-.icon-warning {
-	color: #dec340;
-	height: 4rem;
-	padding-top: 2rem;
-}
-h1 {
-	font-size: 1.5em;
-	margin: 1em;
-}
-.full-log {
-	display: block;
-	text-align: left;
-	font-family: Fira, FiraCode, ui-monospace, monospace;
-	font-size: 12px;
-	line-height: 1.45;
-	background: #333;
-	color: #dfddcc;
-	padding: 0.75rem 1rem;
-	max-width: 40rem;
-	max-height: min(50vh, 28rem);
-	overflow: auto;
-	border-radius: 10px;
-	margin: 0.5rem auto 2rem;
-	white-space: pre-wrap;
-	word-break: break-word;
-}
-@media screen and (max-width: 500px) {
-	.full-log, .err-section {
-		max-width: 92vw;
-	}
-}
-`);
 		}
 
 		if (logEl) {
-			const block =
-				`ERROR CODE: ${code}\n` +
-				`TIME: ${new Date().toISOString()}\n` +
-				`URL: ${location.href}\n` +
-				`UA: ${navigator.userAgent}\n` +
-				`\n---\n\n` +
+			var block =
+				'ERROR CODE: ' + code + '\n' +
+				'TIME: ' + new Date().toISOString() + '\n' +
+				'URL: ' + location.href + '\n' +
+				'UA: ' + navigator.userAgent + '\n' +
+				'\n---\n\n' +
 				(logBody || '(no detail)');
 			if (logEl.textContent && logEl.textContent.trim().length > 0) {
 				logEl.textContent += '\n\n==========\n\n' + block;

@@ -39,5 +39,12 @@
 				el.textContent = messages[key];
 			}
 		}
+
+		const reloadBtn = document.getElementById('err-reload');
+		if (reloadBtn) {
+			reloadBtn.addEventListener('click', () => {
+				location.reload();
+			});
+		}
 	});
 })();

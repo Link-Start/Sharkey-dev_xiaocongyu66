@@ -1,10 +1,12 @@
 /*
  * SPDX-FileCopyrightText: syuilo and misskey-project
- *
  * SPDX-License-Identifier: AGPL-3.0-only
+ *
+ * Boot / server error page — original Sharkey palette, mobile full-height.
  */
 
 * {
+	box-sizing: border-box;
 	font-family: BIZ UDGothic, Roboto, HelveticaNeue, Arial, sans-serif;
 }
 
@@ -13,87 +15,210 @@
 	display: none !important;
 }
 
-body,
-html {
+html.mk-error-page,
+body.mk-error-page {
+	min-height: 100%;
+	min-height: 100dvh;
+	min-height: -webkit-fill-available;
+	width: 100%;
+	margin: 0;
+	padding: 0;
 	background-color: #222;
 	color: #dfddcc;
-	justify-content: center;
-	margin: auto;
-	padding: 10px;
-	text-align: center;
 }
 
-.err-section {
-	max-width: 40rem;
+body.mk-error-page {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	padding:
+		max(16px, env(safe-area-inset-top, 0px))
+		max(16px, env(safe-area-inset-right, 0px))
+		max(24px, env(safe-area-inset-bottom, 0px))
+		max(16px, env(safe-area-inset-left, 0px));
+}
+
+.err-wrap {
+	width: 100%;
+	max-width: 28rem;
+	margin: 0 auto;
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+}
+
+/* —— top —— */
+.err-top {
+	text-align: center;
+	padding: 8px 0 20px;
+}
+
+.icon-warning {
+	color: #dec340;
+	height: 3.5rem;
+	width: 3.5rem;
+	display: block;
+	margin: 1rem auto 0;
+}
+
+h1 {
+	font-size: 1.35em;
+	margin: 0.75rem 0 1rem;
+	font-weight: 700;
+	line-height: 1.35;
+}
+
+.err-code-box {
 	margin: 0 auto 1.25rem;
 }
 
-.err-top {
-	margin-bottom: 1.5rem;
-}
-
-.err-code {
-	margin: 0.75rem auto 1rem;
-}
-
-.err-code code {
+.err-code-box code {
 	display: inline-block;
-	font-family: Fira, FiraCode, monospace;
+	font-family: ui-monospace, Fira Code, Fira, monospace;
+	font-size: 13px;
 	background: #333;
-	padding: 0.5rem 1rem;
+	padding: 0.55rem 0.9rem;
 	border-radius: 10px;
-	white-space: pre-wrap;
-	word-break: break-word;
+	word-break: break-all;
 	text-align: left;
-}
-
-.err-hint {
-	opacity: 0.85;
-	font-size: 15px;
-	margin-top: 0;
-}
-
-.err-tips {
-	margin-top: 1.25rem;
-}
-
-button {
-	border-radius: 999px;
-	padding: 0px 12px 0px 12px;
-	border: none;
-	cursor: pointer;
-	margin-bottom: 12px;
+	white-space: pre-wrap;
 }
 
 .button-big {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: min(100%, 16rem);
+	max-width: 100%;
+	border: none;
+	border-radius: 999px;
+	cursor: pointer;
 	background: linear-gradient(90deg, rgb(134, 179, 0), rgb(74, 179, 0));
 	line-height: 50px;
+	padding: 0 20px;
+	margin: 0 auto 4px;
+	-webkit-tap-highlight-color: transparent;
+	touch-action: manipulation;
 }
 
-.button-big:hover {
+.button-big:hover,
+.button-big:active {
 	background: rgb(153, 204, 0);
-}
-
-.button-small {
-	background: #444;
-	line-height: 40px;
-}
-
-.button-small:hover {
-	background: #555;
 }
 
 .button-label-big {
 	color: #222;
 	font-weight: bold;
-	font-size: 1.2em;
-	padding: 12px;
+	font-size: 1.15em;
+}
+
+/* —— middle tools: <a class="button-small"> only —— */
+.err-mid {
+	text-align: center;
+	padding: 8px 0 16px;
+	border-top: 1px solid #3a3a3a;
+}
+
+.err-mid-title {
+	font-weight: 700;
+	font-size: 1.05em;
+	margin: 1rem 0 0.35rem;
+	color: #b8e000;
+}
+
+.err-mid-hint {
+	font-size: 14px;
+	opacity: 0.8;
+	margin: 0 0 1rem;
+}
+
+a.button-small {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	max-width: 22rem;
+	margin: 0 auto 10px;
+	min-height: 44px;
+	line-height: 44px;
+	border-radius: 999px;
+	background: #444;
+	color: rgb(153, 204, 0);
+	text-decoration: none;
+	font-size: 15px;
+	-webkit-tap-highlight-color: transparent;
+	touch-action: manipulation;
+}
+
+a.button-small:hover,
+a.button-small:active {
+	background: #555;
 }
 
 .button-label-small {
+	padding: 0 14px;
 	color: rgb(153, 204, 0);
-	font-size: 16px;
-	padding: 12px;
+}
+
+.err-tips {
+	margin-top: 1.25rem;
+	text-align: left;
+	max-width: 22rem;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.err-tips p {
+	font-size: 14px;
+	margin: 0.4rem 0;
+	opacity: 0.9;
+	line-height: 1.45;
+}
+
+/* —— bottom log —— */
+.err-bot {
+	text-align: center;
+	padding: 8px 0 0;
+	border-top: 1px solid #3a3a3a;
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.err-bot-title {
+	font-weight: 700;
+	margin: 1rem 0 0.5rem;
+}
+
+.full-log {
+	display: block;
+	text-align: left;
+	flex: 1;
+	font-family: ui-monospace, Fira Code, Fira, monospace;
+	font-size: 11px;
+	line-height: 1.45;
+	background: #2a2a2a;
+	color: #dfddcc;
+	padding: 0.75rem 0.9rem;
+	border-radius: 10px;
+	border: 1px solid #3a3a3a;
+	margin: 0 0 1rem;
+	white-space: pre-wrap;
+	word-break: break-word;
+	min-height: 8rem;
+	overflow: auto;
+	-webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 600px) {
+	.err-wrap {
+		max-width: 32rem;
+	}
+
+	.full-log {
+		max-height: 40vh;
+	}
 }
 
 a {
@@ -101,47 +226,6 @@ a {
 	text-decoration: none;
 }
 
-p,
-li {
+p {
 	font-size: 16px;
-}
-
-.icon-warning {
-	color: #dec340;
-	height: 4rem;
-	padding-top: 2rem;
-}
-
-h1 {
-	font-size: 1.5em;
-	margin: 1em;
-}
-
-code {
-	font-family: Fira, FiraCode, monospace;
-}
-
-.full-log {
-	display: block;
-	text-align: left;
-	font-family: Fira, FiraCode, ui-monospace, monospace;
-	font-size: 12px;
-	line-height: 1.45;
-	background: #333;
-	color: #dfddcc;
-	padding: 0.75rem 1rem;
-	max-width: 40rem;
-	max-height: min(50vh, 28rem);
-	overflow: auto;
-	border-radius: 10px;
-	margin: 0.5rem auto 2rem;
-	white-space: pre-wrap;
-	word-break: break-word;
-}
-
-@media screen and (max-width: 500px) {
-	.full-log,
-	.err-section {
-		max-width: 92vw;
-	}
 }
