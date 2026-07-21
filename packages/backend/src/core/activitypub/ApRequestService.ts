@@ -15,6 +15,7 @@ import { ApUtilityService } from '@/core/activitypub/ApUtilityService.js';
 import { HttpRequestService } from '@/core/HttpRequestService.js';
 import { LoggerService } from '@/core/LoggerService.js';
 import { TimeService } from '@/global/TimeService.js';
+import { rsaSignSha256Base64 } from '@/misc/rsa-sign-pool.js';
 import { bindThis } from '@/decorators.js';
 import type Logger from '@/logger.js';
 import { validateContentTypeSetAsActivityPub } from '@/core/activitypub/misc/validator.js';
@@ -41,7 +42,7 @@ type PrivateKey = {
 };
 
 export class ApRequestCreator {
-	static createSignedPost(args: { key: PrivateKey, url: string, body: string, digest?: string, additionalHeaders: Record<string, string>, now: Date | string | number }): Signed {
+	static async createSignedPost(args: { key: PrivateKey, url: string, body: string, digest?: string, additionalHeaders: Record<string, string>, now: Date | string | number }): Promise<Signed> {
 		const u = new URL(args.url);
 		const digestHeader = args.digest ?? this.createDigest(args.body);
 
@@ -56,7 +57,7 @@ export class ApRequestCreator {
 			}, args.additionalHeaders),
 		};
 
-		const result = this.#signToRequest(request, args.key, ['(request-target)', 'date', 'host', 'digest']);
+		const result = await this.#signToRequest(request, args.key, ['(request-target)', 'date', 'host', 'digest']);
 
 		return {
 			request,
@@ -70,7 +71,7 @@ export class ApRequestCreator {
 		return `SHA-256=${crypto.createHash('sha256').update(body).digest('base64')}`;
 	}
 
-	static createSignedGet(args: { key: PrivateKey, url: string, additionalHeaders: Record<string, string>, now: Date | string | number }): Signed {
+	static async createSignedGet(args: { key: PrivateKey, url: string, additionalHeaders: Record<string, string>, now: Date | string | number }): Promise<Signed> {
 		const u = new URL(args.url);
 
 		const request: Request = {
@@ -85,7 +86,7 @@ export class ApRequestCreator {
 
 		// Do not sign Accept: CDNs/proxies often normalize it, breaking signature
 		// verification (Misskey 2026.3.2).
-		const result = this.#signToRequest(request, args.key, ['(request-target)', 'date', 'host']);
+		const result = await this.#signToRequest(request, args.key, ['(request-target)', 'date', 'host']);
 
 		return {
 			request,
@@ -95,9 +96,10 @@ export class ApRequestCreator {
 		};
 	}
 
-	static #signToRequest(request: Request, key: PrivateKey, includeHeaders: string[]): Signed {
+	static async #signToRequest(request: Request, key: PrivateKey, includeHeaders: string[]): Promise<Signed> {
 		const signingString = this.#genSigningString(request, includeHeaders);
-		const signature = crypto.sign('sha256', Buffer.from(signingString), key.privateKeyPem).toString('base64');
+		// Offloaded to Piscina when initRsaSignPool() has been called.
+		const signature = await rsaSignSha256Base64(signingString, key.privateKeyPem);
 		const signatureHeader = `keyId="${key.keyId}",algorithm="rsa-sha256",headers="${includeHeaders.join(' ')}",signature="${signature}"`;
 
 		request.headers = this.#objectAssignWithLcKey(request.headers, {
@@ -165,7 +167,7 @@ export class ApRequestService {
 
 		const keypair = await this.userKeypairService.getUserKeypair(user.id);
 
-		const req = ApRequestCreator.createSignedPost({
+		const req = await ApRequestCreator.createSignedPost({
 			key: {
 				privateKeyPem: keypair.privateKey,
 				keyId: `${this.config.url}/users/${user.id}#main-key`,
@@ -197,7 +199,7 @@ export class ApRequestService {
 		const _followAlternate = followAlternate ?? true;
 		const keypair = await this.userKeypairService.getUserKeypair(user.id);
 
-		const req = ApRequestCreator.createSignedGet({
+		const req = await ApRequestCreator.createSignedGet({
 			key: {
 				privateKeyPem: keypair.privateKey,
 				keyId: `${this.config.url}/users/${user.id}#main-key`,

@@ -309,6 +309,28 @@ export class MiMeta {
 	})
 	public pauseRemoteNoteFetch: boolean;
 
+	/**
+	 * When true, nightly job deletes old remote notes that are not clipped,
+	 * pinned, favorited, or reacted to by local users (Misskey Remote Notes Cleaning).
+	 * Default off — enable only after reviewing retention needs.
+	 */
+	@Column('boolean', {
+		default: false,
+	})
+	public enableRemoteNotesCleaning: boolean;
+
+	/** Max wall-clock minutes for one cleaning pass. */
+	@Column('integer', {
+		default: 60,
+	})
+	public remoteNotesCleaningMaxProcessingDurationInMinutes: number;
+
+	/** Retain remote notes newer than this many days. */
+	@Column('integer', {
+		default: 90,
+	})
+	public remoteNotesCleaningExpiryDaysForEachNotes: number;
+
 	@Column('varchar', {
 		length: 1024, array: true, default: '{}',
 	})

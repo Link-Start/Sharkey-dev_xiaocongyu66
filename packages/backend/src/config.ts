@@ -59,6 +59,11 @@ type Source = Partial<QueueConfig> & {
 	trustProxy?: FastifyServerOptions['trustProxy'];
 	/** When false, unauthenticated IP-based rate limits are skipped (CDN/edge handles them). */
 	enableIpRateLimit?: boolean;
+	/**
+	 * RSA-SHA256 sign worker threads per process (Misskey threadPoolSize).
+	 * Default 1. Increase carefully — each thread holds OpenSSL state.
+	 */
+	threadPoolSize?: number;
 	db: {
 		host: string;
 		port: number;
@@ -252,6 +257,7 @@ export type Config = QueueConfig & {
 	disableHsts: boolean | undefined;
 	trustProxy: NonNullable<FastifyServerOptions['trustProxy']>;
 	enableIpRateLimit: boolean;
+	threadPoolSize: number;
 	db: {
 		host: string;
 		port: number;
@@ -470,6 +476,7 @@ export function loadConfig(logger?: Logger): Config {
 		// should set trustProxy appropriately in .config/default.yml.
 		trustProxy: config.trustProxy ?? true,
 		enableIpRateLimit: config.enableIpRateLimit ?? true,
+		threadPoolSize: Math.max(1, config.threadPoolSize ?? 1),
 		host,
 		hostname,
 		scheme,
@@ -700,7 +707,7 @@ function applyEnvOverrides(config: Source) {
 	_apply_top(['sentryForFrontend', 'vueIntegration', ['attachProps', 'attachErrorHandler']]);
 	_apply_top(['sentryForFrontend', 'vueIntegration', 'tracingOptions', 'timeout']);
 	_apply_top(['sentryForFrontend', 'browserTracingIntegration', 'routeLabel']);
-	_apply_top([['clusterLimit', 'deliverJobConcurrency', 'inboxJobConcurrency', 'relashionshipJobConcurrency', 'deliverJobPerSec', 'inboxJobPerSec', 'relashionshipJobPerSec', 'deliverJobMaxAttempts', 'inboxJobMaxAttempts']]);
+	_apply_top([['clusterLimit', 'threadPoolSize', 'deliverJobConcurrency', 'inboxJobConcurrency', 'relashionshipJobConcurrency', 'deliverJobPerSec', 'inboxJobPerSec', 'relashionshipJobPerSec', 'deliverJobMaxAttempts', 'inboxJobMaxAttempts']]);
 	_apply_top([['outgoingAddress', 'outgoingAddressFamily', 'proxy', 'proxySmtp', 'mediaDirectory', 'mediaProxy', 'proxyRemoteFiles', 'videoThumbnailGenerator']]);
 	_apply_top([['maxFileSize', 'maxNoteLength', 'maxRemoteNoteLength', 'maxAltTextLength', 'maxRemoteAltTextLength', 'maxBioLength', 'maxRemoteBioLength', 'maxDialogAnnouncements', 'pidFile', 'filePermissionBits']]);
 	_apply_top(['import', ['downloadTimeout', 'maxFileSize']]);

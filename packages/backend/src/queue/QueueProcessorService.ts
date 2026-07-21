@@ -87,6 +87,7 @@ import { ImportAntennasProcessorService } from './processors/ImportAntennasProce
 import { DeleteAccountProcessorService } from './processors/DeleteAccountProcessorService.js';
 import { ExportFavoritesProcessorService } from './processors/ExportFavoritesProcessorService.js';
 import { CleanRemoteFilesProcessorService } from './processors/CleanRemoteFilesProcessorService.js';
+import { CleanRemoteNotesProcessorService } from './processors/CleanRemoteNotesProcessorService.js';
 import { DeleteFileProcessorService } from './processors/DeleteFileProcessorService.js';
 import { RelationshipProcessorService } from './processors/RelationshipProcessorService.js';
 import { TickChartsProcessorService } from './processors/TickChartsProcessorService.js';
@@ -176,6 +177,7 @@ export class QueueProcessorService implements OnApplicationBootstrap, BeforeAppl
 		private deleteAccountProcessorService: DeleteAccountProcessorService,
 		private deleteFileProcessorService: DeleteFileProcessorService,
 		private cleanRemoteFilesProcessorService: CleanRemoteFilesProcessorService,
+		private cleanRemoteNotesProcessorService: CleanRemoteNotesProcessorService,
 		private relationshipProcessorService: RelationshipProcessorService,
 		private tickChartsProcessorService: TickChartsProcessorService,
 		private resyncChartsProcessorService: ResyncChartsProcessorService,
@@ -212,6 +214,10 @@ export class QueueProcessorService implements OnApplicationBootstrap, BeforeAppl
 					case 'clean': return await this.cleanProcessorService.process();
 					case 'cleanupApLogs': return await this.cleanupApLogsProcessorService.process();
 					case 'hibernateUsers': return await this.hibernateUsersProcessorService.process();
+					case 'cleanRemoteNotes': {
+						const result = await this.cleanRemoteNotesProcessorService.process(job);
+						return JSON.stringify(result);
+					}
 					// @ts-expect-error it doesn't realize that we're *trying* to catch unknown values here
 					default: throw new Error(`unrecognized job type ${job.data.type} for system`);
 				}

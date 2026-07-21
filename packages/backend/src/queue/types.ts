@@ -74,7 +74,8 @@ export type SystemJobData =
 	SystemCheckModeratorsActivityJobData |
 	SystemCleanJobData |
 	SystemCleanupApLogsJobData |
-	SystemHibernateUsersJobData;
+	SystemHibernateUsersJobData |
+	SystemCleanRemoteNotesJobData;
 
 export type SystemTickChartsJobData = {
 	type: 'tickCharts';
@@ -114,6 +115,10 @@ export type SystemCleanupApLogsJobData = {
 
 export type SystemHibernateUsersJobData = {
 	type: 'hibernateUsers';
+};
+
+export type SystemCleanRemoteNotesJobData = {
+	type: 'cleanRemoteNotes';
 };
 
 export type InboxJobData = {

@@ -26,6 +26,9 @@ export const paramDef = {
 		disableLocalNoteCreation: { type: 'boolean', nullable: true },
 		blockRemoteNotes: { type: 'boolean', nullable: true },
 		pauseRemoteNoteFetch: { type: 'boolean', nullable: true },
+		enableRemoteNotesCleaning: { type: 'boolean' },
+		remoteNotesCleaningExpiryDaysForEachNotes: { type: 'integer', minimum: 1 },
+		remoteNotesCleaningMaxProcessingDurationInMinutes: { type: 'integer', minimum: 1 },
 		pinnedUsers: {
 			type: 'array', nullable: true, items: {
 				type: 'string',
@@ -354,6 +357,18 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			if (typeof ps.pauseRemoteNoteFetch === 'boolean') {
 				set.pauseRemoteNoteFetch = ps.pauseRemoteNoteFetch;
+			}
+
+			if (ps.enableRemoteNotesCleaning !== undefined) {
+				set.enableRemoteNotesCleaning = ps.enableRemoteNotesCleaning;
+			}
+
+			if (ps.remoteNotesCleaningExpiryDaysForEachNotes !== undefined) {
+				set.remoteNotesCleaningExpiryDaysForEachNotes = ps.remoteNotesCleaningExpiryDaysForEachNotes;
+			}
+
+			if (ps.remoteNotesCleaningMaxProcessingDurationInMinutes !== undefined) {
+				set.remoteNotesCleaningMaxProcessingDurationInMinutes = ps.remoteNotesCleaningMaxProcessingDurationInMinutes;
 			}
 
 			if (Array.isArray(ps.pinnedUsers)) {

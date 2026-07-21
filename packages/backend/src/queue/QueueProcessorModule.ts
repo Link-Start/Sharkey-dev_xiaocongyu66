@@ -18,6 +18,7 @@ import { BakeBufferedReactionsProcessorService } from './processors/BakeBuffered
 import { CleanChartsProcessorService } from './processors/CleanChartsProcessorService.js';
 import { CleanProcessorService } from './processors/CleanProcessorService.js';
 import { CleanRemoteFilesProcessorService } from './processors/CleanRemoteFilesProcessorService.js';
+import { CleanRemoteNotesProcessorService } from './processors/CleanRemoteNotesProcessorService.js';
 import { DeleteAccountProcessorService } from './processors/DeleteAccountProcessorService.js';
 import { DeleteDriveFilesProcessorService } from './processors/DeleteDriveFilesProcessorService.js';
 import { DeleteFileProcessorService } from './processors/DeleteFileProcessorService.js';
@@ -84,6 +85,7 @@ const $Imports = [
 		DeleteAccountProcessorService,
 		DeleteFileProcessorService,
 		CleanRemoteFilesProcessorService,
+		CleanRemoteNotesProcessorService,
 		RelationshipProcessorService,
 		UserWebhookDeliverProcessorService,
 		SystemWebhookDeliverProcessorService,

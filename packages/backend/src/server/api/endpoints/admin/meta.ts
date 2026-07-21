@@ -510,6 +510,18 @@ export const meta = {
 				type: 'boolean',
 				optional: false, nullable: false,
 			},
+			enableRemoteNotesCleaning: {
+				type: 'boolean',
+				optional: false, nullable: false,
+			},
+			remoteNotesCleaningExpiryDaysForEachNotes: {
+				type: 'number',
+				optional: false, nullable: false,
+			},
+			remoteNotesCleaningMaxProcessingDurationInMinutes: {
+				type: 'number',
+				optional: false, nullable: false,
+			},
 			impressumUrl: {
 				type: 'string',
 				optional: false, nullable: true,
@@ -709,6 +721,9 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				disableLocalNoteCreation: instance.disableLocalNoteCreation,
 				blockRemoteNotes: instance.blockRemoteNotes === true,
 				pauseRemoteNoteFetch: instance.pauseRemoteNoteFetch === true,
+				enableRemoteNotesCleaning: instance.enableRemoteNotesCleaning === true,
+				remoteNotesCleaningExpiryDaysForEachNotes: instance.remoteNotesCleaningExpiryDaysForEachNotes ?? 90,
+				remoteNotesCleaningMaxProcessingDurationInMinutes: instance.remoteNotesCleaningMaxProcessingDurationInMinutes ?? 60,
 				emailRequiredForSignup: instance.emailRequiredForSignup,
 				approvalRequiredForSignup: instance.approvalRequiredForSignup,
 				enableHcaptcha: instance.enableHcaptcha,

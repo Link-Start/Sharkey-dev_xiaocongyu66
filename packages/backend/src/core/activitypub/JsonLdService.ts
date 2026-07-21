@@ -13,6 +13,7 @@ import { LoggerService } from '@/core/LoggerService.js';
 import { StatusError } from '@/misc/status-error.js';
 import { TimeService } from '@/global/TimeService.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
+import { rsaSignSha256Base64 } from '@/misc/rsa-sign-pool.js';
 import { CONTEXT, PRELOADED_CONTEXTS } from './misc/contexts.js';
 import { validateContentTypeSetAsJsonLD } from './misc/validator.js';
 import type { ContextDefinition, NodeObject } from 'jsonld';
@@ -132,17 +133,14 @@ export class JsonLd {
 
 		const toBeSigned = await this.createVerifyData(data, options);
 
-		const signer = crypto.createSign('sha256');
-		signer.update(toBeSigned);
-		signer.end();
-
-		const signature = signer.sign(privateKey);
+		// Offload RSA-SHA256 to thread pool when configured (Misskey threadPoolSize).
+		const signatureValue = await rsaSignSha256Base64(toBeSigned, privateKey);
 
 		return {
 			...data,
 			signature: {
 				...options,
-				signatureValue: signature.toString('base64'),
+				signatureValue,
 			},
 		};
 	}

@@ -107,6 +107,7 @@ export class QueueService implements OnModuleInit, OnApplicationBootstrap {
 				'clean-scheduler',
 				'cleanupApLogs-scheduler',
 				'hibernateUsers-scheduler',
+				'cleanRemoteNotes-scheduler',
 			],
 			daemon: [
 				'tickQueueCounts-scheduler',
@@ -279,6 +280,21 @@ export class QueueService implements OnModuleInit, OnApplicationBootstrap {
 				name: 'hibernateUsers',
 				data: {
 					type: 'hibernateUsers',
+				},
+				opts: {
+					removeOnComplete: 10,
+					removeOnFail: 30,
+				},
+			});
+
+		// Daily remote notes cleaning (off by default via meta.enableRemoteNotesCleaning)
+		await this.systemQueue.upsertJobScheduler(
+			'cleanRemoteNotes-scheduler',
+			{ pattern: '0 4 * * *' }, // every day at 04:00 (low traffic)
+			{
+				name: 'cleanRemoteNotes',
+				data: {
+					type: 'cleanRemoteNotes',
 				},
 				opts: {
 					removeOnComplete: 10,

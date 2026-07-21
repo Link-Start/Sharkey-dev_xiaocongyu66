@@ -9,6 +9,9 @@ import { NestLogger } from '@/NestLogger.js';
 import { QueueProcessorModule } from '@/queue/QueueProcessorModule.js';
 import { ServerService } from '@/server/ServerService.js';
 import { MainModule } from '@/MainModule.js';
+import { DI } from '@/di-symbols.js';
+import { initRsaSignPool, destroyRsaSignPool } from '@/misc/rsa-sign-pool.js';
+import type { Config } from '@/config.js';
 import type { IEntryNestModule, INestApplicationContext } from '@nestjs/common';
 
 export async function server() {
@@ -34,11 +37,17 @@ async function createContext(rootModule: IEntryNestModule): Promise<INestApplica
 	const logger = new NestLogger();
 	const app = await NestFactory.createApplicationContext(rootModule, { logger });
 
+	// Init RSA sign thread pool before any federation signing (Misskey threadPoolSize).
+	const config = app.get<Config>(DI.config);
+	initRsaSignPool(config.threadPoolSize);
+
 	// Call startup hooks
 	await app.init();
 
 	// Register shutdown hooks, but only after successful init.
 	app.enableShutdownHooks();
+	// Destroy RSA worker pool on process exit
+	process.once('beforeExit', () => destroyRsaSignPool());
 
 	return app;
 }
